@@ -39,8 +39,16 @@ setup PR #6 went green. `main` is at `da3d495`.
     Merge it once the review round is done.
   - This tracker PR also edits `docs/tracker.md`. Whichever of the two merges second
     takes this version.
-- **Next: M0**, the remaining architecture decisions (Q2–Q12). The handoff is
-  `/Users/levon/Dev/university/gradfolio-repos/m0-prompt.md`.
+- **Next: M1**, the data layer. The handoff is
+  `/Users/levon/Dev/university/gradfolio-repos/m1-prompt.md`. The remaining
+  decisions are made by the module that needs each one:
+  - Q2 and Q12 in M1;
+  - Q7 and Q11 in M2;
+  - Q3 in M3;
+  - Q5 and Q6 in M4;
+  - Q4 in M5;
+  - Q9 in M9;
+  - Q10 in M8.
 - **Merge gate:**
   - Merge a code PR only after the reviewer has reviewed the head commit (or given it
     a 👍) and the orchestrator has validated it.
@@ -127,8 +135,8 @@ relevant checks, and Levon decides the product calls.
 
 | #   | Name                                   | Repos          | Status | Depends on                | Plan | Verification |
 | --- | -------------------------------------- | -------------- | ------ | ------------------------- | ---- | ------------ |
-| M0  | Foundations: setup + architecture plan | api, all       | next   | —                         | —    | —            |
-| M1  | Data layer, schema ownership, DB fixes | api, sql       | todo   | M0                        | —    | —            |
+| M0  | Foundations: setup + architecture plan | api, all       | done   | —                         | —    | —            |
+| M1  | Data layer, schema ownership, DB fixes | api, sql       | next   | M0                        | —    | —            |
 | M2  | Auth and identity, end to end          | auth0, api, fe | todo   | M0, M1                    | —    | —            |
 | M3  | Profiles                               | api, fe        | todo   | M2                        | —    | —            |
 | M4  | Projects and media                     | api, fe        | todo   | M3                        | —    | —            |
@@ -153,17 +161,17 @@ relevant checks, and Levon decides the product calls.
 
 **Goal:** the repository, process and decisions every later milestone builds on.
 
-| ID  | Task                                                                                                                                                     | Repo | Status | Source                        |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ------ | ----------------------------- |
-| 0.1 | Orchestrator kit: CLAUDE.md, AGENTS.md, handoff template, push gates, `.review/`, `gradfolio-review` skill                                               | api  | done   | #1, #2                        |
-| 0.2 | Investigation, tracker, rename to `gradfolio-api`, README                                                                                                | api  | done   | #3, #4                        |
-| 0.3 | Repo hygiene: editorconfig, gitattributes, license, CoC, contributing, security, templates, Dependabot, VS Code                                          | api  | done   | #5                            |
-| 0.4 | NestJS skeleton: config, logging, errors, MySQL pool (UTC session), health, OpenAPI, Docker, compose, CI (4 jobs), `http/`                               | api  | review | #6                            |
-| 0.5 | Levon's settings: auto-delete branches, Codex app, Dependabot security updates                                                                           | ops  | todo   | kit §9                        |
-| 0.6 | **M0 plan** (`docs/m0-plan.md`): decide Q2–Q12, with ADRs for Q2, Q3, Q5, Q11, Q12; endpoint map for M1–M6 (ownership and visibility check per endpoint) | api  | next   | investigation §6              |
-| 0.7 | Frontend baseline: `npm ci`, build, lint and knip on `gradfolio` main. Record what fails.                                                                | fe   | todo   | —                             |
-| 0.8 | Frontend CI (lint, typecheck, build) plus a PR template, so more developers can work in the repo safely                                                  | fe   | todo   | —                             |
-| 0.9 | Workspace docs into version control: spec + competitor analysis → `gradfolio-api/docs/spec/` (or the frontend repo)                                      | api  | todo   | spec lives outside every repo |
+| ID  | Task                                                                                                                       | Repo | Status | Source                        |
+| --- | -------------------------------------------------------------------------------------------------------------------------- | ---- | ------ | ----------------------------- |
+| 0.1 | Orchestrator kit: CLAUDE.md, AGENTS.md, handoff template, push gates, `.review/`, `gradfolio-review` skill                 | api  | done   | #1, #2                        |
+| 0.2 | Investigation, tracker, rename to `gradfolio-api`, README                                                                  | api  | done   | #3, #4                        |
+| 0.3 | Repo hygiene: editorconfig, gitattributes, license, CoC, contributing, security, templates, Dependabot, VS Code            | api  | done   | #5                            |
+| 0.4 | NestJS skeleton: config, logging, errors, MySQL pool (UTC session), health, OpenAPI, Docker, compose, CI (4 jobs), `http/` | api  | review | #6                            |
+| 0.5 | Levon's settings: auto-delete branches, Codex app, Dependabot security updates                                             | ops  | todo   | kit §9                        |
+| 0.6 | Architecture decisions, made per module rather than up front (see Now). Q1 decided; Q8 decided                             | api  | done   | investigation §6              |
+| 0.7 | Frontend baseline: `npm ci`, build, lint and knip on `gradfolio` main. Record what fails.                                  | fe   | todo   | —                             |
+| 0.8 | Frontend CI (lint, typecheck, build) plus a PR template, so more developers can work in the repo safely                    | fe   | todo   | —                             |
+| 0.9 | Workspace docs into version control: spec + competitor analysis → `gradfolio-api/docs/spec/` (or the frontend repo)        | api  | todo   | spec lives outside every repo |
 
 **Exit:** #6 merged; the M0 plan merged, with every Q decided or explicitly deferred;
 frontend baseline recorded.
