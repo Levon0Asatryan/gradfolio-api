@@ -95,7 +95,8 @@ merges pull requests. No chat merges.
 
 - Plan first, in `docs/mN-plan.md`: investigation, decisions, data model, endpoints,
   security properties and how each is proved, and the PR breakdown.
-- Check that `git config user.email` is `levonasatryan1098@gmail.com`.
+- Check that `git config user.email` is the email of the developer whose chat this
+  is (for Levon, `levonasatryan1098@gmail.com`).
 - Branch from the latest `origin/main`, then install dependencies.
 - One chat per working tree at a time: two chats in one checkout corrupt each
   other's work.

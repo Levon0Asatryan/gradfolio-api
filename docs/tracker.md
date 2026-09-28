@@ -4,14 +4,14 @@ Status of record. The orchestrator updates it after validating a worker's
 report; workers propose changes in their report rather than editing it, so two
 chats never edit it at once.
 
-Last updated: 2026-09-28, by the orchestrator, after bootstrap #1 and #2 merged.
-`main` is at `fbdf0e0`; no CI yet.
+Last updated: 2026-09-28, by the orchestrator, after bootstrap #1–#3 merged.
+`main` is at `fc5e7e9`; no CI yet.
 
 ## Now
 
-- **Bootstrap:** #1 conventions (`CLAUDE.md`, `AGENTS.md`, handoff template) and
-  #2 push gates + `.review/` + `gradfolio-review` skill — merged. #3 this tracker
-  + `docs/investigation.md` — in review.
+- **Bootstrap done:** #1 conventions, #2 push gates + `.review/` +
+  `gradfolio-review` skill, #3 tracker + investigation + rename to `gradfolio-api`.
+  README and multi-developer identity rule in review.
 - **Next: M0** — architecture plan. Handoff:
   `/Users/levon/Dev/university/gradfolio-repos/m0-prompt.md`.
 - **Merge gate:** merge a code PR only after the reviewer has reviewed or 👍'd
