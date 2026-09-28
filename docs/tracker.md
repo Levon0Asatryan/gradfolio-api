@@ -133,18 +133,18 @@ relevant checks, and Levon decides the product calls.
 
 ## Milestones
 
-| #   | Name                                   | Repos          | Status | Depends on                | Plan | Verification |
-| --- | -------------------------------------- | -------------- | ------ | ------------------------- | ---- | ------------ |
-| M0  | Foundations: setup + architecture plan | api, all       | done   | —                         | —    | —            |
-| M1  | Data layer, schema ownership, DB fixes | api, sql       | next   | M0                        | —    | —            |
-| M2  | Auth and identity, end to end          | auth0, api, fe | todo   | M0, M1                    | —    | —            |
-| M3  | Profiles                               | api, fe        | todo   | M2                        | —    | —            |
-| M4  | Projects and media                     | api, fe        | todo   | M3                        | —    | —            |
-| M5  | Teams and notifications                | api, fe        | todo   | M4                        | —    | —            |
-| M6  | Discovery and dashboard                | api, fe        | todo   | M4 (M5 for team projects) | —    | —            |
-| M7  | GitHub + LinkedIn (export) import      | api, fe, auth0 | todo   | M4                        | —    | —            |
-| M8  | Utilities: résumé PDF, AI summary      | api, fe        | todo   | M3, M4                    | —    | —            |
-| M9  | Hardening, deployment and v1.0 release | all            | todo   | M1–M8                     | —    | —            |
+| #   | Name                                   | Repos          | Status                  | Depends on                | Plan | Verification |
+| --- | -------------------------------------- | -------------- | ----------------------- | ------------------------- | ---- | ------------ |
+| M0  | Foundations: setup + architecture plan | api, all       | done; 0.5, 0.7–0.9 open | —                         | —    | —            |
+| M1  | Data layer, schema ownership, DB fixes | api, sql       | next                    | M0                        | —    | —            |
+| M2  | Auth and identity, end to end          | auth0, api, fe | todo                    | M0, M1                    | —    | —            |
+| M3  | Profiles                               | api, fe        | todo                    | M2                        | —    | —            |
+| M4  | Projects and media                     | api, fe        | todo                    | M3                        | —    | —            |
+| M5  | Teams and notifications                | api, fe        | todo                    | M4                        | —    | —            |
+| M6  | Discovery and dashboard                | api, fe        | todo                    | M4 (M5 for team projects) | —    | —            |
+| M7  | GitHub + LinkedIn (export) import      | api, fe, auth0 | todo                    | M4                        | —    | —            |
+| M8  | Utilities: résumé PDF, AI summary      | api, fe        | todo                    | M3, M4                    | —    | —            |
+| M9  | Hardening, deployment and v1.0 release | all            | todo                    | M1–M8                     | —    | —            |
 
 **Working in parallel** once M2 lands:
 
