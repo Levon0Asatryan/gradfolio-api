@@ -5,3 +5,7 @@ dist/
 !.env.example
 .DS_Store
 coverage/
+
+# review gate (local receipts)
+.review/.last-review.json
+.review/violations.jsonl
