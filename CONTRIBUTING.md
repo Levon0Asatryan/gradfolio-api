@@ -8,13 +8,13 @@ it, not on its size.
 This file is the short version. The conventions themselves live in files that are
 kept up to date with the code, so they are not repeated here:
 
-| File                               | What it holds                                                 |
-| ---------------------------------- | ------------------------------------------------------------- |
-| [README.md](README.md)             | Running it locally, configuration, the repository layout      |
-| [CLAUDE.md](CLAUDE.md)             | How work is done, file and folder structure, naming, commits  |
-| [AGENTS.md](AGENTS.md)             | What a review checks for. Read it before opening a PR.        |
-| [docs/tracker.md](docs/tracker.md) | What is in progress and what is next                          |
-| [openapi.yaml](openapi.yaml)       | The HTTP API, generated from the request schemas              |
+| File                               | What it holds                                                |
+| ---------------------------------- | ------------------------------------------------------------ |
+| [README.md](README.md)             | Running it locally, configuration, the repository layout     |
+| [CLAUDE.md](CLAUDE.md)             | How work is done, file and folder structure, naming, commits |
+| [AGENTS.md](AGENTS.md)             | What a review checks for. Read it before opening a PR.       |
+| [docs/tracker.md](docs/tracker.md) | What is in progress and what is next                         |
+| [openapi.yaml](openapi.yaml)       | The HTTP API, generated from the request schemas             |
 
 ## Reporting a bug or asking for a feature
 

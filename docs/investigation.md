@@ -9,7 +9,7 @@ Sources read:
 - `gradfolio` (frontend) — `src/` (types, mocks, auth, pages), `CLAUDE.md`, `README.md`.
   It has no `docs/` folder.
 - Product spec — `gradfolio-repos/docs/Student Portfolio Management System – Feature
-  Specification.md` and the competitor analysis next to it. They are not in any repo.
+Specification.md` and the competitor analysis next to it. They are not in any repo.
 
 Rows marked **run** were executed against MySQL 8.4.11 in a throwaway container,
 which was stopped and removed afterwards with no volumes left behind.
@@ -18,21 +18,21 @@ which was stopped and removed afterwards with no volumes left behind.
 
 ## 1. The three repos
 
-| Repo | State |
-| --- | --- |
-| `gradfolio` | Next.js 16, React 19, MUI 7, Auth0 v4. About 9.8k lines of TypeScript. **All data is mock:** no API calls and no tests. Deployed on Vercel. |
-| `gradfolio-sql` | MySQL 8.4 schema with 11 tables, plus seed data, example queries and per-table docs. Hosted on Aiven's free tier (1 GB). |
-| `gradfolio-api` | This repo. It is empty. |
+| Repo            | State                                                                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gradfolio`     | Next.js 16, React 19, MUI 7, Auth0 v4. About 9.8k lines of TypeScript. **All data is mock:** no API calls and no tests. Deployed on Vercel. |
+| `gradfolio-sql` | MySQL 8.4 schema with 11 tables, plus seed data, example queries and per-table docs. Hosted on Aiven's free tier (1 GB).                    |
+| `gradfolio-api` | This repo. It is empty.                                                                                                                     |
 
 ## 2. Scope, from the spec
 
-| Priority | Features |
-| --- | --- |
-| Core | Auth (email/password plus Google, LinkedIn and GitHub OAuth via Auth0); profile page with education, experience, projects, certifications and skills, plus an edit mode; project pages (description, attachments, tech tags, team, metadata); search and browse; teammate tagging with confirmation; notifications for team invites. |
-| Core, harder | GitHub import (list repos, pick some, import metadata and README). LinkedIn import. The LinkedIn API gives third-party apps very limited profile data; check this before promising the feature. |
-| Utilities | Resume PDF, portfolio PDF, sharing by email, AI-generated summaries and tag suggestions. |
-| Optional ("can be skipped") | Email and phone OTP verification; verifying education, certifications and projects; admin interface. |
-| Future | Comments, endorsements, follow and bookmark, "similar projects". |
+| Priority                    | Features                                                                                                                                                                                                                                                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Core                        | Auth (email/password plus Google, LinkedIn and GitHub OAuth via Auth0); profile page with education, experience, projects, certifications and skills, plus an edit mode; project pages (description, attachments, tech tags, team, metadata); search and browse; teammate tagging with confirmation; notifications for team invites. |
+| Core, harder                | GitHub import (list repos, pick some, import metadata and README). LinkedIn import. The LinkedIn API gives third-party apps very limited profile data; check this before promising the feature.                                                                                                                                      |
+| Utilities                   | Resume PDF, portfolio PDF, sharing by email, AI-generated summaries and tag suggestions.                                                                                                                                                                                                                                             |
+| Optional ("can be skipped") | Email and phone OTP verification; verifying education, certifications and projects; admin interface.                                                                                                                                                                                                                                 |
+| Future                      | Comments, endorsements, follow and bookmark, "similar projects".                                                                                                                                                                                                                                                                     |
 
 Things the spec says that the architecture has to respect:
 
@@ -89,17 +89,17 @@ Conventions:
 
 ### 3.2 Facts verified by running (**run**)
 
-| # | Finding | What it means for the backend |
-| --- | --- | --- |
-| D1 | An INSERT that omits `id` leaves `LAST_INSERT_ID()` at 0, so **the API cannot learn the new row's id**. The docs say "inserts must omit id". The schema comment says "GENERATED ALWAYS", which is wrong: it is a plain DEFAULT. The seed itself supplies ids with `SET @x = UUID()`. | The backend generates UUIDs and inserts them itself. The docs need correcting. |
-| D2 | `UUID()` returns version 1 UUIDs, which are built from a timestamp and a node id. | Ids reveal when a row was created. That is harmless here, and app-side UUIDs avoid it. |
-| D3 | FULLTEXT ignores words shorter than 3 characters (`innodb_ft_min_token_size=3`). `ML`, `AI`, `Go`, `UI` and `C#` return 0 hits. Armenian text matches correctly. | Short search terms need a fallback (a tag or `LIKE` match), or we accept the gap. |
-| D4 | `JSON_CONTAINS(technologies,'"react"')` returns 0 rows when the stored value is `React`. | Tag search and clickable tags must normalise case. |
-| D5 | There are no CHECK constraints. `tags` accepts `{"a":1}` and `certifications.date` accepts `banana`. | The API is the only thing validating JSON shapes and `YYYY-MM` strings. |
-| D6 | UNIQUE(project_id,user_id) stops a linked user being added twice to a project. Several rows with `user_id` NULL (external teammates) are allowed. | Re-inviting someone after `rejected` must be an UPDATE, not an INSERT. |
-| D7 | The seed is inconsistent about the owner: 2 projects have a team-member row for their owner and 2 do not. | Needs a decision; see Q4. |
-| D8 | `sql_mode` includes `ONLY_FULL_GROUP_BY` and `STRICT_TRANS_TABLES`. `time_zone` is `SYSTEM`. | The backend should set the session `time_zone` to `+00:00`, because DATETIME stores no time zone. |
-| D9 | **The local Docker setup fails on a fresh volume.** The compose file mounts all of `sql/` into `docker-entrypoint-initdb.d`, and MySQL runs those files alphabetically: `drop.sql`, then `queries.sql`, which fails with `ERROR 1146 Table 'gradfolio.users' doesn't exist`. The container then restarts in a loop. | Fix it in `gradfolio-sql`: mount only the schema and seed, or rename them `01-`/`02-`. Backend tests must not depend on that compose file as it is. |
+| #   | Finding                                                                                                                                                                                                                                                                                                             | What it means for the backend                                                                                                                       |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | An INSERT that omits `id` leaves `LAST_INSERT_ID()` at 0, so **the API cannot learn the new row's id**. The docs say "inserts must omit id". The schema comment says "GENERATED ALWAYS", which is wrong: it is a plain DEFAULT. The seed itself supplies ids with `SET @x = UUID()`.                                | The backend generates UUIDs and inserts them itself. The docs need correcting.                                                                      |
+| D2  | `UUID()` returns version 1 UUIDs, which are built from a timestamp and a node id.                                                                                                                                                                                                                                   | Ids reveal when a row was created. That is harmless here, and app-side UUIDs avoid it.                                                              |
+| D3  | FULLTEXT ignores words shorter than 3 characters (`innodb_ft_min_token_size=3`). `ML`, `AI`, `Go`, `UI` and `C#` return 0 hits. Armenian text matches correctly.                                                                                                                                                    | Short search terms need a fallback (a tag or `LIKE` match), or we accept the gap.                                                                   |
+| D4  | `JSON_CONTAINS(technologies,'"react"')` returns 0 rows when the stored value is `React`.                                                                                                                                                                                                                            | Tag search and clickable tags must normalise case.                                                                                                  |
+| D5  | There are no CHECK constraints. `tags` accepts `{"a":1}` and `certifications.date` accepts `banana`.                                                                                                                                                                                                                | The API is the only thing validating JSON shapes and `YYYY-MM` strings.                                                                             |
+| D6  | UNIQUE(project_id,user_id) stops a linked user being added twice to a project. Several rows with `user_id` NULL (external teammates) are allowed.                                                                                                                                                                   | Re-inviting someone after `rejected` must be an UPDATE, not an INSERT.                                                                              |
+| D7  | The seed is inconsistent about the owner: 2 projects have a team-member row for their owner and 2 do not.                                                                                                                                                                                                           | Needs a decision; see Q4.                                                                                                                           |
+| D8  | `sql_mode` includes `ONLY_FULL_GROUP_BY` and `STRICT_TRANS_TABLES`. `time_zone` is `SYSTEM`.                                                                                                                                                                                                                        | The backend should set the session `time_zone` to `+00:00`, because DATETIME stores no time zone.                                                   |
+| D9  | **The local Docker setup fails on a fresh volume.** The compose file mounts all of `sql/` into `docker-entrypoint-initdb.d`, and MySQL runs those files alphabetically: `drop.sql`, then `queries.sql`, which fails with `ERROR 1146 Table 'gradfolio.users' doesn't exist`. The container then restarts in a loop. | Fix it in `gradfolio-sql`: mount only the schema and seed, or rename them `01-`/`02-`. Backend tests must not depend on that compose file as it is. |
 
 ### 3.3 Defects in `queries.sql`, the draft of the API's SQL
 
@@ -124,16 +124,16 @@ Conventions:
 
 ### 4.1 What it needs from the API (from its pages and mocks)
 
-| Page | Data shown | API it needs |
-| --- | --- | --- |
-| `/` dashboard | Own profile header, stats, 4 recent projects, activity feed | Dashboard read |
-| `/profile/[id]` | Full profile, including accepted team projects; inline editing on your own profile | Profile read, profile update, create/update/delete per section, reordering |
-| `/projects` | Own projects; search, category filter and sort happen in the browser | List own projects |
-| `/projects/[id]` | Detail, attachments, accepted team members, metadata | Project read |
-| `/projects/new` | Title, AI summary, demo URL, repo URL, attachments (URLs only) | Project create |
-| `/search` | Portfolios matched by name, headline, skills and projects; category heuristic | Search |
-| `/integrations`, onboarding stepper | Connect or disconnect GitHub and LinkedIn; import | OAuth and import, in a later milestone |
-| — | Notifications: the table exists, but there is **no UI** | The API can come first; the UI later |
+| Page                                | Data shown                                                                         | API it needs                                                               |
+| ----------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `/` dashboard                       | Own profile header, stats, 4 recent projects, activity feed                        | Dashboard read                                                             |
+| `/profile/[id]`                     | Full profile, including accepted team projects; inline editing on your own profile | Profile read, profile update, create/update/delete per section, reordering |
+| `/projects`                         | Own projects; search, category filter and sort happen in the browser               | List own projects                                                          |
+| `/projects/[id]`                    | Detail, attachments, accepted team members, metadata                               | Project read                                                               |
+| `/projects/new`                     | Title, AI summary, demo URL, repo URL, attachments (URLs only)                     | Project create                                                             |
+| `/search`                           | Portfolios matched by name, headline, skills and projects; category heuristic      | Search                                                                     |
+| `/integrations`, onboarding stepper | Connect or disconnect GitHub and LinkedIn; import                                  | OAuth and import, in a later milestone                                     |
+| —                                   | Notifications: the table exists, but there is **no UI**                            | The API can come first; the UI later                                       |
 
 ### 4.2 Auth
 
@@ -148,25 +148,25 @@ Conventions:
   `profile/[id]/page.tsx` and `AppNavigation.tsx`.
 - `middleware.ts` catches every error and returns `undefined`, so a failure lets the
   request through.
-- *Not verified:* the frontend CLAUDE.md says the middleware "protects all routes". In
+- _Not verified:_ the frontend CLAUDE.md says the middleware "protects all routes". In
   v4, `auth0.middleware` mounts the `/auth/*` routes and refreshes sessions; it does not
   by itself require a login. Check this when wiring the frontend to the API.
 
 ### 4.3 Where frontend types and the schema disagree (the API has to bridge these)
 
-| Frontend | Database | Note |
-| --- | --- | --- |
-| Profile-level `Project` has `name` and a `category` with 4 values | `projects.title`; ENUM with 6 values | Rename the field and widen the frontend type |
-| `ProfileData.avatarUrl: string` is required | Column is nullable | Needs a default or fallback |
-| `ProjectDetailData.aiSummary` and `descriptionHtml` are required | Columns are nullable | Return `""` or make them optional |
-| `socialLinks` has `github`, `linkedin`, `twitter` | Table also has `website`, `bio`, `phone`, `birthday` | `website` and `bio` are missing from the profile type |
-| `TeamMember.profileUrl` | Derived from `user_id` | The API computes it |
-| `DashboardStats.githubStars`, `linkedinConnections` | **No column anywhere** | Drop them, or add storage for them |
-| `Integration.id` is `"github"` | `integration_type` plus a UUID `id` | The API maps between them |
-| Search categories ("Developers", "Designers"…) | Nothing | A keyword heuristic |
-| Onboarding stepper has free-text `experience`, `education` and `repos` fields | Structured tables | The stepper needs redesigning when it is wired up |
-| Mock ids such as `u_001` and `ecoroute` | UUIDs | Routes will use UUIDs |
-| — | `notifications` | No frontend type yet |
+| Frontend                                                                      | Database                                             | Note                                                  |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------- |
+| Profile-level `Project` has `name` and a `category` with 4 values             | `projects.title`; ENUM with 6 values                 | Rename the field and widen the frontend type          |
+| `ProfileData.avatarUrl: string` is required                                   | Column is nullable                                   | Needs a default or fallback                           |
+| `ProjectDetailData.aiSummary` and `descriptionHtml` are required              | Columns are nullable                                 | Return `""` or make them optional                     |
+| `socialLinks` has `github`, `linkedin`, `twitter`                             | Table also has `website`, `bio`, `phone`, `birthday` | `website` and `bio` are missing from the profile type |
+| `TeamMember.profileUrl`                                                       | Derived from `user_id`                               | The API computes it                                   |
+| `DashboardStats.githubStars`, `linkedinConnections`                           | **No column anywhere**                               | Drop them, or add storage for them                    |
+| `Integration.id` is `"github"`                                                | `integration_type` plus a UUID `id`                  | The API maps between them                             |
+| Search categories ("Developers", "Designers"…)                                | Nothing                                              | A keyword heuristic                                   |
+| Onboarding stepper has free-text `experience`, `education` and `repos` fields | Structured tables                                    | The stepper needs redesigning when it is wired up     |
+| Mock ids such as `u_001` and `ecoroute`                                       | UUIDs                                                | Routes will use UUIDs                                 |
+| —                                                                             | `notifications`                                      | No frontend type yet                                  |
 
 ### 4.4 Security notes
 
@@ -198,25 +198,25 @@ Conventions:
 
 ## 6. Decisions for the architecture milestone (M0)
 
-| # | Question | Why it matters |
-| --- | --- | --- |
-| Q1 | **Stack: Spring Boot (Java) or NestJS (TypeScript)?** The spec says Spring Boot; NestJS keeps one language across frontend and backend and allows sharing types. Also choose how the code talks to the database: a query builder or an ORM, given the MySQL features in play (`ON DUPLICATE KEY`, JSON columns, FULLTEXT). | Decides the build, test and gate commands in `CLAUDE.md`, the git hooks and the review skill. |
-| Q2 | **Who owns the schema?** Either `gradfolio-sql` stays the source of truth, or the backend takes over with versioned migrations (Flyway/Liquibase, or a TS migrator) that each have a down step. | Today there is no migration path: a schema change means re-running `schema.sql`. |
-| Q3 | **Privacy:** can a private project or profile be read by direct link (the docs), only by logged-in users (the spec), or only by its owner (404 for everyone else)? | Every read path depends on it. |
-| Q4 | **Is the owner an implicit team member, or always a team-member row (D7)?** Can teammates exist without an account (schema yes, spec no)? | The team list, and whether a project appears on a teammate's profile. |
-| Q5 | **How do frontend and API share types?** An OpenAPI spec that generates a TypeScript client, or types kept by hand. | Covers the mismatches in §4.3. |
-| Q6 | **Where are files stored?** Vercel Blob, S3, R2, or external URLs only. | Attachments, avatars and verification documents. |
-| Q7 | **When is a `users` row created?** Probably on the first authenticated request. Two first requests can race on the `auth0_id` UNIQUE key, so use an upsert. | Resolving the caller's identity on every request. |
-| Q8 | **Integrations scope:** real GitHub OAuth and import now, or later? LinkedIn import may not be possible with its API. | Token encryption, the SSRF risk, and milestone order. |
-| Q9 | **Where does the backend run** (Render, Fly, Railway…), and how do integration tests get MySQL 8.4 (Testcontainers or compose)? | The real-run and CI commands. |
-| Q10 | **How do AI summaries, PDF generation and email work?** Which providers, and do they run in the request or in a background job? | Whether the backend needs a worker process. |
+| #   | Question                                                                                                                                                                                                                                                                                                                   | Why it matters                                                                                |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Q1  | **Stack: Spring Boot (Java) or NestJS (TypeScript)?** The spec says Spring Boot; NestJS keeps one language across frontend and backend and allows sharing types. Also choose how the code talks to the database: a query builder or an ORM, given the MySQL features in play (`ON DUPLICATE KEY`, JSON columns, FULLTEXT). | Decides the build, test and gate commands in `CLAUDE.md`, the git hooks and the review skill. |
+| Q2  | **Who owns the schema?** Either `gradfolio-sql` stays the source of truth, or the backend takes over with versioned migrations (Flyway/Liquibase, or a TS migrator) that each have a down step.                                                                                                                            | Today there is no migration path: a schema change means re-running `schema.sql`.              |
+| Q3  | **Privacy:** can a private project or profile be read by direct link (the docs), only by logged-in users (the spec), or only by its owner (404 for everyone else)?                                                                                                                                                         | Every read path depends on it.                                                                |
+| Q4  | **Is the owner an implicit team member, or always a team-member row (D7)?** Can teammates exist without an account (schema yes, spec no)?                                                                                                                                                                                  | The team list, and whether a project appears on a teammate's profile.                         |
+| Q5  | **How do frontend and API share types?** An OpenAPI spec that generates a TypeScript client, or types kept by hand.                                                                                                                                                                                                        | Covers the mismatches in §4.3.                                                                |
+| Q6  | **Where are files stored?** Vercel Blob, S3, R2, or external URLs only.                                                                                                                                                                                                                                                    | Attachments, avatars and verification documents.                                              |
+| Q7  | **When is a `users` row created?** Probably on the first authenticated request. Two first requests can race on the `auth0_id` UNIQUE key, so use an upsert.                                                                                                                                                                | Resolving the caller's identity on every request.                                             |
+| Q8  | **Integrations scope:** real GitHub OAuth and import now, or later? LinkedIn import may not be possible with its API.                                                                                                                                                                                                      | Token encryption, the SSRF risk, and milestone order.                                         |
+| Q9  | **Where does the backend run** (Render, Fly, Railway…), and how do integration tests get MySQL 8.4 (Testcontainers or compose)?                                                                                                                                                                                            | The real-run and CI commands.                                                                 |
+| Q10 | **How do AI summaries, PDF generation and email work?** Which providers, and do they run in the request or in a background job?                                                                                                                                                                                            | Whether the backend needs a worker process.                                                   |
 
 ## 7. Follow-ups for the other repos
 
-| Repo | Item |
-| --- | --- |
-| gradfolio-sql | D9: fresh `docker compose up` fails on the first boot (`queries.sql` runs before `schema.sql`). |
+| Repo          | Item                                                                                                                                                                  |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| gradfolio-sql | D9: fresh `docker compose up` fails on the first boot (`queries.sql` runs before `schema.sql`).                                                                       |
 | gradfolio-sql | Docs say 12 tables; there are 11. The schema comment says "GENERATED ALWAYS" but the column uses a plain DEFAULT. "Inserts must omit id" contradicts D1 and the seed. |
-| gradfolio-sql | `queries.sql` 7c (no owner check), 2a–2c (`is_public` ignored), 8a (no project ownership check). |
-| gradfolio-sql | Seed notification links use mock ids (`/projects/proj_001`). |
-| gradfolio | `middleware.ts` lets requests through when it errors; the regex HTML sanitizer can be bypassed; out-of-date docs (§4.5). |
+| gradfolio-sql | `queries.sql` 7c (no owner check), 2a–2c (`is_public` ignored), 8a (no project ownership check).                                                                      |
+| gradfolio-sql | Seed notification links use mock ids (`/projects/proj_001`).                                                                                                          |
+| gradfolio     | `middleware.ts` lets requests through when it errors; the regex HTML sanitizer can be bypassed; out-of-date docs (§4.5).                                              |

@@ -6,9 +6,13 @@ evidence attached, to recruiters and peers. The API serves the Next.js frontend
 ([gradfolio](https://github.com/Levon0Asatryan/gradfolio)) from a MySQL 8.4 database
 ([gradfolio-sql](https://github.com/Levon0Asatryan/gradfolio-sql)).
 
-- **The stack is not decided yet** (Spring Boot or NestJS; see `docs/investigation.md`
-  Q1). This section gets the stack, the layer boundaries and the verify command once
-  the M0 plan merges.
+- **Stack:** NestJS 12, Node 24, TypeScript 6.0 (ESM). zod validates config and
+  requests, and generates `openapi.yaml`. pino for logging, `mysql2` for the pool,
+  Vitest for tests. The query layer is still an M0 decision.
+- `src/core` depends on nothing else in `src/`, and `src/api` depends on `core`.
+  `src/architecture.test.ts` enforces this.
+- `npm run verify` runs format, lint, types, the OpenAPI check and the unit tests.
+  `npm run test:int` runs against a real MySQL 8.4.
 - **Identity:** requests carry an Auth0 access token (`Authorization: Bearer`). The
   token's `sub` maps to `users.auth0_id`.
 - **Scale:** university coursework. Tens of users, hundreds of projects, Aiven's free

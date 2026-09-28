@@ -32,12 +32,36 @@ the current HEAD sha.`,
 if (!ctx) return 'Could not gather the branch context; nothing reviewed.';
 
 const lenses = [
-  { label: 'correctness', brief: 'Wrong results that look plausible: boundaries, units, rounding, time zones (DATETIME is zoneless; session must be UTC), YYYY-MM strings, case-sensitive tag matching, FULLTEXT short-token gaps, snake_case/camelCase mapping.' },
-  { label: 'concurrency', brief: 'Duplicates, lost updates, races, deadlocks: first-login user provisioning on auth0_id, multi-statement writes outside a transaction (replace-all skills, reorder), FK share locks on parents, InnoDB gap locks, check-then-act across queries.' },
-  { label: 'security', brief: 'Ownership: every write scoped to the caller, zero-row writes become 404. Visibility: is_public on every public read path. Private fields (birthday, phone, tokens, auth0_id) never in public responses. description_html allow-list sanitized on write. JWT signature/issuer/audience/expiry. SSRF on imports. Injection. Secrets in logs.' },
-  { label: 'tests', brief: 'Tests that cannot fail: for every guard name the test and what removing it breaks; every authz guard has a second-user-gets-404 test; races forced by sleeps; integration tests on anything but real MySQL 8.4; assertions satisfiable a second way.' },
-  { label: 'contract', brief: 'The plan\'s normative sentences, each pointed at its implementing line; the API document in step with the code; limits from validated config; response shapes the frontend (../gradfolio/src types) can consume.' },
-  { label: 'architecture', brief: 'Trace one request hop by hop: token → caller → validation → service → SQL → response mapping. Layer boundaries; who owns the SQL and the schema; what the next milestone depends on.' },
+  {
+    label: 'correctness',
+    brief:
+      'Wrong results that look plausible: boundaries, units, rounding, time zones (DATETIME is zoneless; session must be UTC), YYYY-MM strings, case-sensitive tag matching, FULLTEXT short-token gaps, snake_case/camelCase mapping.',
+  },
+  {
+    label: 'concurrency',
+    brief:
+      'Duplicates, lost updates, races, deadlocks: first-login user provisioning on auth0_id, multi-statement writes outside a transaction (replace-all skills, reorder), FK share locks on parents, InnoDB gap locks, check-then-act across queries.',
+  },
+  {
+    label: 'security',
+    brief:
+      'Ownership: every write scoped to the caller, zero-row writes become 404. Visibility: is_public on every public read path. Private fields (birthday, phone, tokens, auth0_id) never in public responses. description_html allow-list sanitized on write. JWT signature/issuer/audience/expiry. SSRF on imports. Injection. Secrets in logs.',
+  },
+  {
+    label: 'tests',
+    brief:
+      'Tests that cannot fail: for every guard name the test and what removing it breaks; every authz guard has a second-user-gets-404 test; races forced by sleeps; integration tests on anything but real MySQL 8.4; assertions satisfiable a second way.',
+  },
+  {
+    label: 'contract',
+    brief:
+      "The plan's normative sentences, each pointed at its implementing line; the API document in step with the code; limits from validated config; response shapes the frontend (../gradfolio/src types) can consume.",
+  },
+  {
+    label: 'architecture',
+    brief:
+      'Trace one request hop by hop: token → caller → validation → service → SQL → response mapping. Layer boundaries; who owns the SQL and the schema; what the next milestone depends on.',
+  },
 ];
 
 phase('Review by lens');
@@ -94,7 +118,8 @@ const found = reviews.flatMap((r, i) =>
 );
 
 const lost = reviews.filter((r) => !r).length;
-if (lost > 0) log(`${lost} of ${lenses.length} lenses returned nothing — findings may be incomplete.`);
+if (lost > 0)
+  log(`${lost} of ${lenses.length} lenses returned nothing — findings may be incomplete.`);
 
 phase('Attack the findings');
 
