@@ -9,3 +9,10 @@ coverage/
 # review gate (local receipts)
 .review/.last-review.json
 .review/violations.jsonl
+
+*.tsbuildinfo
+
+# ...except the request collection's, which holds local development fixtures
+# rather than secrets and is useless to the next person if it does not travel
+# with the requests that read it. See http/README.md.
+!http/.env
