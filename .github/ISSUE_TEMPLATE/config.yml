@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/Levon0Asatryan/gradfolio-api/security/advisories/new
+    about: Privately — never in a public issue. See SECURITY.md.
+  - name: Frontend issues
+    url: https://github.com/Levon0Asatryan/gradfolio/issues
+    about: Pages, components and UI behaviour belong in the gradfolio repository.
+  - name: Database schema issues
+    url: https://github.com/Levon0Asatryan/gradfolio-sql/issues
+    about: Table definitions, seed data and schema docs.
