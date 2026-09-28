@@ -1,0 +1,21 @@
+# Keep the build context small and free of local state. The Dockerfile copies
+# only package manifests, tsconfig and src.
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.git/
+.github/
+.husky/
+.vscode/
+.claude/
+.review/
+http/
+.env
+.env.*
+!.env.example
+docs/
+*.md
+docker-compose.yml
+Dockerfile
+.dockerignore
