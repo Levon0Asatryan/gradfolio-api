@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest something Gradfolio's API should do.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gradfolio's scope is set by its feature specification (university coursework). What is planned and in progress is in [docs/tracker.md](https://github.com/Levon0Asatryan/gradfolio-api/blob/main/docs/tracker.md).
+        A request that maps to a spec feature, or argues why it should be added, is the easiest to act on.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do, and what gets in the way today.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+      description: The behaviour you want. An example request and response helps.
+    validations:
+      required: true
+
+  - type: input
+    id: spec
+    attributes:
+      label: Related spec feature or milestone
+      description: For example "§4 Project Pages" or "M3", if one applies.
+      placeholder: e.g. §6 Search and Discovery
+
+  - type: textarea
+    id: frontend
+    attributes:
+      label: Frontend impact
+      description: Which gradfolio page or component would use this, if you know.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other ways to get the same result, including existing features.
