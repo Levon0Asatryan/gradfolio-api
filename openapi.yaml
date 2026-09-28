@@ -1,0 +1,87 @@
+openapi: 3.0.3
+info:
+  title: Gradfolio API
+  version: 0.1.0
+  description: Backend for Gradfolio, a student portfolio platform. Every route except the health checks is under `/v1`. Every failure answers with an `ErrorResponse`.
+  license:
+    name: MIT
+tags:
+  - name: health
+    description: Liveness and readiness, outside `/v1`
+paths:
+  /healthz:
+    get:
+      operationId: liveness
+      tags:
+        - health
+      summary: "Liveness: the process is running"
+      description: Touches no dependency, so it stays 200 while the database is down.
+      responses:
+        "200":
+          description: Alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - ok
+                required:
+                  - status
+                additionalProperties: false
+  /readyz:
+    get:
+      operationId: readiness
+      tags:
+        - health
+      summary: "Readiness: the process can serve traffic"
+      description: Runs `SELECT 1` against MySQL, bounded by HEALTH_TIMEOUT_MS.
+      responses:
+        "200":
+          description: Ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - ok
+                  database:
+                    type: string
+                    enum:
+                      - ok
+                required:
+                  - status
+                  - database
+                additionalProperties: false
+        "503":
+          description: "DATABASE_UNAVAILABLE: MySQL is unreachable or too slow"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    ErrorResponse:
+      $ref: "#/definitions/ErrorResponse"
+      definitions:
+        ErrorResponse:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Stable machine-readable code. Branch on this, never on `message`.
+              example: NOT_FOUND
+            message:
+              type: string
+              description: Human-readable; not part of the contract.
+            details:
+              description: Field-level detail, for VALIDATION_FAILED only.
+          required:
+            - code
+            - message
+          additionalProperties: false
