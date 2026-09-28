@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -24,12 +24,9 @@ describe('readCommitted', () => {
   });
 
   it('surfaces any other failure instead of calling it missing', async () => {
+    // A directory fails with EISDIR for every user, root included -- unlike a
+    // permission bit, which root ignores.
     dir = await mkdtemp(join(tmpdir(), 'openapi-'));
-    const path = join(dir, 'locked.yaml');
-    await writeFile(path, 'x');
-    await chmod(path, 0o000);
-    // Root can read anything, so the permission case only holds for other users.
-    if (process.getuid?.() === 0) return;
-    await expect(readCommitted(path)).rejects.toMatchObject({ code: 'EACCES' });
+    await expect(readCommitted(dir)).rejects.toMatchObject({ code: 'EISDIR' });
   });
 });
