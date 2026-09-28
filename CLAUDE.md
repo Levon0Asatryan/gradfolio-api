@@ -1,4 +1,4 @@
-# gradfolio-backend — working conventions
+# gradfolio-api — working conventions
 
 Read this before adding files. `AGENTS.md` has the review rules: what to flag on a
 pull request. This file has the conventions to follow while writing.
@@ -136,7 +136,7 @@ merges pull requests. No chat merges.
    Green checks do not mean there are no conflicts.
 4. The reviewer reviews every push.
    - Read findings with
-     `gh api repos/Levon0Asatryan/gradfolio-backend/pulls/<n>/comments --paginate`.
+     `gh api repos/Levon0Asatryan/gradfolio-api/pulls/<n>/comments --paginate`.
    - The reviewer is done with a push only when either:
      - `pulls/<n>/reviews` has an entry whose `commit_id` is the head commit, or
      - its no-findings 👍 comment or reaction is timestamped after the head commit
@@ -168,7 +168,7 @@ Absolute path: `/Users/levon/Dev/university/gradfolio-repos`.
 
 | Path | What it is |
 | --- | --- |
-| `gradfolio-backend/` | This repo. |
+| `gradfolio-api/` | This repo. |
 | `gradfolio/` | Frontend: Next.js 16, MUI 7, Auth0 v4, on Vercel. All data is currently mock. |
 | `gradfolio-sql/` | MySQL 8.4 schema (11 tables), seed data, example queries, per-table docs. |
 | `docs/` | The product spec (`Student Portfolio Management System – Feature Specification.md`) and a competitor analysis. These are not in any repo. |

@@ -10,10 +10,10 @@ How work moves between the orchestrator session and worker chats:
 ## Part 1: prompt to the worker
 
 ```text
-You are a worker chat on gradfolio-backend, the backend API for Gradfolio: a student
+You are a worker chat on gradfolio-api, the backend API for Gradfolio: a student
 portfolio platform (NPUA coursework) that serves the Next.js frontend from MySQL 8.4.
-Repo: /Users/levon/Dev/university/gradfolio-repos/gradfolio-backend
-(GitHub Levon0Asatryan/gradfolio-backend).
+Repo: /Users/levon/Dev/university/gradfolio-repos/gradfolio-api
+(GitHub Levon0Asatryan/gradfolio-api).
 
 Read these first, in order: CLAUDE.md, AGENTS.md, docs/tracker.md,
 docs/investigation.md.

@@ -1,6 +1,6 @@
 ---
 name: gradfolio-review
-description: Review gradfolio-backend changes against this repository's own mined rules in .review/rules/, before pushing. Passes — mechanical checks, the rule corpus, an architecture pass that traces one request end to end and checks the change against the plan and ADRs, then an adversarial pass. Use before the first push of a PR, and after fixing review findings. Scoped entirely to this repository.
+description: Review gradfolio-api changes against this repository's own mined rules in .review/rules/, before pushing. Passes — mechanical checks, the rule corpus, an architecture pass that traces one request end to end and checks the change against the plan and ADRs, then an adversarial pass. Use before the first push of a PR, and after fixing review findings. Scoped entirely to this repository.
 ---
 
 # gradfolio-review

@@ -22,7 +22,7 @@ which was stopped and removed afterwards with no volumes left behind.
 | --- | --- |
 | `gradfolio` | Next.js 16, React 19, MUI 7, Auth0 v4. About 9.8k lines of TypeScript. **All data is mock:** no API calls and no tests. Deployed on Vercel. |
 | `gradfolio-sql` | MySQL 8.4 schema with 11 tables, plus seed data, example queries and per-table docs. Hosted on Aiven's free tier (1 GB). |
-| `gradfolio-backend` | This repo. It is empty. |
+| `gradfolio-api` | This repo. It is empty. |
 
 ## 2. Scope, from the spec
 
