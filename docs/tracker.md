@@ -39,8 +39,16 @@ setup PR #6 went green. `main` is at `da3d495`.
     Merge it once the review round is done.
   - This tracker PR also edits `docs/tracker.md`. Whichever of the two merges second
     takes this version.
-- **Next: M0**, the remaining architecture decisions (Q2–Q12). The handoff is
-  `/Users/levon/Dev/university/gradfolio-repos/m0-prompt.md`.
+- **Next: M1**, the data layer. The handoff is
+  `/Users/levon/Dev/university/gradfolio-repos/m1-prompt.md`. The remaining
+  decisions are made by the module that needs each one:
+  - Q2 and Q12 in M1;
+  - Q7 and Q11 in M2;
+  - Q3 in M3;
+  - Q5 and Q6 in M4;
+  - Q4 in M5;
+  - Q9 in M9;
+  - Q10 in M8.
 - **Merge gate:**
   - Merge a code PR only after the reviewer has reviewed the head commit (or given it
     a 👍) and the orchestrator has validated it.
@@ -75,32 +83,32 @@ three UI languages (en/ru/am), with the release checks in M9 passed.
 
 ### Spec feature → scope
 
-| Spec feature                                          | v1.0                                                      | Milestone |
-| ----------------------------------------------------- | --------------------------------------------------------- | --------- |
-| §1 Sign-up (email/password + Google/LinkedIn/GitHub)  | in (Auth0 social + database connections)                  | M2        |
-| §1 Profile initialization on first login              | in                                                        | M2        |
-| §1 Email verification                                 | in, via Auth0's own flow and `email_verified`             | M2        |
-| §1 Phone OTP                                          | stretch (the spec calls it optional)                      | —         |
-| §1 External account linking (GitHub/LinkedIn)         | in for GitHub; LinkedIn per Q8                            | M7        |
-| §2 LinkedIn import                                    | decide in Q8 (the API may not allow it)                   | M7        |
-| §2 GitHub import + manual re-sync                     | in                                                        | M7        |
-| §3 Profile page: all sections + edit mode             | in                                                        | M3        |
-| §4 Project page, list, add/edit, attachments, tags    | in                                                        | M4        |
-| §4 Team members with approval                         | in                                                        | M5        |
-| §4 AI summary / tag suggestions                       | per Q10: manual field is always in, generation is stretch | M8        |
-| §4 Live-site preview (iframe/screenshot)              | stretch                                                   | —         |
-| §4 Comments                                           | out (the spec says future scope)                          | —         |
-| §5 Verification: badges from Auth0/GitHub signals     | in (small)                                                | M2/M7     |
-| §5 Education/certificate document verification, admin | out (spec: "very optional, can be skipped")               | —         |
-| §6 Search, tag pages, browse projects, browse users   | in                                                        | M6        |
-| §6 Tag cloud                                          | in                                                        | M6        |
-| §6 Similar projects / people                          | stretch                                                   | M6        |
-| §6 Public vs private content                          | in (rules per Q3)                                         | M3/M4     |
-| §7 Résumé PDF                                         | in (per Q10)                                              | M8        |
-| §7 Portfolio PDF export                               | stretch                                                   | M8        |
-| §7 Share by email                                     | stretch (needs an email provider)                         | M8        |
-| §7 Notifications                                      | in (team events; the rest as features exist)              | M5        |
-| §7 Admin interface                                    | out (moderation by script if ever needed)                 | —         |
+| Spec feature                                          | v1.0                                                                                             | Milestone |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------- |
+| §1 Sign-up (email/password + Google/LinkedIn/GitHub)  | in (Auth0 social + database connections)                                                         | M2        |
+| §1 Profile initialization on first login              | in                                                                                               | M2        |
+| §1 Email verification                                 | in, via Auth0's own flow and `email_verified`                                                    | M2        |
+| §1 Phone OTP                                          | stretch (the spec calls it optional)                                                             | —         |
+| §1 External account linking (GitHub/LinkedIn)         | in: GitHub (API access); LinkedIn as a login identity only                                       | M7        |
+| §2 LinkedIn import                                    | in, **from LinkedIn's data export** (ZIP upload → review → save); the API does not allow it (Q8) | M7        |
+| §2 GitHub import + manual re-sync                     | in                                                                                               | M7        |
+| §3 Profile page: all sections + edit mode             | in                                                                                               | M3        |
+| §4 Project page, list, add/edit, attachments, tags    | in                                                                                               | M4        |
+| §4 Team members with approval                         | in                                                                                               | M5        |
+| §4 AI summary / tag suggestions                       | per Q10: manual field is always in, generation is stretch                                        | M8        |
+| §4 Live-site preview (iframe/screenshot)              | stretch                                                                                          | —         |
+| §4 Comments                                           | out (the spec says future scope)                                                                 | —         |
+| §5 Verification: badges from Auth0/GitHub signals     | in (small)                                                                                       | M2/M7     |
+| §5 Education/certificate document verification, admin | out (spec: "very optional, can be skipped")                                                      | —         |
+| §6 Search, tag pages, browse projects, browse users   | in                                                                                               | M6        |
+| §6 Tag cloud                                          | in                                                                                               | M6        |
+| §6 Similar projects / people                          | stretch                                                                                          | M6        |
+| §6 Public vs private content                          | in (rules per Q3)                                                                                | M3/M4     |
+| §7 Résumé PDF                                         | in (per Q10)                                                                                     | M8        |
+| §7 Portfolio PDF export                               | stretch                                                                                          | M8        |
+| §7 Share by email                                     | stretch (needs an email provider)                                                                | M8        |
+| §7 Notifications                                      | in (team events; the rest as features exist)                                                     | M5        |
+| §7 Admin interface                                    | out (moderation by script if ever needed)                                                        | —         |
 
 ## Decisions
 
@@ -108,35 +116,35 @@ The details and options for each are in [investigation.md](investigation.md) §6
 "Proposed" is the orchestrator's starting position: M0 confirms it by running the
 relevant checks, and Levon decides the product calls.
 
-| ID  | Question                                     | Status           | Proposed / decided                                                                                                                                           |
-| --- | -------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Q1  | Stack                                        | **decided**      | NestJS 12, Node 24, TypeScript 6.0, zod, pino, mysql2, Vitest (#6)                                                                                           |
-| Q2  | Who owns the schema, and how migrations work | open (M0)        | API owns versioned `.sql` migrations with down steps. Baseline = current `schema.sql`. `gradfolio-sql` becomes reference docs and demo seed, or is archived. |
-| Q3  | Privacy rules                                | open (M0, Levon) | Private profile or project: 404 to everyone except the owner; excluded from search and browse. The spec's "direct link" variant is the alternative.          |
-| Q4  | Owner and teammate model                     | open (M0, Levon) | The owner is implicit (`projects.user_id`), with no member row. Teammates without an account are allowed, named only, no invite.                             |
-| Q5  | API contract and type sharing                | open (M0)        | `openapi.yaml` (already generated) → TypeScript types generated in the frontend (`openapi-typescript`), checked in CI.                                       |
-| Q6  | File storage                                 | open (M0)        | Candidates: Vercel Blob, Cloudflare R2, S3, Cloudinary. v1 could stay URL-only apart from avatars and hero images.                                           |
-| Q7  | When the user row is created                 | open (M0)        | Upsert on `auth0_id` at the first authenticated request (`GET /v1/me`). Race-safe; proven with a barrier test.                                               |
-| Q8  | Integrations scope                           | open (M0, Levon) | GitHub: in. LinkedIn: verify the API first; likely name/email/photo only, so import is manual or stretch.                                                    |
-| Q9  | Hosting, and MySQL for tests                 | open (M0)        | API on a container host that can reach Aiven over TLS. Tests use the compose/CI MySQL 8.4 (already working in #6).                                           |
-| Q10 | AI summary, PDF, email                       | open (M0, Levon) | AI: provider chosen, optional, rate-limited, and the feature degrades if the provider is down. PDF: pick a generator. Email: stretch.                        |
-| Q11 | How the frontend calls the API               | open (M0) — new  | From the Next.js server only (server components, route handlers, server actions), with the access token kept server-side. No CORS needed.                    |
-| Q12 | Query layer on top of `mysql2`               | open (M0) — new  | A query builder (Kysely, as probeboard uses) or an ORM (Drizzle, Prisma), judged on MySQL JSON, FULLTEXT, `ON DUPLICATE KEY` and transactions.               |
+| ID  | Question                                     | Status                   | Proposed / decided                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --- | -------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | Stack                                        | **decided**              | NestJS 12, Node 24, TypeScript 6.0, zod, pino, mysql2, Vitest (#6)                                                                                                                                                                                                                                                                                                                                                                                         |
+| Q2  | Who owns the schema, and how migrations work | open (M0)                | API owns versioned `.sql` migrations with down steps. Baseline = current `schema.sql`. `gradfolio-sql` becomes reference docs and demo seed, or is archived.                                                                                                                                                                                                                                                                                               |
+| Q3  | Privacy rules                                | open (M0, Levon)         | Private profile or project: 404 to everyone except the owner; excluded from search and browse. The spec's "direct link" variant is the alternative.                                                                                                                                                                                                                                                                                                        |
+| Q4  | Owner and teammate model                     | open (M0, Levon)         | The owner is implicit (`projects.user_id`), with no member row. Teammates without an account are allowed, named only, no invite.                                                                                                                                                                                                                                                                                                                           |
+| Q5  | API contract and type sharing                | open (M0)                | `openapi.yaml` (already generated) → TypeScript types generated in the frontend (`openapi-typescript`), checked in CI.                                                                                                                                                                                                                                                                                                                                     |
+| Q6  | File storage                                 | open (M0)                | Candidates: Vercel Blob, Cloudflare R2, S3, Cloudinary. v1 could stay URL-only apart from avatars and hero images.                                                                                                                                                                                                                                                                                                                                         |
+| Q7  | When the user row is created                 | open (M0)                | Upsert on `auth0_id` at the first authenticated request (`GET /v1/me`). Race-safe; proven with a barrier test.                                                                                                                                                                                                                                                                                                                                             |
+| Q8  | Integrations scope                           | **decided (2026-09-28)** | GitHub: full API import. LinkedIn: the API is closed. Its only open permissions are sign-in (name, headline, photo, email). Positions, education, skills and certifications need partner programs ([Getting Access](https://learn.microsoft.com/en-us/linkedin/shared/authentication/getting-access), updated 2026-06). So: LinkedIn sign-in pre-fills the profile, import is by uploading the member's own data export, and manual entry is the fallback. |
+| Q9  | Hosting, and MySQL for tests                 | open (M0)                | API on a container host that can reach Aiven over TLS. Tests use the compose/CI MySQL 8.4 (already working in #6).                                                                                                                                                                                                                                                                                                                                         |
+| Q10 | AI summary, PDF, email                       | open (M0, Levon)         | AI: provider chosen, optional, rate-limited, and the feature degrades if the provider is down. PDF: pick a generator. Email: stretch.                                                                                                                                                                                                                                                                                                                      |
+| Q11 | How the frontend calls the API               | open (M0) — new          | From the Next.js server only (server components, route handlers, server actions), with the access token kept server-side. No CORS needed.                                                                                                                                                                                                                                                                                                                  |
+| Q12 | Query layer on top of `mysql2`               | open (M0) — new          | A query builder (Kysely, as probeboard uses) or an ORM (Drizzle, Prisma), judged on MySQL JSON, FULLTEXT, `ON DUPLICATE KEY` and transactions.                                                                                                                                                                                                                                                                                                             |
 
 ## Milestones
 
-| #   | Name                                   | Repos          | Status | Depends on                | Plan | Verification |
-| --- | -------------------------------------- | -------------- | ------ | ------------------------- | ---- | ------------ |
-| M0  | Foundations: setup + architecture plan | api, all       | next   | —                         | —    | —            |
-| M1  | Data layer, schema ownership, DB fixes | api, sql       | todo   | M0                        | —    | —            |
-| M2  | Auth and identity, end to end          | auth0, api, fe | todo   | M0, M1                    | —    | —            |
-| M3  | Profiles                               | api, fe        | todo   | M2                        | —    | —            |
-| M4  | Projects and media                     | api, fe        | todo   | M3                        | —    | —            |
-| M5  | Teams and notifications                | api, fe        | todo   | M4                        | —    | —            |
-| M6  | Discovery and dashboard                | api, fe        | todo   | M4 (M5 for team projects) | —    | —            |
-| M7  | GitHub integration (+ LinkedIn per Q8) | api, fe, auth0 | todo   | M4                        | —    | —            |
-| M8  | Utilities: résumé PDF, AI summary      | api, fe        | todo   | M3, M4                    | —    | —            |
-| M9  | Hardening, deployment and v1.0 release | all            | todo   | M1–M8                     | —    | —            |
+| #   | Name                                   | Repos          | Status                  | Depends on                | Plan | Verification |
+| --- | -------------------------------------- | -------------- | ----------------------- | ------------------------- | ---- | ------------ |
+| M0  | Foundations: setup + architecture plan | api, all       | done; 0.5, 0.7–0.9 open | —                         | —    | —            |
+| M1  | Data layer, schema ownership, DB fixes | api, sql       | next                    | M0                        | —    | —            |
+| M2  | Auth and identity, end to end          | auth0, api, fe | todo                    | M0, M1                    | —    | —            |
+| M3  | Profiles                               | api, fe        | todo                    | M2                        | —    | —            |
+| M4  | Projects and media                     | api, fe        | todo                    | M3                        | —    | —            |
+| M5  | Teams and notifications                | api, fe        | todo                    | M4                        | —    | —            |
+| M6  | Discovery and dashboard                | api, fe        | todo                    | M4 (M5 for team projects) | —    | —            |
+| M7  | GitHub + LinkedIn (export) import      | api, fe, auth0 | todo                    | M4                        | —    | —            |
+| M8  | Utilities: résumé PDF, AI summary      | api, fe        | todo                    | M3, M4                    | —    | —            |
+| M9  | Hardening, deployment and v1.0 release | all            | todo                    | M1–M8                     | —    | —            |
 
 **Working in parallel** once M2 lands:
 
@@ -153,17 +161,17 @@ relevant checks, and Levon decides the product calls.
 
 **Goal:** the repository, process and decisions every later milestone builds on.
 
-| ID  | Task                                                                                                                                                     | Repo | Status | Source                        |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ------ | ----------------------------- |
-| 0.1 | Orchestrator kit: CLAUDE.md, AGENTS.md, handoff template, push gates, `.review/`, `gradfolio-review` skill                                               | api  | done   | #1, #2                        |
-| 0.2 | Investigation, tracker, rename to `gradfolio-api`, README                                                                                                | api  | done   | #3, #4                        |
-| 0.3 | Repo hygiene: editorconfig, gitattributes, license, CoC, contributing, security, templates, Dependabot, VS Code                                          | api  | done   | #5                            |
-| 0.4 | NestJS skeleton: config, logging, errors, MySQL pool (UTC session), health, OpenAPI, Docker, compose, CI (4 jobs), `http/`                               | api  | review | #6                            |
-| 0.5 | Levon's settings: auto-delete branches, Codex app, Dependabot security updates                                                                           | ops  | todo   | kit §9                        |
-| 0.6 | **M0 plan** (`docs/m0-plan.md`): decide Q2–Q12, with ADRs for Q2, Q3, Q5, Q11, Q12; endpoint map for M1–M6 (ownership and visibility check per endpoint) | api  | next   | investigation §6              |
-| 0.7 | Frontend baseline: `npm ci`, build, lint and knip on `gradfolio` main. Record what fails.                                                                | fe   | todo   | —                             |
-| 0.8 | Frontend CI (lint, typecheck, build) plus a PR template, so more developers can work in the repo safely                                                  | fe   | todo   | —                             |
-| 0.9 | Workspace docs into version control: spec + competitor analysis → `gradfolio-api/docs/spec/` (or the frontend repo)                                      | api  | todo   | spec lives outside every repo |
+| ID  | Task                                                                                                                       | Repo | Status | Source                        |
+| --- | -------------------------------------------------------------------------------------------------------------------------- | ---- | ------ | ----------------------------- |
+| 0.1 | Orchestrator kit: CLAUDE.md, AGENTS.md, handoff template, push gates, `.review/`, `gradfolio-review` skill                 | api  | done   | #1, #2                        |
+| 0.2 | Investigation, tracker, rename to `gradfolio-api`, README                                                                  | api  | done   | #3, #4                        |
+| 0.3 | Repo hygiene: editorconfig, gitattributes, license, CoC, contributing, security, templates, Dependabot, VS Code            | api  | done   | #5                            |
+| 0.4 | NestJS skeleton: config, logging, errors, MySQL pool (UTC session), health, OpenAPI, Docker, compose, CI (4 jobs), `http/` | api  | review | #6                            |
+| 0.5 | Levon's settings: auto-delete branches, Codex app, Dependabot security updates                                             | ops  | todo   | kit §9                        |
+| 0.6 | Architecture decisions, made per module rather than up front (see Now). Q1 decided; Q8 decided                             | api  | done   | investigation §6              |
+| 0.7 | Frontend baseline: `npm ci`, build, lint and knip on `gradfolio` main. Record what fails.                                  | fe   | todo   | —                             |
+| 0.8 | Frontend CI (lint, typecheck, build) plus a PR template, so more developers can work in the repo safely                    | fe   | todo   | —                             |
+| 0.9 | Workspace docs into version control: spec + competitor analysis → `gradfolio-api/docs/spec/` (or the frontend repo)        | api  | todo   | spec lives outside every repo |
 
 **Exit:** #6 merged; the M0 plan merged, with every Q decided or explicitly deferred;
 frontend baseline recorded.
@@ -221,7 +229,7 @@ verifies, and it resolves to exactly one `users` row.
 | 2.11 | FE: middleware fails closed on protected routes (no swallowed errors)                                                                                                                        | fe    | todo   | F2                |
 | 2.12 | FE: remove hardcoded `u_001` (3 places); "My profile" and `isOwnProfile` come from `/v1/me`                                                                                                  | fe    | todo   | F3                |
 | 2.13 | FE: auth-aware navigation (login vs avatar/logout; hide "Login" and "Login Connections" when signed in)                                                                                      | fe    | todo   | nav check         |
-| 2.14 | FE: first-login profile initialization (name, photo, bio pre-filled from Auth0), replacing the stepper's free-text steps                                                                     | fe    | todo   | spec §1, F4       |
+| 2.14 | FE: first-login profile initialization (name, photo, bio pre-filled from Auth0; **headline too when signing in with LinkedIn**), replacing the stepper's free-text steps                     | fe    | todo   | spec §1, F4       |
 | 2.15 | FE docs: Auth0 v4 variable names in CLAUDE.md/README; add `.env.example`                                                                                                                     | fe    | todo   | F6                |
 | 2.16 | Verified badge v1: email verified (Auth0) + linked GitHub (M7) → `users.verified`                                                                                                            | api   | todo   | spec §5           |
 
@@ -303,21 +311,25 @@ marked (404).
 **Exit:** searching "IoT", "ML" or an Armenian name finds what it should, and private
 content never appears.
 
-## M7: GitHub integration (+ LinkedIn per Q8)
+## M7: GitHub integration and LinkedIn export import
 
-| ID  | Task                                                                                                                                                                              | Repo       | Status | Source    |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------ | --------- |
-| 7.1 | Decide the token source: Auth0 identity-provider token for the GitHub connection (Management API) vs a separate GitHub OAuth app run by the API. Run both options before choosing | api, auth0 | todo   | Q8        |
-| 7.2 | API: connect/disconnect; tokens **encrypted at rest** (AES-256-GCM, key from env, rotation note); never in responses or logs                                                      | api        | todo   | S10       |
-| 7.3 | API: list repos, import the selected ones as **draft** projects (name, description, language, stars, forks, README → description), deduplicated by `github_repo_id`               | api        | todo   | spec §2   |
-| 7.4 | API: manual re-sync per project (no silent overwrites of fields the user edited)                                                                                                  | api        | todo   | spec §2   |
-| 7.5 | API: README fetched only through the GitHub API, sanitized like any description; no URLs supplied by the user are fetched                                                         | api        | todo   | SSRF rule |
-| 7.6 | LinkedIn: verify what the API returns today (cite the source). If profile import is not possible, v1 = identity only, and import is manual or a data-export upload (stretch)      | api        | todo   | P4, Q8    |
-| 7.7 | FE: integrations page on the API (status, last synced, connect/disconnect), import wizard (repo picker → drafts → review)                                                         | fe         | todo   | —         |
-| 7.8 | GitHub-source badge on imported projects; "linked GitHub" counts toward `verified`                                                                                                | api, fe    | todo   | spec §5   |
+| ID   | Task                                                                                                                                                                                                                                                      | Repo       | Status | Source      |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------ | ----------- |
+| 7.1  | Decide the token source: Auth0 identity-provider token for the GitHub connection (Management API) vs a separate GitHub OAuth app run by the API. Run both options before choosing                                                                         | api, auth0 | todo   | Q8          |
+| 7.2  | API: connect/disconnect; tokens **encrypted at rest** (AES-256-GCM, key from env, rotation note); never in responses or logs                                                                                                                              | api        | todo   | S10         |
+| 7.3  | API: list repos, import the selected ones as **draft** projects (name, description, language, stars, forks, README → description), deduplicated by `github_repo_id`                                                                                       | api        | todo   | spec §2     |
+| 7.4  | API: manual re-sync per project (no silent overwrites of fields the user edited)                                                                                                                                                                          | api        | todo   | spec §2     |
+| 7.5  | API: README fetched only through the GitHub API, sanitized like any description; no URLs supplied by the user are fetched                                                                                                                                 | api        | todo   | SSRF rule   |
+| 7.6  | LinkedIn: get a real data export (LinkedIn → Settings → Data privacy → Get a copy of your data) from each team member and record its actual file names and columns. The parser is written against real files, not remembered names                        | api        | todo   | Q8          |
+| 7.7  | API: `POST /v1/me/imports/linkedin`: upload the export ZIP (size cap, ZIP-bomb and path-traversal guards, CSV only, never written to disk unchecked) → parse positions, education, skills and certifications → return a **preview**; nothing is saved yet | api        | todo   | Q8          |
+| 7.8  | API: confirm the import. Selected items become profile rows in one transaction, deduplicated against existing rows; `YYYY-MM` and year validation as in manual entry; `integrations.linkedin.last_synced_at` updated                                      | api        | todo   | Q8, spec §2 |
+| 7.9  | FE: LinkedIn import wizard (instructions to download the export, upload, preview with per-item checkboxes, confirm) in the onboarding flow and on the integrations page                                                                                   | fe         | todo   | spec §2     |
+| 7.10 | LinkedIn sign-in pre-fill: name, headline and photo from Auth0's LinkedIn connection on first login (with 2.14). The integration card shows LinkedIn as connected when that identity is linked                                                            | api, fe    | todo   | Q8          |
+| 7.11 | FE: integrations page on the API (status, last synced, connect/disconnect), import wizard (repo picker → drafts → review)                                                                                                                                 | fe         | todo   | —           |
+| 7.12 | GitHub-source badge on imported projects; "linked GitHub" counts toward `verified`                                                                                                                                                                        | api, fe    | todo   | spec §5     |
 
 **Exit:** link GitHub, import 2 repos as drafts, edit one and publish it, re-sync it,
-and the user's edits survive. Disconnecting deletes the tokens.
+and the user's edits survive. Disconnecting deletes the tokens. A real LinkedIn export ZIP previews correctly, and confirming adds only the selected items, with no duplicates on a second import. A malformed or oversized ZIP is rejected with a stable code.
 
 ## M8: Utilities
 
@@ -353,31 +365,31 @@ live; v1.0 tagged.
 
 Every known defect maps to a task, so nothing is dropped. IDs refer to `issues.md`.
 
-| Issue | Summary                                                                          | Task(s)            |
-| ----- | -------------------------------------------------------------------------------- | ------------------ |
-| S1    | `gradfolio-sql` compose crash-loops on a fresh volume                            | 1.11               |
-| S2    | INSERT cannot return a DB-generated id; docs are wrong                           | 1.4, 1.12          |
-| S3    | Mark notification read without an owner check                                    | 5.4, 1.13          |
-| S4    | Invite without a project-ownership check                                         | 5.1, 1.13          |
-| S5    | Project detail ignores `is_public`                                               | 3.1, 4.1, 1.13, Q3 |
-| S6    | Skills replace-all with no transaction                                           | 3.4, 1.13          |
-| S7    | No CHECK constraints; the API is the only validator                              | 1.5, 1.8           |
-| S8    | FULLTEXT ignores words shorter than 3 characters                                 | 6.1                |
-| S9    | `JSON_CONTAINS` is case-sensitive                                                | 1.6, 6.2           |
-| S10   | OAuth tokens stored without enforced encryption                                  | 7.2                |
-| S11   | Seed owner-as-member inconsistent                                                | 1.14, 1.10, Q4     |
-| S12   | Seed notification links use mock ids                                             | 1.10, 5.4          |
-| S13   | Docs say 12 tables; there are 11                                                 | 1.12               |
-| F1    | Regex HTML sanitizer can be bypassed                                             | 4.2, 4.8           |
-| F2    | Middleware lets requests through on error                                        | 2.11               |
-| F3    | Current user hardcoded as `u_001`                                                | 2.12               |
-| F4    | Frontend and schema types disagree                                               | Q5, 3.8, 6.5, 2.14 |
-| F5    | Image domain allowlist covers mock hosts only                                    | 4.9                |
-| F6    | Frontend docs out of date (Auth0 variable names, `vercel.json`, Next.js version) | 2.15               |
-| P1    | Privacy rules conflict (spec vs schema docs)                                     | Q3                 |
-| P2    | Teammates without accounts (schema yes, spec no)                                 | Q4, 5.1            |
-| P3    | Spec features with no storage                                                    | 1.7, 6.6           |
-| P4    | LinkedIn import may not be possible                                              | Q8, 7.6            |
+| Issue | Summary                                                                          | Task(s)                |
+| ----- | -------------------------------------------------------------------------------- | ---------------------- |
+| S1    | `gradfolio-sql` compose crash-loops on a fresh volume                            | 1.11                   |
+| S2    | INSERT cannot return a DB-generated id; docs are wrong                           | 1.4, 1.12              |
+| S3    | Mark notification read without an owner check                                    | 5.4, 1.13              |
+| S4    | Invite without a project-ownership check                                         | 5.1, 1.13              |
+| S5    | Project detail ignores `is_public`                                               | 3.1, 4.1, 1.13, Q3     |
+| S6    | Skills replace-all with no transaction                                           | 3.4, 1.13              |
+| S7    | No CHECK constraints; the API is the only validator                              | 1.5, 1.8               |
+| S8    | FULLTEXT ignores words shorter than 3 characters                                 | 6.1                    |
+| S9    | `JSON_CONTAINS` is case-sensitive                                                | 1.6, 6.2               |
+| S10   | OAuth tokens stored without enforced encryption                                  | 7.2                    |
+| S11   | Seed owner-as-member inconsistent                                                | 1.14, 1.10, Q4         |
+| S12   | Seed notification links use mock ids                                             | 1.10, 5.4              |
+| S13   | Docs say 12 tables; there are 11                                                 | 1.12                   |
+| F1    | Regex HTML sanitizer can be bypassed                                             | 4.2, 4.8               |
+| F2    | Middleware lets requests through on error                                        | 2.11                   |
+| F3    | Current user hardcoded as `u_001`                                                | 2.12                   |
+| F4    | Frontend and schema types disagree                                               | Q5, 3.8, 6.5, 2.14     |
+| F5    | Image domain allowlist covers mock hosts only                                    | 4.9                    |
+| F6    | Frontend docs out of date (Auth0 variable names, `vercel.json`, Next.js version) | 2.15                   |
+| P1    | Privacy rules conflict (spec vs schema docs)                                     | Q3                     |
+| P2    | Teammates without accounts (schema yes, spec no)                                 | Q4, 5.1                |
+| P3    | Spec features with no storage                                                    | 1.7, 6.6               |
+| P4    | LinkedIn import may not be possible                                              | Q8 (decided), 7.6–7.10 |
 
 ## Follow-ups
 
@@ -392,11 +404,11 @@ Kinds: fix · decide · process. Every deferred review finding becomes a row.
 
 ## Risks
 
-| Risk                                                                 | Impact                                    | Mitigation                                                                |
-| -------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------- |
-| LinkedIn API gives no profile data to third-party apps               | §2 LinkedIn import cannot ship            | Q8 decided early (M0); manual entry is the v1 path                        |
-| Aiven free tier limits (storage, connections, backups)               | Outage or data loss at demo time          | Pool size ≤ plan limit; scheduled export; demo reset script (9.8)         |
-| Auth0 tenant misconfigured (audience, callbacks) across environments | Logins work but API calls 401             | 2.1–2.4 as a checklist; exit criterion tested on a Vercel preview         |
-| The frontend has no tests or CI today                                | Wiring regressions go unnoticed           | 0.8 CI, then 9.6 E2E of the §8 journey                                    |
-| Stored rich text becomes an XSS path                                 | Account takeover through a viewed project | Sanitize on write (4.2) + DOMPurify on render (4.8) + bypass corpus tests |
-| Scope growth from "optional" spec features                           | v1.0 slips                                | The scope table above is the contract; stretch items only after M9 passes |
+| Risk                                                                 | Impact                                    | Mitigation                                                                                                                                        |
+| -------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| LinkedIn changes its data-export format                              | Import parser breaks                      | Parser keyed on column names from a real export (7.6), with a fixture test; a column it does not recognise is skipped and reported, never guessed |
+| Aiven free tier limits (storage, connections, backups)               | Outage or data loss at demo time          | Pool size ≤ plan limit; scheduled export; demo reset script (9.8)                                                                                 |
+| Auth0 tenant misconfigured (audience, callbacks) across environments | Logins work but API calls 401             | 2.1–2.4 as a checklist; exit criterion tested on a Vercel preview                                                                                 |
+| The frontend has no tests or CI today                                | Wiring regressions go unnoticed           | 0.8 CI, then 9.6 E2E of the §8 journey                                                                                                            |
+| Stored rich text becomes an XSS path                                 | Account takeover through a viewed project | Sanitize on write (4.2) + DOMPurify on render (4.8) + bypass corpus tests                                                                         |
+| Scope growth from "optional" spec features                           | v1.0 slips                                | The scope table above is the contract; stretch items only after M9 passes                                                                         |
