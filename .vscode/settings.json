@@ -1,0 +1,33 @@
+{
+  // Use the TypeScript in node_modules, not the one bundled with VS Code.
+  // Otherwise the editor type-checks with a different compiler than
+  // `npm run typecheck` and CI do, and reports errors that do not exist. The
+  // project pins TypeScript 6.0 (typescript-eslint does not support newer),
+  // while VS Code bundles whatever is current.
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
+  "eslint.useFlatConfig": true,
+  "eslint.validate": ["typescript", "javascript"],
+
+  // Relative imports need explicit .js extensions under nodenext.
+  "typescript.preferences.importModuleSpecifierEnding": "js",
+
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/coverage": true
+  },
+
+  "[sql]": { "editor.formatOnSave": false }
+}

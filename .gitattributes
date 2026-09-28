@@ -1,0 +1,12 @@
+# Normalise line endings in the repository regardless of the checkout platform.
+# The shell scripts under scripts/ and .husky/ break with CRLF.
+* text=auto eol=lf
+
+# Generated; keep it out of diffs and reviews.
+package-lock.json linguist-generated=true -diff
+openapi.yaml linguist-generated=true
+
+# Binary, never merge.
+*.png binary
+*.jpg binary
+*.ico binary
