@@ -1,6 +1,7 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ErrorFilter } from './common/filters/error.filter.js';
 import { buildApp, stubDb } from '../testing/app.js';
 import { testConfig } from '../testing/database.js';
 
@@ -16,7 +17,7 @@ describe('the configured application', () => {
     app = undefined;
   });
 
-  async function start(env: NodeJS.ProcessEnv = {}, ping?: () => Promise<void>) {
+  async function start(env: NodeJS.ProcessEnv = {}, ping?: (timeoutMs: number) => Promise<void>) {
     app = await buildApp(testConfig({ LOG_LEVEL: 'fatal', ...env }), stubDb(ping));
     return request(app.getHttpServer());
   }
@@ -62,6 +63,23 @@ describe('the configured application', () => {
       .send('{"broken":')
       .expect(400);
     expect(res.body).toEqual({ code: 'BAD_REQUEST', message: 'request could not be understood' });
+  });
+
+  it('logs a malformed body by exception type only, never its content', async () => {
+    const http = await start();
+    const filter = app!.get(ErrorFilter);
+    const logger = (filter as unknown as { logger: { warn: (...a: unknown[]) => void } }).logger;
+    const warn = vi.spyOn(logger, 'warn');
+
+    await http
+      .post('/v1/anything')
+      .set('content-type', 'application/json')
+      .send('{"token": SECRET_TOKEN_123}')
+      .expect(400);
+
+    expect(warn).toHaveBeenCalled();
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('SECRET');
+    expect(JSON.stringify(warn.mock.calls)).toContain('BadRequestException (status 400)');
   });
 
   it('reports the database outage on readiness only', async () => {

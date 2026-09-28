@@ -59,6 +59,26 @@ function httpBodyOf(err: unknown): unknown {
 }
 
 /**
+ * An HTTP error that is not an AppError is logged by name and status only,
+ * never by its message.
+ *
+ * Those messages can quote the caller's input. A malformed JSON body reaches
+ * the filter as Nest 12's BadRequestException whose message is V8's parse
+ * error, which quotes a fragment of the payload: `Unexpected token 'S',
+ * ..."{"token": SECRET_TOK"... is not valid JSON` on Node 24. Field-level
+ * redaction cannot reach a secret inside a string. A raw body-parser error
+ * (`entity.parse.failed`, ...) is logged by its fixed type for the same reason.
+ * AppError messages are written by this codebase and are logged as-is.
+ */
+const BODY_PARSER_TYPE = /^(entity|encoding|charset|request|stream|parameters)\.[a-z.]+$/;
+
+function bodyParserType(err: unknown): string | undefined {
+  if (typeof err !== 'object' || err === null || !('type' in err)) return undefined;
+  const { type } = err;
+  return typeof type === 'string' && BODY_PARSER_TYPE.test(type) ? type : undefined;
+}
+
+/**
  * Maps any thrown value to a status, a safe body and a log line.
  *
  * Only an AppError's own message, or a body a handler built deliberately in
@@ -66,13 +86,23 @@ function httpBodyOf(err: unknown): unknown {
  * fixed message per status, so a driver error, SQL text or stack trace can
  * never leak through a response.
  */
-export function toErrorResponse(err: unknown): MappedError {
-  const logDetail = describeError(err);
+function httpLogDetail(err: object, status: number): string {
+  const parserType = bodyParserType(err);
+  if (parserType) return `request body rejected by parser: ${parserType}`;
+  const name = err instanceof Error ? err.name : 'HttpError';
+  return `${name} (status ${status})`;
+}
 
+export function toErrorResponse(err: unknown): MappedError {
   if (err instanceof AppError) {
     const body: ErrorResponse = { code: err.code, message: err.message };
     if (err.details !== undefined) body.details = err.details;
-    return { status: err.status, body, logDetail, isServerFault: err.status >= 500 };
+    return {
+      status: err.status,
+      body,
+      logDetail: describeError(err),
+      isServerFault: err.status >= 500,
+    };
   }
 
   const status = httpStatusOf(err);
@@ -81,14 +111,19 @@ export function toErrorResponse(err: unknown): MappedError {
     const body = isErrorResponse(response)
       ? { code: response.code, message: response.message }
       : (STATUS_CODES[status] ?? { code: 'ERROR', message: 'request failed' });
-    return { status, body, logDetail, isServerFault: status >= 500 };
+    return {
+      status,
+      body,
+      logDetail: httpLogDetail(err as object, status),
+      isServerFault: status >= 500,
+    };
   }
 
   if (isDatabaseUnavailable(err)) {
     return {
       status: 503,
       body: { code: 'DATABASE_UNAVAILABLE', message: 'database is not reachable' },
-      logDetail,
+      logDetail: describeError(err),
       isServerFault: true,
     };
   }
@@ -96,7 +131,7 @@ export function toErrorResponse(err: unknown): MappedError {
   return {
     status: 500,
     body: { code: 'INTERNAL_ERROR', message: 'an unexpected error occurred' },
-    logDetail,
+    logDetail: describeError(err),
     isServerFault: true,
   };
 }
