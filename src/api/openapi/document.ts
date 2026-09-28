@@ -15,19 +15,17 @@ function schemaOf(schema: ZodType): Record<string, unknown> {
   return z.toJSONSchema(schema, { target: 'openapi-3.0' });
 }
 
-export const errorResponseSchema = z
-  .object({
-    code: z.string().meta({
-      description: 'Stable machine-readable code. Branch on this, never on `message`.',
-      example: 'NOT_FOUND',
-    }),
-    message: z.string().meta({ description: 'Human-readable; not part of the contract.' }),
-    details: z
-      .unknown()
-      .optional()
-      .meta({ description: 'Field-level detail, for VALIDATION_FAILED only.' }),
-  })
-  .meta({ id: 'ErrorResponse' });
+export const errorResponseSchema = z.object({
+  code: z.string().meta({
+    description: 'Stable machine-readable code. Branch on this, never on `message`.',
+    example: 'NOT_FOUND',
+  }),
+  message: z.string().meta({ description: 'Human-readable; not part of the contract.' }),
+  details: z
+    .unknown()
+    .optional()
+    .meta({ description: 'Field-level detail, for VALIDATION_FAILED only.' }),
+});
 
 const livenessSchema = z.object({ status: z.literal('ok') });
 const readinessSchema = z.object({ status: z.literal('ok'), database: z.literal('ok') });
@@ -106,7 +104,10 @@ export function buildOpenApiDocument(
     };
   }
 
-  const { id: _id, ...errorSchema } = schemaOf(errorResponseSchema);
+  // The component is the schema itself. Giving the zod schema an `id` would
+  // make toJSONSchema emit a root `$ref` into a `definitions` map, which does
+  // not resolve from inside an OpenAPI document.
+  const errorSchema = schemaOf(errorResponseSchema);
 
   return {
     openapi: '3.0.3',

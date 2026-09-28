@@ -76,6 +76,31 @@ describe('openapi document', () => {
     expect(JSON.stringify(readiness503)).toContain('#/components/schemas/ErrorResponse');
   });
 
+  it('resolves every $ref it contains', () => {
+    const doc = buildOpenApiDocument();
+    const refs: string[] = [];
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) return node.forEach(walk);
+      if (node === null || typeof node !== 'object') return;
+      for (const [key, value] of Object.entries(node)) {
+        if (key === '$ref' && typeof value === 'string') refs.push(value);
+        else walk(value);
+      }
+    };
+    walk(doc);
+
+    expect(refs.length).toBeGreaterThan(0);
+    for (const ref of refs) {
+      expect(ref.startsWith('#/'), ref).toBe(true);
+      const target = ref
+        .slice(2)
+        .split('/')
+        .reduce<unknown>((at, part) => (at as Record<string, unknown> | undefined)?.[part], doc);
+      expect(target, `${ref} does not resolve`).toBeTypeOf('object');
+      expect(target, `${ref} is itself only a $ref`).not.toHaveProperty('$ref');
+    }
+  });
+
   it('keeps several methods on one path, and omits what an operation does not set', () => {
     const doc = buildOpenApiDocument([
       {

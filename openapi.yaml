@@ -67,21 +67,18 @@ paths:
 components:
   schemas:
     ErrorResponse:
-      $ref: "#/definitions/ErrorResponse"
-      definitions:
-        ErrorResponse:
-          type: object
-          properties:
-            code:
-              type: string
-              description: Stable machine-readable code. Branch on this, never on `message`.
-              example: NOT_FOUND
-            message:
-              type: string
-              description: Human-readable; not part of the contract.
-            details:
-              description: Field-level detail, for VALIDATION_FAILED only.
-          required:
-            - code
-            - message
-          additionalProperties: false
+      type: object
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable code. Branch on this, never on `message`.
+          example: NOT_FOUND
+        message:
+          type: string
+          description: Human-readable; not part of the contract.
+        details:
+          description: Field-level detail, for VALIDATION_FAILED only.
+      required:
+        - code
+        - message
+      additionalProperties: false
