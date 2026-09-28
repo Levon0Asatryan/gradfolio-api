@@ -13,11 +13,13 @@ in `docs/mN-plan.md`, the project's ADRs, and `docs/investigation.md`. It reads
 and writes no rule corpus outside this repository.
 
 Invoked:
+
 - `/gradfolio-review` — the branch diff against `origin/main`
 - `/gradfolio-review --fix-round` — pass 0 plus the blast radius of the fix
 - `/gradfolio-review <path>` — one file or directory
 
 ## Pass 0 — mechanical (always, seconds)
+
 Run the commands from `CLAUDE.md` → "Commands" and report failures as a block:
 **verify**, **coverage ≥ threshold**, **integration** (real MySQL 8.4). Until M0
 fills that table there is nothing to run: say so under NOT CHECKED.
@@ -27,12 +29,14 @@ files, reporting file:line plus the message. If pass 0 fails, stop — there is 
 point reviewing code that does not build.
 
 ## Pass 1 — the rule corpus
+
 For each rule in `.review/rules/gradfolio.md`, and each rule in `AGENTS.md`'s
 "Security" and "MySQL specifics" sections, ask whether this diff could violate
 it; check the ones that apply. Weight the rules that produced wrong results or
 authorization gaps.
 
 ## Pass 2 — architecture, end to end
+
 - **Trace one request end to end**, hop by hop — frontend call → token
   verification → caller resolution (`sub` → `users.id`) → validation → service →
   SQL → response mapping (snake_case → camelCase, private fields dropped) — and
@@ -49,6 +53,7 @@ authorization gaps.
   frontend (`../gradfolio/src`) will have to change to consume it.
 
 ## Pass 3 — adversarial
+
 Knock down your own findings: is the premise true (verify limits, defaults,
 specs, library behaviour against the source or by running it on MySQL 8.4)?
 Would the test actually fail — for every guard, name the test and what removing
@@ -58,11 +63,13 @@ the guard makes fail? Is it a nit the severity contract excludes?
 reads it, or the reading one reports defects that do not exist.
 
 ## Output
+
 PASS 0 / PASS 1 / PASS 2 / PASS 3 summary, then FINDINGS ranked by severity
 (file:line — one sentence, then the concrete failure: input → wrong output),
 then NOT CHECKED. "Nothing" is a valid finding list.
 
 ## The receipt — this is what unblocks the push
+
 Write `.review/.last-review.json`:
 `{"sha": "<git rev-parse HEAD>", "at": "<ISO timestamp>", "findings_open": 0, "method": "gradfolio-review"}`
 `findings_open` is what the author still has to act on — deferring is a
@@ -70,5 +77,6 @@ decision to record, not a way to reach zero. A hand-written receipt uses an
 honest `method` and the PR says which passes ran.
 
 ## After the review
+
 Fix what holds up before the first push. A recurring finding not yet in the
 corpus is added there with its `**Why:**` and source PR.

@@ -1,0 +1,60 @@
+name: gradfolio-api
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: gradfolio
+      MYSQL_USER: gradfolio
+      MYSQL_PASSWORD: gradfolio
+      # Deliberately not UTC: the server's own zone differs from the one the
+      # app pins per session, so a connection that skipped the pin would write
+      # timestamps four hours off -- and pool.int.test.ts would see it.
+      TZ: Asia/Yerevan
+    command: ['--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci']
+    ports:
+      # 3307 on the host: gradfolio-sql's own compose already takes 3306.
+      - '${MYSQL_HOST_PORT:-3307}:3306'
+    volumes:
+      - mysqldata:/var/lib/mysql
+      # Creates gradfolio_test for the integration suite on first boot.
+      - ./docker/mysql-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-uroot', '-proot']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+  api:
+    build: .
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: info
+      DATABASE_URL: mysql://gradfolio:gradfolio@mysql:3306/gradfolio
+      API_PORT: '3000'
+      # Browsable API documentation at http://127.0.0.1:3000/docs
+      API_DOCS_ENABLED: 'true'
+    ports:
+      - '${API_HOST_PORT:-3000}:3000'
+    restart: unless-stopped
+    healthcheck:
+      # readyz, not healthz: an api that cannot reach the database is not serving.
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysqldata:

@@ -19,7 +19,7 @@ review-plugin stack detection to `gradfolio` for that reason.
   `gh api repos/Levon0Asatryan/gradfolio-api/pulls/<n>/comments --paginate`
   and `…/pulls/<n>/reviews`; cluster by defect shape; one rule per cluster seen
   twice or that cost a defect.
-- Group by *what goes wrong*, not by file.
+- Group by _what goes wrong_, not by file.
 - Standing, pre-verified project facts (MySQL behaviour, security surface) live in
   `AGENTS.md`, not here. This corpus holds what review actually caught.
 
@@ -33,7 +33,7 @@ One or two sentences.
 **Why:** the real finding(s) it came from, with PR numbers, and what it cost.
 
 **Tags:** `concern:…` `layer:…` `severity:must|should`
-**Check:** [ext] `ERE regex` :: remediation message   (only when mechanical)
+**Check:** [ext] `ERE regex` :: remediation message (only when mechanical)
 **Relates:** complements #M
 **Sources:** #PRs
 ```

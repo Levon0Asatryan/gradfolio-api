@@ -167,13 +167,13 @@ This repository is its backend API.
 
 Absolute path: `/Users/levon/Dev/university/gradfolio-repos`.
 
-| Path | What it is |
-| --- | --- |
-| `gradfolio-api/` | This repo. |
-| `gradfolio/` | Frontend: Next.js 16, MUI 7, Auth0 v4, on Vercel. All data is currently mock. |
-| `gradfolio-sql/` | MySQL 8.4 schema (11 tables), seed data, example queries, per-table docs. |
-| `docs/` | The product spec (`Student Portfolio Management System – Feature Specification.md`) and a competitor analysis. These are not in any repo. |
-| `issues.md` | Known defects across all three repos. |
+| Path             | What it is                                                                                                                                |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `gradfolio-api/` | This repo.                                                                                                                                |
+| `gradfolio/`     | Frontend: Next.js 16, MUI 7, Auth0 v4, on Vercel. All data is currently mock.                                                             |
+| `gradfolio-sql/` | MySQL 8.4 schema (11 tables), seed data, example queries, per-table docs.                                                                 |
+| `docs/`          | The product spec (`Student Portfolio Management System – Feature Specification.md`) and a competitor analysis. These are not in any repo. |
+| `issues.md`      | Known defects across all three repos.                                                                                                     |
 
 Background for every milestone:
 [`docs/investigation.md`](docs/investigation.md), covering the schema facts verified
@@ -181,26 +181,110 @@ by running them, the gaps between frontend and schema, and open decisions Q1–Q
 
 ### Stack
 
-**Not decided yet**: Spring Boot or NestJS (Q1). The M0 plan decides it. Until
-then:
+Decided: **NestJS 12 on Node 24, TypeScript 6.0 (ESM, `nodenext`)**, Express 5,
+zod 4 for config and request validation, pino (`nestjs-pino`) for logs, `mysql2`
+for the MySQL 8.4 pool, Vitest 5, ESLint 10 (type-aware) with Prettier, husky and
+lint-staged. The query layer on top of the pool (query builder or ORM) is still an
+M0 decision.
 
-- The "Commands" section below is empty.
-- Git hooks are not installed.
-- `scripts/check-branch.sh` works now. Run it by hand before pushing.
+- **TypeScript stays on 6.0.x**: typescript-eslint 8 supports `<6.1.0`. Dependabot
+  ignores TypeScript minor and major bumps.
+- **`npm run dev` uses `nest start --watch` (tsc), not tsx.** tsx (esbuild) does not
+  emit decorator metadata, so Nest's type-based injection gets `undefined`. This was
+  checked by running it: tsx gave `undefined`, while tsc and Vitest's oxc gave the
+  instance.
+- **`LOG_FORMAT=pretty` needs devDependencies.** The runtime image has no
+  pino-pretty, so containers log JSON.
 
 ### Commands
 
-<!-- Filled in by the M0 skeleton PR. Every command other files refer to: -->
+| Purpose                                         | Command                                                                                      |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| install                                         | `npm ci`                                                                                     |
+| build                                           | `npm run build`                                                                              |
+| dev server (reload, reads `.env`)               | `docker compose up -d mysql && npm run dev`                                                  |
+| verify (format + lint + types + openapi + unit) | `npm run verify`                                                                             |
+| unit                                            | `npm test`                                                                                   |
+| integration (real MySQL 8.4)                    | `docker compose up -d mysql && npm run test:int`                                             |
+| coverage (floor 90% on every metric)            | `npm run test:coverage`                                                                      |
+| regenerate the API document                     | `npm run openapi` (CI runs `openapi:check`)                                                  |
+| real run (API + MySQL, over HTTP)               | `docker compose up -d --build`, then the requests in `http/`; `docker compose down -v` after |
 
-| Purpose | Command |
-| --- | --- |
-| install | TBD (M0) |
-| build | TBD (M0) |
-| verify (format + lint + types + unit) | TBD (M0) |
-| unit | TBD (M0) |
-| integration (real MySQL 8.4) | TBD (M0) |
-| coverage, threshold TBD | TBD (M0) |
-| real run (API + MySQL, exercised over HTTP) | TBD (M0) |
+Docker Desktop on this machine: set
+`DOCKER_HOST=unix://$HOME/.docker/run/docker.sock` if the CLI cannot find the
+daemon.
+
+## File and folder structure
+
+Two rules, applied at two levels.
+
+### Level 1: feature modules, not technical layers
+
+Inside `api/`, group by **feature**: `health/`, `profiles/`, `projects/`. Never
+`controllers/` or `services/` at this level. Deleting a feature should mean deleting
+one folder.
+
+### Level 2: inside a module, one folder per role
+
+This is the standard NestJS layout:
+
+- `<name>.module.ts`, `<name>.controller.ts` and `<name>.service.ts` stay at the
+  module root;
+- then `dto/`, `services/`, `repositories/`, `guards/`, `decorators/`, `utils/` and
+  `e2e/` as each appears.
+
+Use the role folder even when it holds a single file.
+
+### Top level
+
+```
+src/
+  core/      shared, framework-light: config, logging, errors, db. Depends on nothing else in src/.
+  api/       HTTP: main.ts, bootstrap.ts, api.module.ts, common/, health/, openapi/, feature modules
+  testing/   test-only helpers; never imported by shipped code, excluded from the build
+```
+
+`src/architecture.test.ts` enforces this. Keeping `core` independent of `api` means
+a second process (a worker for imports or PDFs) needs no untangling first.
+
+### Naming
+
+- Files are named `<subject>.<role>.ts`, with a NestJS role: `module`, `controller`,
+  `service`, `repository`, `guard`, `decorator`, `pipe`, `filter`, `dto`.
+- Pure helpers use plain kebab-case.
+- Keep the subject prefix inside a role folder: `repositories/project.repository.ts`.
+- Relative imports end in `.js` (`nodenext`).
+
+### Tests
+
+- `<file>.test.ts` sits beside the file it tests: unit tests, no I/O.
+- `<file>.int.test.ts` is for anything that needs MySQL. It has a separate Vitest
+  config and a separate CI job.
+- Tests that span a whole module go in `<module>/e2e/<subject>.int.test.ts`.
+- `src/testing/app.ts` builds the real app, the way `main.ts` does, for HTTP tests.
+
+### Endpoints are finished only when
+
+- `openapi.yaml` is regenerated: `OPERATIONS` in `src/api/openapi/document.ts`, then
+  `npm run openapi`. `document.test.ts` fails on any route that is served but not
+  documented, and on any route that is documented but not served.
+- Its request is in `http/<module>.http`.
+- Its ownership and visibility checks each have a test where a second user gets 404.
+
+### When files move
+
+Update the coverage exclusion paths in `vitest.config.mts`. They are literal paths,
+so a move silently re-admits an excluded file.
+
+## Other conventions
+
+- **Configuration** is injected through `APP_CONFIG`, never read from a module-level
+  singleton. Every variable is declared in `src/core/config/schema.ts` and validated
+  at boot.
+- **Logging** uses a static message, with variable data in fields. Tokens and private
+  profile fields are redacted, and the query string is never logged.
+- **Errors** carry a stable `code`. Internal detail goes to the log, never to a
+  response (`src/core/errors/http-mapping.ts`).
 
 ### Facts every chat must know
 

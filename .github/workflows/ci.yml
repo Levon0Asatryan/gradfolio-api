@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push to a PR makes the previous run irrelevant.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Fast feedback: needs no services and fails in seconds.
+  static:
+    name: Format, lint, types, OpenAPI
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      # The committed document must match what the schemas produce, or a
+      # changed request shape ships a spec describing the old one.
+      - run: npm run openapi:check
+
+  test:
+    name: Unit tests + coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # The thresholds are a floor; running them here stops it slipping.
+      - run: npm run test:coverage
+
+  # Behaviour that depends on MySQL is tested against MySQL 8.4, never a
+  # stand-in: session time zone, real driver errors, utf8mb4.
+  integration:
+    name: Integration tests (MySQL 8.4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: gradfolio_test
+          MYSQL_USER: gradfolio
+          MYSQL_PASSWORD: gradfolio
+          # Not UTC on purpose -- see docker-compose.yml.
+          TZ: Asia/Yerevan
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: mysql://gradfolio:gradfolio@127.0.0.1:3306/gradfolio_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run test:int
+
+  # The deployment artefact has to build, and the stack has to come up.
+  stack:
+    name: Container stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Start the stack from one command
+        run: docker compose up -d --build
+
+      - name: Wait for the api to report ready
+        run: |
+          for i in $(seq 1 90); do
+            if curl -fsS http://localhost:3000/readyz >/dev/null 2>&1; then
+              echo "ready after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::api never became ready"
+          docker compose ps -a; docker compose logs
+          exit 1
+
+      - name: Liveness, readiness, version prefix, JSON 404, docs
+        run: |
+          curl -fsS http://localhost:3000/healthz | grep -q '"status":"ok"'
+          curl -fsS http://localhost:3000/readyz  | grep -q '"database":"ok"'
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/v1/healthz)
+          [ "$code" = "404" ] || { echo "::error::/v1/healthz answered $code"; exit 1; }
+          curl -s http://localhost:3000/nope | grep -q '"code":"NOT_FOUND"'
+          curl -fsS http://localhost:3000/docs-json | grep -q '"Gradfolio API"'
+
+      # An unhandled pool error event is fatal in Node; a database restart must
+      # not take the api down with it.
+      - name: Survives a database restart
+        run: |
+          docker compose restart mysql
+          sleep 5
+          docker compose ps api --status running --format '{{.Name}}' | grep -q . \
+            || { echo "::error::api died when the database restarted"; docker compose logs api; exit 1; }
+          curl -fsS --retry 30 --retry-delay 2 --retry-all-errors http://localhost:3000/readyz \
+            | grep -q '"database":"ok"'
+
+      - name: Readiness fails while the database is down, liveness does not
+        run: |
+          docker compose stop mysql
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://localhost:3000/readyz)
+          [ "$code" = "503" ] || { echo "::error::readyz answered $code with mysql down"; exit 1; }
+          curl -fsS http://localhost:3000/healthz | grep -q '"status":"ok"'
+          docker compose start mysql
+
+      - name: Stops gracefully
+        run: |
+          docker compose stop api
+          code=$(docker inspect gradfolio-api-api-1 --format '{{.State.ExitCode}}')
+          [ "$code" = "0" ] || { echo "::error::api exited with $code, expected 0"; exit 1; }
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: docker compose ps -a && docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

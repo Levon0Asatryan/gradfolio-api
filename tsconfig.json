@@ -1,0 +1,41 @@
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "target": "ES2024",
+    "lib": ["ES2024"],
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "sourceMap": true,
+    "removeComments": true,
+    "incremental": true,
+    // Inside the output directory, not beside the config: a build marker that
+    // outlives the output it describes makes `rm -rf dist && npm run build`
+    // emit nothing at all -- tsc considers the project current. Deleting dist
+    // must delete the marker. tsconfig.build.json overrides the name, because
+    // the two projects compile different file sets and must not share one.
+    "tsBuildInfoFile": "./dist/.tsbuildinfo.typecheck",
+    "resolveJsonModule": true,
+
+    // Nest's dependency injection reads constructor parameter types from the
+    // metadata these emit.
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+
+    "strict": true,
+    "strictPropertyInitialization": false,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

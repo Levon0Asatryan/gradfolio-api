@@ -1,0 +1,28 @@
+### api/common -- behaviour every route shares
+
+@baseUrl = {{$dotenv baseUrl}}
+
+###
+# @name notFoundInsidePrefix
+# 404 {"code":"NOT_FOUND","message":"resource not found"} -- JSON, not HTML.
+GET {{baseUrl}}/v1/does-not-exist
+
+###
+# @name notFoundOutsidePrefix
+# The same body as above.
+GET {{baseUrl}}/does-not-exist
+
+###
+# @name malformedJson
+# 400 {"code":"BAD_REQUEST",...}. The parser's own message is not echoed.
+POST {{baseUrl}}/v1/anything
+Content-Type: application/json
+
+{"broken":
+
+###
+# Body over API_BODY_LIMIT (256kb by default) -> 413 PAYLOAD_TOO_LARGE.
+# No interactive client produces one comfortably, so from a shell:
+#   head -c 300000 /dev/zero | tr '\0' 'x' | sed 's/^/{"x":"/; s/$/"}/' \
+#     | curl -s -X POST -H 'content-type: application/json' --data-binary @- \
+#       http://127.0.0.1:3000/v1/anything
