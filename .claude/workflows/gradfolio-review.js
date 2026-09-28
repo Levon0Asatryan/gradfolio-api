@@ -44,7 +44,7 @@ phase('Review by lens');
 
 const reviews = await pipeline(lenses, (lens) =>
   agent(
-    `You are reviewing one lens of a gradfolio-backend branch: ${lens.label}.
+    `You are reviewing one lens of a gradfolio-api branch: ${lens.label}.
 ${lens.brief}
 Report ONLY what the severity contract allows. One finding per defect. For
 each: file:line, one sentence, and the concrete failure. Cite any fact you

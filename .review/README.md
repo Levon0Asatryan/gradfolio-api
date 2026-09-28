@@ -16,7 +16,7 @@ review-plugin stack detection to `gradfolio` for that reason.
 - A rule nobody has fought with for a milestone or two is deleted.
 - At each milestone close, **mine the new PRs again** rather than writing rules
   from memory:
-  `gh api repos/Levon0Asatryan/gradfolio-backend/pulls/<n>/comments --paginate`
+  `gh api repos/Levon0Asatryan/gradfolio-api/pulls/<n>/comments --paginate`
   and `…/pulls/<n>/reviews`; cluster by defect shape; one rule per cluster seen
   twice or that cost a defect.
 - Group by *what goes wrong*, not by file.

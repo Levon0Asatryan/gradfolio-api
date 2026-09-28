@@ -1,4 +1,4 @@
-# gradfolio-backend
+# gradfolio-api
 
 Backend API for **Gradfolio**, a student portfolio platform built as NPUA university
 coursework. Students use it to show their projects, skills and achievements, with
