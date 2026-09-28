@@ -1,0 +1,16 @@
+### api/openapi -- the documentation page, when it is served at all
+#
+# Off unless API_DOCS_ENABLED=true. docker-compose.yml and .env.example set it;
+# with it unset, both answer 404.
+
+@baseUrl = {{$dotenv baseUrl}}
+
+###
+# @name docsPage
+# 200 text/html -- Swagger UI over the same document openapi.yaml holds.
+GET {{baseUrl}}/docs
+
+###
+# @name docsJson
+# 200 -- the OpenAPI document.
+GET {{baseUrl}}/docs-json
