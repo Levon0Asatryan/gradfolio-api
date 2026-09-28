@@ -1,11 +1,11 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import type { PinoLogger } from 'nestjs-pino';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { DbService } from '../../core/db/db.service.js';
 import { testConfig } from '../../testing/database.js';
 import { HealthController } from './health.controller.js';
 
-function controller(ping: () => Promise<void>, timeoutMs = 3000) {
+function controller(ping: (timeoutMs: number) => Promise<void>, timeoutMs = 3000) {
   const logger = { error: vi.fn() } as unknown as PinoLogger;
   const db = { ping } as unknown as DbService;
   const cfg = testConfig({ HEALTH_TIMEOUT_MS: String(timeoutMs) });
@@ -13,10 +13,6 @@ function controller(ping: () => Promise<void>, timeoutMs = 3000) {
 }
 
 describe('HealthController', () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   it('liveness never touches the database', () => {
     const ping = vi.fn();
     expect(controller(ping).ctrl.live()).toEqual({ status: 'ok' });
@@ -48,13 +44,9 @@ describe('HealthController', () => {
     );
   });
 
-  it('readiness gives up at its deadline when the database never answers', async () => {
-    vi.useFakeTimers();
-    const { ctrl } = controller(() => new Promise<void>(() => undefined), 500);
-
-    const pending = ctrl.ready().catch((e: unknown) => e);
-    await vi.advanceTimersByTimeAsync(500);
-
-    expect(await pending).toBeInstanceOf(ServiceUnavailableException);
+  it('readiness hands the configured deadline to the database ping', async () => {
+    const ping = vi.fn(() => Promise.resolve());
+    await controller(ping, 1234).ctrl.ready();
+    expect(ping).toHaveBeenCalledWith(1234);
   });
 });

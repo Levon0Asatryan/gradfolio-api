@@ -20,11 +20,17 @@ export class HealthController {
     return { status: 'ok' };
   }
 
-  /** Readiness: the process can actually serve traffic. */
+  /**
+   * Readiness: the process can actually serve traffic.
+   *
+   * Bounded by HEALTH_TIMEOUT_MS in time *and* in resources: DbService.ping
+   * destroys its connection at the deadline, so a stalled database cannot make
+   * repeated probes pile up queries or drain the pool.
+   */
   @Get(READINESS_PATH)
   async ready(): Promise<{ status: 'ok'; database: 'ok' }> {
     try {
-      await this.pingWithDeadline();
+      await this.db.ping(this.cfg.HEALTH_TIMEOUT_MS);
     } catch (err) {
       // The cause goes to the log; the unauthenticated caller gets a code.
       this.logger.error({ cause: describeError(err) }, 'readiness check failed');
@@ -34,26 +40,5 @@ export class HealthController {
       });
     }
     return { status: 'ok', database: 'ok' };
-  }
-
-  /**
-   * Bounded by its own deadline. The pool's connect timeout bounds acquiring a
-   * connection, not a query on one already open: a database that accepts
-   * connections and stops answering would otherwise hold this request open.
-   */
-  private async pingWithDeadline(): Promise<void> {
-    let timer: NodeJS.Timeout | undefined;
-    const deadline = new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(
-        () => reject(new Error(`readiness query exceeded ${this.cfg.HEALTH_TIMEOUT_MS}ms`)),
-        this.cfg.HEALTH_TIMEOUT_MS,
-      );
-    });
-
-    try {
-      await Promise.race([this.db.ping(), deadline]);
-    } finally {
-      clearTimeout(timer);
-    }
   }
 }

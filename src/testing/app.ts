@@ -31,7 +31,7 @@ export async function buildApp(
   return app;
 }
 
-export const stubDb = (ping: () => Promise<void> = () => Promise.resolve()) => ({
+export const stubDb = (ping: (timeoutMs: number) => Promise<void> = () => Promise.resolve()) => ({
   ping,
   onModuleDestroy: () => Promise.resolve(),
 });
