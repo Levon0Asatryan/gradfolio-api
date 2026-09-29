@@ -17,6 +17,7 @@
     "db:schema": "tsx --env-file-if-exists=.env src/core/db/migrator/dump-cli.ts",
     "db:types": "kysely-codegen --config-file .kysely-codegenrc.json",
     "db:types:check": "kysely-codegen --config-file .kysely-codegenrc.json --verify",
+    "db:seed": "tsx --env-file-if-exists=.env src/core/db/seed/cli.ts",
     "openapi": "tsx src/api/openapi/cli.ts",
     "openapi:check": "tsx src/api/openapi/cli.ts --check",
     "test": "vitest run",

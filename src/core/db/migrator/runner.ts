@@ -114,6 +114,20 @@ export async function down(
   });
 }
 
+/**
+ * Migrations not fully applied, in order. Reads without the lock; it refuses,
+ * like `up`, when the registry contradicts the files.
+ */
+export async function pending(conn: Connection, migrations: Migration[]): Promise<string[]> {
+  const progress = await loadProgress(conn, migrations);
+  return migrations
+    .filter((m) => {
+      const done = progress.get(m.name);
+      return !done || done.down.size > 0 || m.up.some((s) => !done.up.has(s.index));
+    })
+    .map((m) => m.name);
+}
+
 function upTo(migrations: Migration[], to: string): Migration[] {
   const i = migrations.findIndex((m) => m.name === to);
   if (i === -1) throw new MigrationError(`no migration named ${to}`);
