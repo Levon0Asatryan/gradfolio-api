@@ -1,5 +1,9 @@
 import { randomBytes } from 'node:crypto';
-import { createConnection } from 'mysql2/promise';
+import { sql } from 'kysely';
+import { createConnection, type Pool } from 'mysql2/promise';
+import { createDatabase, type Database } from '../core/db/database.js';
+import { REGISTRY_TABLE } from '../core/db/migrator/registry.js';
+import { createPool } from '../core/db/pool.js';
 import { loadConfig, type AppConfig } from '../core/config/index.js';
 
 /**
@@ -62,4 +66,42 @@ export async function scratchDatabase(): Promise<ScratchDatabase> {
       }
     },
   };
+}
+
+let shared: { pool: Pool; db: Database } | undefined;
+
+/**
+ * Kysely on the integration database, shared by one test file and closed by
+ * the per-file hook in integration-setup.ts.
+ */
+export function testDatabase(): Database {
+  if (!shared) {
+    const pool = createPool({ ...testConfig(), DATABASE_POOL_MAX: 5 });
+    shared = { pool, db: createDatabase(pool) };
+  }
+  return shared.db;
+}
+
+export async function closeTestDatabase(): Promise<void> {
+  const current = shared;
+  shared = undefined;
+  await current?.pool.end();
+}
+
+/**
+ * Empties every table except the migration registry. DELETE rather than
+ * TRUNCATE: about 10 ms against 180 ms for the 11 baseline tables (plan §8).
+ * Foreign key checks are off for this session only, so the order is free.
+ */
+export async function resetDatabase(db: Database = testDatabase()): Promise<void> {
+  await sql`SET FOREIGN_KEY_CHECKS = 0`.execute(db);
+  try {
+    const tables = await sql<{ name: string }>`
+      SELECT table_name AS name FROM information_schema.tables
+       WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'
+         AND table_name <> ${REGISTRY_TABLE}`.execute(db);
+    for (const { name } of tables.rows) await sql`DELETE FROM ${sql.table(name)}`.execute(db);
+  } finally {
+    await sql`SET FOREIGN_KEY_CHECKS = 1`.execute(db);
+  }
 }

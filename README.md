@@ -57,6 +57,8 @@ npm run dev                         # http://localhost:3000, reloads on change
 | `npm run migrate`       | Apply pending migrations (`-- --to <name>` to stop at one)            |
 | `npm run migrate:down`  | Roll back the latest migration (`-- --all`, or `-- --to <name>`)      |
 | `npm run db:schema`     | Print the normalized schema (`SHOW CREATE TABLE`), for diffing        |
+| `npm run db:types`      | Regenerate `src/core/db/types.generated.ts` from the migrated schema  |
+| `npm run db:seed`       | Load the en/ru/am demo data (not in production; after `migrate`)      |
 
 ## Schema and migrations
 

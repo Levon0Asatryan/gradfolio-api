@@ -2,22 +2,23 @@ import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common';
 import type { Pool, PoolConnection } from 'mysql2/promise';
 import { APP_CONFIG } from '../config/config.module.js';
 import type { AppConfig } from '../config/schema.js';
+import { createDatabase, type Database } from './database.js';
 import { createPool } from './pool.js';
 
 /**
- * Owns the MySQL pool for the process lifetime.
- *
- * The query layer on top of it (query builder or ORM) is an M0 decision; until
- * then this exposes the pool and a bounded liveness query.
+ * Owns the MySQL pool for the process lifetime, and the typed query layer
+ * (Kysely, `db`) on top of it.
  */
 @Injectable()
 export class DbService implements OnModuleDestroy {
   readonly pool: Pool;
+  readonly db: Database;
 
   constructor(@Inject(APP_CONFIG) cfg: AppConfig) {
     // Lazy: mysql2 opens connections on first use, so constructing the app
     // does not need a reachable database -- readiness reports that instead.
     this.pool = createPool(cfg);
+    this.db = createDatabase(this.pool);
   }
 
   /** `SELECT 1`, bounded by `timeoutMs` in time and in resources. */

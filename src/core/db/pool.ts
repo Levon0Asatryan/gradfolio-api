@@ -1,6 +1,11 @@
 import { createPool as createMysqlPool, type Pool, type PoolOptions } from 'mysql2/promise';
 import type { AppConfig } from '../config/schema.js';
 
+/** The column mysql2 hands a `typeCast` function. */
+type TypeCastField = Parameters<
+  Extract<NonNullable<PoolOptions['typeCast']>, (...args: never[]) => unknown>
+>[0];
+
 /**
  * Every connection's session time zone.
  *
@@ -20,6 +25,21 @@ type DbConfig = Pick<
   | 'DATABASE_SSL_CA'
 >;
 
+/**
+ * Reads `TINYINT(1)` -- the schema's boolean -- as a JS boolean.
+ *
+ * mysql2 returns it as the number 0 or 1, and Kysely passes that through, so
+ * `isPublic` would be `1` where the types promise `true`. Only display width 1
+ * is converted: every boolean column is `TINYINT(1)`, and nothing else is.
+ */
+export const castTinyIntBoolean = (field: TypeCastField, next: () => unknown): unknown => {
+  if (field.type === 'TINY' && field.length === 1) {
+    const value = field.string();
+    return value === null ? null : value === '1';
+  }
+  return next();
+};
+
 export function poolOptions(cfg: DbConfig): PoolOptions {
   return {
     uri: cfg.DATABASE_URL,
@@ -29,6 +49,11 @@ export function poolOptions(cfg: DbConfig): PoolOptions {
     // session zone set below.
     timezone: 'Z',
     charset: 'utf8mb4_unicode_ci',
+    typeCast: castTinyIntBoolean,
+    // DATE is a calendar day, not an instant: as a JS Date it becomes midnight
+    // in some zone, and a reader in another zone sees the day before. Kept as
+    // 'YYYY-MM-DD'. DATETIME stays a Date, read as UTC.
+    dateStrings: ['DATE'],
     // A dropped idle connection is noticed before a request picks it up.
     enableKeepAlive: true,
     ...(cfg.DATABASE_SSL === 'required'

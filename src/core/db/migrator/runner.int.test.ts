@@ -4,7 +4,7 @@ import { scratchDatabase, type ScratchDatabase, testConfig } from '../../../test
 import { createPool } from '../pool.js';
 import { loadMigrations, type Migration, parseSteps } from './files.js';
 import { type Connection, REGISTRY_TABLE } from './registry.js';
-import { down, MigrationError, type RunOptions, up } from './runner.js';
+import { down, MigrationError, pending, type RunOptions, up } from './runner.js';
 import { dumpSchema } from './schema-dump.js';
 
 /** Polls a condition on the server; fails the test if it never holds. */
@@ -213,6 +213,14 @@ describe('migration runner against MySQL 8.4', () => {
     expect(await down(conn, opts([broken]))).toEqual(['0001_two_steps']);
     expect(await recorded()).toEqual([]);
     expect(await dumpSchema(conn)).toBe(before);
+  });
+
+  it('reports which migrations are not fully applied', async () => {
+    expect(await pending(conn, [fixed])).toEqual(['0001_two_steps']);
+    await up(conn, opts([broken])).catch(() => undefined);
+    expect(await pending(conn, [fixed])).toEqual(['0001_two_steps']);
+    await up(conn, opts([fixed]));
+    expect(await pending(conn, [fixed])).toEqual([]);
   });
 
   it('rolls back the latest by default, everything after --to, or everything with --all', async () => {
