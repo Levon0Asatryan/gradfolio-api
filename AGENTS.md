@@ -22,6 +22,9 @@ evidence attached, to recruiters and peers. The API serves the Next.js frontend
 
 ## Code Review Rules
 
+Read by both reviewers of record: Codex (from this file) and GitHub Copilot (through
+`.github/copilot-instructions.md`, which points here). Every push is reviewed by both.
+
 ### What to report, and what to leave alone
 
 This is university coursework on a deadline. Every review round costs the author five
