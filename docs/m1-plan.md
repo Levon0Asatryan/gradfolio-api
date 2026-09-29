@@ -12,15 +12,15 @@ and outputs that matter are quoted below.
 
 ## 1. Decisions
 
-| ID       | Decision                                                                                                                                                                                                                    | Evidence |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| Q12      | **Kysely** on the existing `mysql2` pool, row types **generated** by kysely-codegen from the migrated database with per-column overrides, checked for drift in CI.                                                          | §2       |
-| Q2       | **The API owns the schema.** Versioned `.sql` migrations in this repo, applied by **our own small runner** (one statement per step, each step recorded on success, guarded DDL). Baseline = `gradfolio-sql/sql/schema.sql`. | §3       |
-| Q2 (sql) | `gradfolio-sql` stays as reference docs: `schema.sql` is frozen as the baseline snapshot, its README points to this repo's migrations, its compose/seed/queries are fixed (1.11–1.14).                                      | §3.5     |
-| 1.6      | Project technologies and tags move from JSON columns into **`project_technologies` and `project_tags` tables** (utf8mb4_unicode_ci), plus UNIQUE `(user_id, skill_name)` on `user_skills`.                                  | §6       |
-| 1.8      | CHECK constraints on every JSON column (**`JSON_SCHEMA_VALID`**, element shape, not only "is an array") and every `YYYY-MM` column (`REGEXP_LIKE`).                                                                         | §7       |
-| 1.9      | Clean database **per test file by `DELETE`** (FK checks off), automatic via a Vitest `setupFiles` hook. No transaction-per-test.                                                                                            | §8       |
-| 1.10     | TypeScript seed with fixed UUIDs, en/ru/am data, links built from those ids, owner never a team-member row; one transaction; idempotent.                                                                                    | §9       |
+| ID       | Decision                                                                                                                                                                                                                                                      | Evidence |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| Q12      | **Kysely** on the existing `mysql2` pool, row types **generated** by kysely-codegen from the migrated database with per-column overrides, checked for drift in CI.                                                                                            | §2       |
+| Q2       | **The API owns the schema.** Versioned `.sql` migrations in this repo, applied by **our own small runner** (one statement per step, each step recorded on success, guarded DDL). Baseline = `gradfolio-sql/sql/schema.sql`.                                   | §3       |
+| Q2 (sql) | `gradfolio-sql` stays as reference docs: `schema.sql` is frozen as the baseline snapshot, its README points to this repo's migrations, its compose/seed/queries are fixed (1.11–1.14).                                                                        | §3.5     |
+| 1.6      | Project technologies and tags move from JSON columns into **`project_technologies` and `project_tags` tables** (utf8mb4_unicode_ci); canonical spellings in a case-insensitively keyed **`terms`** registry; UNIQUE `(user_id, skill_name)` on `user_skills`. | §6       |
+| 1.8      | CHECK constraints on every JSON column (**`JSON_SCHEMA_VALID`**, element shape, not only "is an array") and every `YYYY-MM` column (`REGEXP_LIKE`).                                                                                                           | §7       |
+| 1.9      | Clean database **per test file by `DELETE`** (FK checks off), automatic via a Vitest `setupFiles` hook. No transaction-per-test.                                                                                                                              | §8       |
+| 1.10     | TypeScript seed with fixed UUIDs, en/ru/am data, links built from those ids, owner never a team-member row; one transaction; idempotent.                                                                                                                      | §9       |
 
 ## 2. Q12: the query layer
 
@@ -200,12 +200,12 @@ connection, `multipleStatements` off.
 
 ### 3.4 Migrations in M1
 
-| Migration             | Up steps                                                                                                                                                                                                                                                                                               | Down steps                                                                                                                                                 |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0001_baseline`       | 11 × `CREATE TABLE IF NOT EXISTS`, text identical to `schema.sql` otherwise (1.2)                                                                                                                                                                                                                      | 11 × `DROP TABLE IF EXISTS`, children first                                                                                                                |
-| `0002_value_checks`   | one guarded `ALTER TABLE … ADD CONSTRAINT … CHECK …` per table (education, experience, certifications, projects, activities); §7                                                                                                                                                                       | one guarded `ALTER TABLE … DROP CHECK …` per table                                                                                                         |
-| `0003_project_terms`  | `CREATE TABLE IF NOT EXISTS project_technologies`, `… project_tags`; backfill each from the JSON column (`INSERT … SELECT … JSON_TABLE … ON DUPLICATE KEY UPDATE`); guarded `ALTER TABLE projects DROP COLUMN tags, DROP COLUMN technologies`; guarded UNIQUE `(user_id, skill_name)` on `user_skills` | re-add both JSON columns and their CHECKs (guarded); backfill them from the tables (ordered, below); drop the UNIQUE (guarded); `DROP TABLE IF EXISTS` × 2 |
-| `0004_project_source` | one guarded `ALTER TABLE projects ADD …` (1.7, §3.6)                                                                                                                                                                                                                                                   | one guarded `ALTER TABLE projects DROP …`                                                                                                                  |
+| Migration             | Up steps                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Down steps                                                                                                                                                                                                                |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0001_baseline`       | 11 × `CREATE TABLE IF NOT EXISTS`, text identical to `schema.sql` otherwise (1.2)                                                                                                                                                                                                                                                                                                                                                                                                                               | 11 × `DROP TABLE IF EXISTS`, children first                                                                                                                                                                               |
+| `0002_value_checks`   | one guarded `ALTER TABLE … ADD CONSTRAINT … CHECK …` per table (education, experience, certifications, projects, activities); §7                                                                                                                                                                                                                                                                                                                                                                                | one guarded `ALTER TABLE … DROP CHECK …` per table                                                                                                                                                                        |
+| `0003_project_terms`  | `CREATE TABLE IF NOT EXISTS terms`, `… project_technologies`, `… project_tags`; backfill each from the JSON column (`INSERT … SELECT … JSON_TABLE … ON DUPLICATE KEY UPDATE`); register every existing spelling in `terms` (skills first, then technologies, then tags; `ON DUPLICATE KEY UPDATE`); rewrite each row's name to its `terms` spelling (`UPDATE … JOIN terms`); guarded `ALTER TABLE projects DROP COLUMN tags, DROP COLUMN technologies`; guarded UNIQUE `(user_id, skill_name)` on `user_skills` | re-add both JSON columns and their CHECKs (guarded); backfill them from the tables (ordered, below); drop the UNIQUE (guarded); `DROP TABLE IF EXISTS` × 3. Rewritten spellings are not restored: they were the same term |
+| `0004_project_source` | one guarded `ALTER TABLE projects ADD …` (1.7, §3.6)                                                                                                                                                                                                                                                                                                                                                                                                                                                            | one guarded `ALTER TABLE projects DROP …`                                                                                                                                                                                 |
 
 Facts behind 0003 (**run**): dropping a column also drops its single-column CHECK
 (`DROP CHECK x, DROP COLUMN c` fails 3821, `DROP COLUMN c` alone succeeds); the down
@@ -357,15 +357,37 @@ project_technologies (          -- project_tags: same shape
 clickable-tag namespace (spec §4, "Technologies/Skills Used … clickable").
 `experience.skills` stays JSON (a display list inside one entry, never matched).
 
+The canonical spelling lives in a registry keyed case-insensitively:
+
+```sql
+terms (
+  name VARCHAR(255) NOT NULL,             -- utf8mb4_unicode_ci
+  PRIMARY KEY (name)                      -- 'React' and 'react' are the same key
+)
+```
+
 **The rule.** `normalizeTerm`: NFC, trim, collapse internal whitespace; empty is
-rejected. **Stored in canonical case**: on write, a term that already exists
-case-insensitively in `user_skills`, `project_technologies` or `project_tags` is stored
-in its most-used existing spelling (`canonicalizeTerms(db, names)`); a new term is
-stored as entered. **Matched case-insensitively**: by the collation, never by
-`JSON_CONTAINS`. Duplicates within one list collapse to the first (the primary key
-decides, so it agrees with the collation exactly). Two concurrent first writers of
-`react` and `React` can both store their own spelling; matching is unaffected, and the
-tag cloud groups by the collation.
+rejected. **Stored in canonical case**: `canonicalizeTerms(trx, names)` runs, inside the
+writer's transaction, `INSERT INTO terms (name) VALUES (?) ON DUPLICATE KEY UPDATE name =
+name`, then `SELECT name FROM terms WHERE name = ? FOR SHARE`. The spelling that
+reaches the key first wins, and every writer stores that spelling in `user_skills`,
+`project_technologies` or `project_tags`. **Matched case-insensitively**: by the
+collation, never by `JSON_CONTAINS`. Duplicates within one list collapse to the first
+(the primary key decides, so it agrees with the collation exactly). `terms` rows are
+never deleted: a term nobody uses any more keeps its spelling, which is harmless.
+
+The race, forced with a barrier (**run**): transaction A registers `React` and stays
+open; transaction B, which already holds a REPEATABLE READ snapshot, registers `react`
+and blocks on the key.
+
+- A commits → B's insert becomes a no-op, and its `FOR SHARE` read returns **`React`**.
+  One row in `terms`.
+- A rolls back → B's `react` is inserted and returned; A's rows are gone with it, so no
+  second spelling survives.
+- Guard removed (plain `SELECT` instead of `FOR SHARE`) → B's old snapshot reads
+  **no row**. That is why the read is a locking read.
+- The rollback case can also deadlock a waiter (§2.1), so writers run in
+  `inTransaction` (1213 retry).
 
 ## 7. CHECK constraints (1.8)
 
@@ -482,28 +504,29 @@ opting in.
 
 Every guard ships with a test that fails when the guard is removed (Phase 3 table).
 
-| Property                                                       | Test that fails without it                                                                            |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Each step is recorded as soon as it succeeds                   | int: a two-step migration whose step 2 fails leaves step 1 recorded; the re-run completes             |
-| Guards close the crash window                                  | int: step executed, record deleted by the test, re-run → guard skips it, records it                   |
-| Every step is re-runnable                                      | unit: an unguarded `ALTER` in a fixture migration fails the lint                                      |
-| Applied steps are immutable                                    | int: change a recorded step's SQL → `up` refuses                                                      |
-| An older build cannot migrate a newer database                 | int: an unknown recorded migration → `up` refuses                                                     |
-| Two runners cannot interleave                                  | int: the test holds `GET_LOCK`, `up` with a 0 s timeout exits "another migration is running"          |
-| Down resumes after a partial failure                           | int: failing down step; the re-run completes; the schema snapshot equals the pre-migration one        |
-| Baseline = `schema.sql`                                        | int + CI: normalized diff is empty                                                                    |
-| up → down → up is identical                                    | CI job step 5                                                                                         |
-| `TINYINT(1)` is boolean; JSON keys kept; DATE is a string      | int against the real driver                                                                           |
-| Ids are generated in the app                                   | type test: an insert without `id` does not compile; int: the stored id is the one generated           |
-| JSON writes are validated                                      | type test: `JSON.stringify` output is not accepted; unit: each shape rejects the wrong one            |
-| Validator limits equal the real column limits                  | int: `COLUMN_LIMITS` vs `information_schema`; unit: 500 emoji pass `varchar(500)`, 501 fail           |
-| URL schemes are http/https only                                | unit: `javascript:`, `data:`, relative → rejected                                                     |
-| Tags match case-insensitively and store the canonical spelling | int: `React` stored, `react` written → stored as `React`, and a lookup by `REACT` finds both projects |
-| Each CHECK                                                     | int: `{"a":1}` into a JSON column, `banana` into a month column → MySQL 3819 (real transport)         |
-| MySQL error mapping (1062, 1213, 3819, 1406)                   | int: each code produced by a real statement, mapped by `mysqlErrno`                                   |
-| `inTransaction` retries a deadlock victim                      | int: a deadlock forced with the barrier; the retried transaction commits once                         |
-| Every test file starts clean                                   | int: two files; the second sees no rows from the first                                                |
-| Seed links resolve                                             | int: every notification `reference_id` joins a real project and its `link` = `/projects/<that id>`    |
+| Property                                                       | Test that fails without it                                                                                                                                                                    |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Each step is recorded as soon as it succeeds                   | int: a two-step migration whose step 2 fails leaves step 1 recorded; the re-run completes                                                                                                     |
+| Guards close the crash window                                  | int: step executed, record deleted by the test, re-run → guard skips it, records it                                                                                                           |
+| Every step is re-runnable                                      | unit: an unguarded `ALTER` in a fixture migration fails the lint                                                                                                                              |
+| Applied steps are immutable                                    | int: change a recorded step's SQL → `up` refuses                                                                                                                                              |
+| An older build cannot migrate a newer database                 | int: an unknown recorded migration → `up` refuses                                                                                                                                             |
+| Two runners cannot interleave                                  | int: the test holds `GET_LOCK`, `up` with a 0 s timeout exits "another migration is running"                                                                                                  |
+| Down resumes after a partial failure                           | int: failing down step; the re-run completes; the schema snapshot equals the pre-migration one                                                                                                |
+| Baseline = `schema.sql`                                        | int + CI: normalized diff is empty                                                                                                                                                            |
+| up → down → up is identical                                    | CI job step 5                                                                                                                                                                                 |
+| `TINYINT(1)` is boolean; JSON keys kept; DATE is a string      | int against the real driver                                                                                                                                                                   |
+| Ids are generated in the app                                   | type test: an insert without `id` does not compile; int: the stored id is the one generated                                                                                                   |
+| JSON writes are validated                                      | type test: `JSON.stringify` output is not accepted; unit: each shape rejects the wrong one                                                                                                    |
+| Validator limits equal the real column limits                  | int: `COLUMN_LIMITS` vs `information_schema`; unit: 500 emoji pass `varchar(500)`, 501 fail                                                                                                   |
+| URL schemes are http/https only                                | unit: `javascript:`, `data:`, relative → rejected                                                                                                                                             |
+| Tags match case-insensitively and store the canonical spelling | int: `React` stored, `react` written → stored as `React`, and a lookup by `REACT` finds both projects                                                                                         |
+| Concurrent first writers agree on one spelling                 | int, barrier: A registers `React` and holds; B (old snapshot) registers `react` and blocks; A commits → B stores `React`. Fails with a plain `SELECT` instead of `FOR SHARE` (B reads no row) |
+| Each CHECK                                                     | int: `{"a":1}` into a JSON column, `banana` into a month column → MySQL 3819 (real transport)                                                                                                 |
+| MySQL error mapping (1062, 1213, 3819, 1406)                   | int: each code produced by a real statement, mapped by `mysqlErrno`                                                                                                                           |
+| `inTransaction` retries a deadlock victim                      | int: a deadlock forced with the barrier; the retried transaction commits once                                                                                                                 |
+| Every test file starts clean                                   | int: two files; the second sees no rows from the first                                                                                                                                        |
+| Seed links resolve                                             | int: every notification `reference_id` joins a real project and its `link` = `/projects/<that id>`                                                                                            |
 
 ## 12. Pull requests
 
@@ -552,7 +575,7 @@ columns (the API validates them).
 ## 15. Proposed tracker changes (for the orchestrator)
 
 - Q2, Q12 → decided, per §1.
-- 1.6 text: "two tables (`project_technologies`, `project_tags`); JSON columns dropped".
+- 1.6 text: "two tables (`project_technologies`, `project_tags`) plus a `terms` registry for the canonical spelling; JSON columns dropped".
 - 1.8: no longer "optional".
 - 9.1: "run the baseline diff against Aiven before its first `migrate`".
 - New follow-up for M2 (Q7): upsert = ODKU + re-read outside the transaction or with
