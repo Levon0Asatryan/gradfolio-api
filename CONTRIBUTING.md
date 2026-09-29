@@ -63,8 +63,9 @@ npm run dev
    The pre-push hook also runs `/gradfolio-review` (Claude Code) through
    `scripts/require-review.sh`. See `CLAUDE.md`.
 
-CI runs every job on every push, and all of them must pass. An automated reviewer
-comments on each push. Every thread gets a reply, whether that is a fix or a reasoned
+CI runs every job on every push, and all of them must pass. Two automated reviewers,
+GitHub Copilot and Codex, review each push. Request both with
+`sh scripts/request-review.sh`. Every thread gets a reply, whether that is a fix or a reasoned
 disagreement.
 
 ## Code of conduct

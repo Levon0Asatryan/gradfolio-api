@@ -46,7 +46,7 @@ merges pull requests. No chat merges.
 
 1. **The first push is a finished PR, not a draft.** Phase 3 (the full test suite,
    removing each guard to prove its test fails, and a real run) happens **before**
-   the first push of code. If the reviewer sees work the author hasn't checked, the
+   the first push of code. If the reviewers see work the author hasn't checked, the
    author's own defects become review rounds.
 2. **One push per round, carrying every finding from that round.** Read all the
    comments, decide on all of them, fix all of them, then push once.
@@ -135,14 +135,23 @@ merges pull requests. No chat merges.
    check what was stored. Passing tests alone is not done.
 3. CI is green on every job, and `gh pr view <n> --json mergeable` says `MERGEABLE`.
    Green checks do not mean there are no conflicts.
-4. The reviewer reviews every push.
-   - Read findings with
+4. **Both reviewers review every push: GitHub Copilot and Codex.**
+   - Request both on every push, including the confirmation round and docs-only PRs
+     (docs-only PRs do not wait for them before merging):
+     `sh scripts/request-review.sh [pr] ["scope note"]`.
+     - Copilot is requested as a formal reviewer.
+     - Codex is asked through an `@codex review` comment, because it is a GitHub App
+       and the review-request API does not accept it.
+   - Read the findings from both with
      `gh api repos/Levon0Asatryan/gradfolio-api/pulls/<n>/comments --paginate`.
-   - The reviewer is done with a push only when either:
-     - `pulls/<n>/reviews` has an entry whose `commit_id` is the head commit, or
-     - its no-findings 👍 comment or reaction is timestamped after the head commit
-       was pushed.
-   - 👀 means it is still reviewing.
+   - A push counts as reviewed only when **both** have reviewed the head commit.
+     `sh scripts/review-status.sh [pr]` checks this and exits 0 only when both have.
+     - A reviewer has reviewed the head when `pulls/<n>/reviews` has an entry of theirs
+       whose `commit_id` is the head.
+     - For Codex, a no-findings 👍 timestamped after the head was pushed also counts.
+       A 👀 from Codex means it is still reviewing.
+   - Findings from both reviewers on the same push belong to **one** round: decide all
+     of them, then push once.
 5. **Leave the machine clean.**
    - Stop everything a run started, and check for one-off containers or processes the
      task created.
