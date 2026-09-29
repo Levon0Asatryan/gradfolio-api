@@ -97,7 +97,7 @@ describe('CHECK constraints', () => {
   });
 });
 
-/** The unique keys the migrations add, each rejecting a real duplicate. */
+/** The unique keys 0003 and 0004 add, each rejecting a real duplicate. */
 describe('unique keys', () => {
   const db = testDatabase();
   const errnoOf = (p: Promise<unknown>) => p.then(() => undefined, mysqlErrno);
@@ -112,5 +112,21 @@ describe('unique keys', () => {
     expect(await errnoOf(insert(user.id, 'REACT'))).toBe(MysqlErrno.DUPLICATE_KEY);
     // Another user may have the same skill.
     expect(await errnoOf(insert(other.id, 'React'))).toBeUndefined();
+  });
+
+  it('projects: one import of a GitHub repository per user (0004)', async () => {
+    const user = await createUser(db);
+    const other = await createUser(db);
+    const insert = (userId: string, githubRepoId: number | null) =>
+      db
+        .insertInto('projects')
+        .values({ id: newId(), userId, title: 't', source: 'github', githubRepoId })
+        .execute();
+    await insert(user.id, 812345678);
+    expect(await errnoOf(insert(user.id, 812345678))).toBe(MysqlErrno.DUPLICATE_KEY);
+    // Another user may import the same repository; manual projects (NULL) never clash.
+    expect(await errnoOf(insert(other.id, 812345678))).toBeUndefined();
+    expect(await errnoOf(insert(user.id, null))).toBeUndefined();
+    expect(await errnoOf(insert(user.id, null))).toBeUndefined();
   });
 });
