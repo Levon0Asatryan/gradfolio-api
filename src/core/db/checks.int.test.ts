@@ -96,3 +96,21 @@ describe('CHECK constraints', () => {
     );
   });
 });
+
+/** The unique keys the migrations add, each rejecting a real duplicate. */
+describe('unique keys', () => {
+  const db = testDatabase();
+  const errnoOf = (p: Promise<unknown>) => p.then(() => undefined, mysqlErrno);
+
+  it('user_skills: one skill per user, case-insensitively (0003)', async () => {
+    const user = await createUser(db);
+    const other = await createUser(db);
+    const insert = (userId: string, skillName: string) =>
+      db.insertInto('userSkills').values({ id: newId(), userId, skillName }).execute();
+    await insert(user.id, 'React');
+    expect(await errnoOf(insert(user.id, 'react'))).toBe(MysqlErrno.DUPLICATE_KEY);
+    expect(await errnoOf(insert(user.id, 'REACT'))).toBe(MysqlErrno.DUPLICATE_KEY);
+    // Another user may have the same skill.
+    expect(await errnoOf(insert(other.id, 'React'))).toBeUndefined();
+  });
+});
