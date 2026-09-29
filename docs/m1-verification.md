@@ -40,7 +40,7 @@ npm ci && npm run build && npm run verify && npm run test:coverage && npm run te
 | `npm run build`         | `dist/core/db/migrations/`: `0001`–`0004` `.up.sql` and `.down.sql`                                 | PASS   |
 | `npm run verify`        | Prettier clean, lint clean, types clean, `openapi.yaml: up to date`, 22 files, **260 tests passed** | PASS   |
 | `npm run test:coverage` | 260 passed; statements 99.12%, branches 96.98%, functions 98.85%, lines 99.66% (floor 90%)          | PASS   |
-| `npm run test:int`      | 14 files, **65 tests passed**                                                                       | PASS   |
+| `npm run test:int`      | 14 files, **65 tests passed** (67 after review round 1 added two unique-key tests)                  | PASS   |
 
 Each commit on its own (`git checkout <c>`, `tsc --noEmit`, `vitest run`):
 
@@ -361,42 +361,46 @@ Each guard was removed on the final code and the named test run. Every one faile
 Migration mutations ran against a throwaway test database, so the checksum guard on
 `gradfolio_test` would not mask them.
 
-| Guard removed                                                | Test that failed                                                                                     |
-| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| record each step as it succeeds (record only at the end)     | `records a step the moment it succeeds, so a failed migration resumes where it stopped`              |
-| `skip-if` evaluation                                         | `closes the crash window: a step in effect but unrecorded is recorded, not re-run`                   |
-| checksum check                                               | `refuses when an applied step has been edited`                                                       |
-| database-ahead check                                         | `refuses a database that records a migration this build does not have`                               |
-| `GET_LOCK`                                                   | `refuses to run while another runner holds the lock on this database`                                |
-| lock release in `finally`                                    | `releases the lock after a failed run`                                                               |
-| refuse `up` while partially rolled back                      | `resumes a rollback that failed part-way, and refuses to migrate up meanwhile`                       |
-| down skips recorded down steps                               | same test                                                                                            |
-| `isRerunnable` lint                                          | `files.test.ts`: 5 × `rejects … without a guard`                                                     |
-| baseline = schema.sql (one index dropped)                    | `0001_baseline is identical to gradfolio-sql schema.sql` (diff shows the index)                      |
-| TINYINT(1) `typeCast`                                        | `reads TINYINT(1) as boolean and maps snake_case columns to camelCase`                               |
-| `dateStrings: ['DATE']`                                      | `reads DATE as YYYY-MM-DD and DATETIME as a Date`                                                    |
-| `maintainNestedObjectKeys`                                   | `keeps the keys inside JSON values as stored, snake_case included`                                   |
-| callback pool (`pool.pool` → the promise pool)               | `database.int.test.ts` fails: `Hook timed out` (queries hang)                                        |
-| `inTransaction` retry on 1213                                | `retries the deadlock victim, and both callers get the one row`                                      |
-| `FOR SHARE` in `canonicalizeTerms`                           | `give two concurrent first writers one spelling (barrier)`                                           |
-| `terms` registry lookup                                      | `store the canonical spelling and match case-insensitively`                                          |
-| `toJsonColumn` validation                                    | `refuses a value of the wrong shape…`, `serializes what the schema returned, normalized`             |
-| 0003 legacy normalization                                    | `normalizes legacy spellings, so one term has one key and one spelling`                              |
-| 0003 duplicate-skill merge                                   | `merges case-insensitive duplicate skills, keeping the first, before the UNIQUE key`                 |
-| 0003 `TEXT … ERROR ON ERROR` (→ `VARCHAR(255)`, the default) | `stops, losing nothing, when a legacy name is longer than the new column`                            |
-| CHECK `ck_certifications_date`                               | `rejects certifications.date = banana with 3819`                                                     |
-| CHECK links element shape (`required: [label, url]`)         | `rejects projects.links = [{"label":"a"}] with 3819`                                                 |
-| VARCHAR counted in code points                               | `VARCHAR(500): 500 emoji -> true` (and one more)                                                     |
-| http/https scheme check                                      | `rejects "javascript:alert(1)"` (4 failed)                                                           |
-| `YYYY-MM` month range                                        | `rejects "2024-13"`, `rejects "2024-00"`                                                             |
-| `linkList` strict object                                     | `rejects an extra key`                                                                               |
-| `COLUMN_LIMITS` = real limits (`users.headline` 500 → 400)   | `matches every string column of the migrated schema`                                                 |
-| seed deletes its own rows first                              | `loads on the migrated schema, and loading again gives the same rows`                                |
-| seed links from real ids (→ `/projects/proj_001`)            | `builds every notification link from a real project id (S12)`                                        |
-| per-file reset (`setupFiles` removed)                        | `starts every file with empty tables, whatever was left before it`                                   |
-| ids required by the row types (`id: Generated<string>`)      | `tsc`: `database.int.test.ts` `Unused '@ts-expect-error' directive` (insert without id now compiles) |
-| JSON columns accept `JsonText` only (→ `string`)             | `tsc`: `database.int.test.ts` `Unused '@ts-expect-error' directive` (`JSON.stringify` now compiles)  |
-| queries.sql 8a (gradfolio-sql): NULL teammate                | checked by hand on 8.4.11: external 1 row, account 1, owner self 0, non-owner 0                      |
+| Guard removed                                                                | Test that failed                                                                                     |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| record each step as it succeeds (record only at the end)                     | `records a step the moment it succeeds, so a failed migration resumes where it stopped`              |
+| `skip-if` evaluation                                                         | `closes the crash window: a step in effect but unrecorded is recorded, not re-run`                   |
+| checksum check                                                               | `refuses when an applied step has been edited`                                                       |
+| database-ahead check                                                         | `refuses a database that records a migration this build does not have`                               |
+| `GET_LOCK`                                                                   | `refuses to run while another runner holds the lock on this database`                                |
+| lock release in `finally`                                                    | `releases the lock after a failed run`                                                               |
+| refuse `up` while partially rolled back                                      | `resumes a rollback that failed part-way, and refuses to migrate up meanwhile`                       |
+| down skips recorded down steps                                               | same test                                                                                            |
+| `isRerunnable` lint                                                          | `files.test.ts`: 5 × `rejects … without a guard`                                                     |
+| baseline = schema.sql (one index dropped)                                    | `0001_baseline is identical to gradfolio-sql schema.sql` (diff shows the index)                      |
+| TINYINT(1) `typeCast`                                                        | `reads TINYINT(1) as boolean and maps snake_case columns to camelCase`                               |
+| `dateStrings: ['DATE']`                                                      | `reads DATE as YYYY-MM-DD and DATETIME as a Date`                                                    |
+| `maintainNestedObjectKeys`                                                   | `keeps the keys inside JSON values as stored, snake_case included`                                   |
+| callback pool (`pool.pool` → the promise pool)                               | `database.int.test.ts` fails: `Hook timed out` (queries hang)                                        |
+| `inTransaction` retry on 1213                                                | `retries the deadlock victim, and both callers get the one row`                                      |
+| `FOR SHARE` in `canonicalizeTerms`                                           | `give two concurrent first writers one spelling (barrier)`                                           |
+| `terms` registry lookup                                                      | `store the canonical spelling and match case-insensitively`                                          |
+| `toJsonColumn` validation                                                    | `refuses a value of the wrong shape…`, `serializes what the schema returned, normalized`             |
+| 0003 legacy normalization                                                    | `normalizes legacy spellings, so one term has one key and one spelling`                              |
+| 0003 duplicate-skill merge                                                   | `merges case-insensitive duplicate skills, keeping the first, before the UNIQUE key`                 |
+| 0003 `TEXT … ERROR ON ERROR` (→ `VARCHAR(255)`, the default)                 | `stops, losing nothing, when a legacy name is longer than the new column`                            |
+| CHECK `ck_certifications_date`                                               | `rejects certifications.date = banana with 3819`                                                     |
+| CHECK links element shape (`required: [label, url]`)                         | `rejects projects.links = [{"label":"a"}] with 3819`                                                 |
+| VARCHAR counted in code points                                               | `VARCHAR(500): 500 emoji -> true` (and one more)                                                     |
+| http/https scheme check                                                      | `rejects "javascript:alert(1)"` (4 failed)                                                           |
+| `YYYY-MM` month range                                                        | `rejects "2024-13"`, `rejects "2024-00"`                                                             |
+| `linkList` strict object                                                     | `rejects an extra key`                                                                               |
+| `COLUMN_LIMITS` = real limits (`users.headline` 500 → 400)                   | `matches every string column of the migrated schema`                                                 |
+| seed deletes its own rows first                                              | `loads on the migrated schema, and loading again gives the same rows`                                |
+| seed links from real ids (→ `/projects/proj_001`)                            | `builds every notification link from a real project id (S12)`                                        |
+| per-file reset (`setupFiles` removed)                                        | `starts every file with empty tables, whatever was left before it`                                   |
+| ids required by the row types (`id: Generated<string>`)                      | `tsc`: `database.int.test.ts` `Unused '@ts-expect-error' directive` (insert without id now compiles) |
+| JSON columns accept `JsonText` only (→ `string`)                             | `tsc`: `database.int.test.ts` `Unused '@ts-expect-error' directive` (`JSON.stringify` now compiles)  |
+| UNIQUE `(user_id, skill_name)` (0003); review round 1                        | `user_skills: one skill per user, case-insensitively (0003)`                                         |
+| UNIQUE `(user_id, github_repo_id)` (0004); review round 1                    | `projects: one import of a GitHub repository per user (0004)`                                        |
+| seed reload writes the same content (roles changed per load); review round 1 | `loads on the migrated schema, and loading again gives the same rows`; counts alone had passed       |
+| queries.sql 8a (gradfolio-sql): NULL teammate                                | checked by hand on 8.4.11: external 1 row, account 1, owner self 0, non-owner 0                      |
+| queries.sql visibility on 1b-1g and 2d (gradfolio-sql, round 2)              | checked by hand on 8.4.11, private profile and project: non-owner 0 rows, owner 1+                   |
 
 Not proven by a test: the sorted lock order in `canonicalizeTerms`. A test would need
 two writers taking the same two new names in opposite orders, and with the sort they
@@ -405,11 +409,11 @@ there.
 
 ## 11. CI
 
-| PR                | Head                | Jobs                                                                |
-| ----------------- | ------------------- | ------------------------------------------------------------------- |
-| gradfolio-api #11 | `1bf6130`           | static, unit, integration, **migrations**, stack: all pass (merged) |
-| gradfolio-api #12 | (filled after push) |                                                                     |
-| gradfolio-sql #1  | `d1907e7`           | no CI in that repository; verified by §8                            |
+| PR                | Head                 | Jobs                                                                                                                                 |
+| ----------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| gradfolio-api #11 | `1bf6130`            | static, unit, integration, **migrations**, stack: all pass (merged)                                                                  |
+| gradfolio-api #12 | `7932634`, `5281ff1` | static, unit, integration, migrations, stack: all pass on both heads. Review: Codex round 1 (3 findings, fixed), round 2 no findings |
+| gradfolio-sql #1  | `69991dc`            | no CI in that repository; §8 re-run is unaffected (the fixes touch only `queries.sql`, which compose does not mount)                 |
 
 ## 12. Machine clean
 
