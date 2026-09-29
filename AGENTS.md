@@ -155,6 +155,13 @@ it is wrong.
 
 ### MySQL specifics
 
+- Flag a correlated `EXISTS`/`IN` subquery over `JSON_TABLE`. On MySQL 8.4.11 it
+  returns wrong results (found in M1). Technologies and tags live in tables for this
+  reason.
+- Flag `JSON_TABLE` without `ERROR ON ERROR` on a column that could overflow. The
+  default `NULL ON ERROR` silently drops the value.
+- Flag a JSON column written other than through `toJsonColumn`, which validates the
+  shape before the write.
 - Flag writing to a JSON column a value that has not been validated against its
   documented shape (`string[]`, or `{label, url}[]`). MySQL accepts any valid JSON
   here.
