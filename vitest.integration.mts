@@ -13,6 +13,8 @@ export default defineConfig({
     fileParallelism: false,
     // Migrates the test database to the latest schema before any file runs.
     globalSetup: ['src/testing/global-setup.ts'],
+    // Every file starts from empty tables (plan §8).
+    setupFiles: ['src/testing/integration-setup.ts'],
     testTimeout: 20_000,
     hookTimeout: 30_000,
   },

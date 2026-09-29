@@ -1,0 +1,45 @@
+{
+  "$comment": "npm run db:types regenerates src/core/db/types.generated.ts from a migrated database; npm run db:types:check (CI) fails when it is stale. Overrides encode what the database cannot: ids are supplied by the application (never Generated), TINYINT(1) is boolean, JSON columns take validated JsonText, DATE is YYYY-MM-DD text.",
+  "dialect": "mysql",
+  "camelCase": true,
+  "outFile": "src/core/db/types.generated.ts",
+  "excludePattern": "schema_migrations",
+  "customImports": {
+    "Bool": "./column-types.js",
+    "DateText": "./column-types.js",
+    "JsonColumn": "./column-types.js",
+    "LinkList": "./column-types.js",
+    "StringList": "./column-types.js",
+    "TranslationParams": "./column-types.js"
+  },
+  "overrides": {
+    "columns": {
+      "users.id": "string",
+      "education.id": "string",
+      "experience.id": "string",
+      "certifications.id": "string",
+      "user_skills.id": "string",
+      "projects.id": "string",
+      "project_attachments.id": "string",
+      "project_team_members.id": "string",
+      "integrations.id": "string",
+      "activities.id": "string",
+      "notifications.id": "string",
+      "users.verified": "Bool",
+      "users.is_public": "Bool",
+      "projects.is_public": "Bool",
+      "projects.is_draft": "Bool",
+      "notifications.is_read": "Bool",
+      "users.birthday": "DateText",
+      "projects.repo_latest_commit": "DateText",
+      "projects.meta_start_date": "DateText",
+      "projects.meta_end_date": "DateText",
+      "education.highlights": "JsonColumn<StringList>",
+      "experience.achievements": "JsonColumn<StringList>",
+      "experience.skills": "JsonColumn<StringList>",
+      "projects.links": "JsonColumn<LinkList>",
+      "projects.files": "JsonColumn<LinkList>",
+      "activities.translation_params": "JsonColumn<TranslationParams>"
+    }
+  }
+}
