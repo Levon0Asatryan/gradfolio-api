@@ -69,6 +69,8 @@ jobs:
           --health-interval 5s --health-timeout 3s --health-retries 20
     env:
       TEST_DATABASE_URL: mysql://gradfolio:gradfolio@127.0.0.1:3306/gradfolio_test
+      # Creates the throwaway databases the migration tests start from.
+      TEST_ADMIN_DATABASE_URL: mysql://root:root@127.0.0.1:3306
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -77,6 +79,73 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:int
+
+  # MySQL commits DDL implicitly, so a migration cannot be rolled back as a
+  # transaction; the runner records each step instead. This proves the real
+  # migrations on an empty database: apply, re-apply is a no-op, roll back all
+  # of them, re-apply, and the schema is identical both times.
+  migrations:
+    name: Migrations (MySQL 8.4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: gradfolio
+          MYSQL_USER: gradfolio
+          MYSQL_PASSWORD: gradfolio
+          # Not UTC on purpose -- see docker-compose.yml.
+          TZ: Asia/Yerevan
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: mysql://gradfolio:gradfolio@127.0.0.1:3306/gradfolio
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      - name: Apply every migration to an empty database
+        run: |
+          npm run -s migrate | tee applied.txt
+          grep -q '^migrations: applied 0001_baseline' applied.txt
+
+      - name: Applying again does nothing
+        run: |
+          out=$(npm run -s migrate)
+          echo "$out"
+          [ "$out" = "migrations: nothing to apply" ] || { echo "::error::second migrate was not a no-op"; exit 1; }
+
+      - run: npm run -s db:schema > schema-first.sql
+
+      - name: Roll every migration back
+        run: |
+          npm run -s migrate:down -- --all
+          npm run -s db:schema > schema-empty.sql
+          [ ! -s schema-empty.sql ] || { echo "::error::tables left after down --all"; cat schema-empty.sql; exit 1; }
+          left=$(mysql -h127.0.0.1 -P3306 -ugradfolio -pgradfolio gradfolio -N -e "SELECT COUNT(*) FROM schema_migrations")
+          [ "$left" = "0" ] || { echo "::error::$left registry rows left after down --all"; exit 1; }
+
+      - name: Re-apply; the schema is identical to the first time
+        run: |
+          npm run -s migrate
+          npm run -s db:schema > schema-second.sql
+          diff schema-first.sql schema-second.sql
+
+      # baseline.int.test.ts proves 0001_baseline equals this fixture; this
+      # proves the fixture is still gradfolio-sql's schema.sql at the commit
+      # the baseline was taken from.
+      - name: The baseline fixture is gradfolio-sql schema.sql at 187ff66
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/Levon0Asatryan/gradfolio-sql/187ff668cdcc3ab4139ace0359cc089d760e64dd/sql/schema.sql \
+            | diff - src/testing/fixtures/gradfolio-sql-schema.sql
 
   # The deployment artefact has to build, and the stack has to come up.
   stack:
@@ -100,6 +169,16 @@ jobs:
           echo "::error::api never became ready"
           docker compose ps -a; docker compose logs
           exit 1
+
+      - name: Migrations ran before the api, and re-running them is a no-op
+        run: |
+          code=$(docker inspect gradfolio-api-migrate-1 --format '{{.State.ExitCode}}')
+          [ "$code" = "0" ] || { echo "::error::migrate exited with $code"; docker compose logs migrate; exit 1; }
+          docker compose logs migrate | grep -q 'migrations: applied 0001_baseline'
+          tables=$(docker compose exec -T mysql mysql -ugradfolio -pgradfolio gradfolio -N -e \
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'gradfolio' AND table_name <> 'schema_migrations'")
+          [ "$tables" = "11" ] || { echo "::error::expected 11 tables, found $tables"; exit 1; }
+          docker compose run --rm migrate | grep -qx 'migrations: nothing to apply'
 
       - name: Liveness, readiness, version prefix, JSON 404, docs
         run: |

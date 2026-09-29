@@ -25,7 +25,7 @@ in [docs/investigation.md](docs/investigation.md) §6, and progress is tracked i
 Requires Docker and Node 24 (`nvm use`).
 
 ```sh
-docker compose up -d --build        # MySQL 8.4 + api
+docker compose up -d --build        # MySQL 8.4, migrations, then the api
 curl localhost:3000/healthz         # {"status":"ok"}
 curl localhost:3000/readyz          # {"status":"ok","database":"ok"}
 open http://localhost:3000/docs     # Swagger UI
@@ -40,6 +40,7 @@ Run MySQL in Docker and the API on the host, so restarts are instant:
 cp .env.example .env
 docker compose up -d mysql          # host port 3307 (gradfolio-sql's compose uses 3306)
 npm ci
+npm run migrate                     # bring the database to the latest schema
 npm run dev                         # http://localhost:3000, reloads on change
 ```
 
@@ -53,6 +54,25 @@ npm run dev                         # http://localhost:3000, reloads on change
 | `npm run test:coverage` | Unit tests with the 90% coverage floor                                |
 | `npm run test:int`      | Integration tests against MySQL (`docker compose up -d mysql`)        |
 | `npm run openapi`       | Regenerate `openapi.yaml` from the zod schemas                        |
+| `npm run migrate`       | Apply pending migrations (`-- --to <name>` to stop at one)            |
+| `npm run migrate:down`  | Roll back the latest migration (`-- --all`, or `-- --to <name>`)      |
+| `npm run db:schema`     | Print the normalized schema (`SHOW CREATE TABLE`), for diffing        |
+
+## Schema and migrations
+
+This repository owns the database schema (decided in `docs/m1-plan.md`, Q2).
+`src/core/db/migrations/NNNN_name.up.sql` and `.down.sql`; `0001_baseline` is
+gradfolio-sql's `schema.sql` at commit 187ff66.
+
+- MySQL commits DDL implicitly, so a migration is not a transaction. The runner
+  records each step (one statement) in `schema_migrations` as soon as it succeeds,
+  and a failed run resumes at the failed step.
+- Every step must be safe to run twice: `CREATE TABLE IF NOT EXISTS`,
+  `DROP TABLE IF EXISTS`, idempotent DML, or a `-- skip-if: <SELECT>` guard line
+  before it (MySQL 8.4 has no `IF NOT EXISTS` for columns, indexes or CHECKs). A unit
+  test rejects any other step.
+- An applied migration is immutable: the runner refuses if a recorded step's SQL
+  changed. Write a new migration instead.
 
 ## Configuration
 

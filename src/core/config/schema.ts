@@ -80,6 +80,9 @@ const database = {
   // container only.
   DATABASE_SSL: z.enum(['off', 'required']).default('off'),
   DATABASE_SSL_CA: z.string().min(1).optional(),
+  // How long `migrate` waits for another runner on the same database to
+  // finish before giving up. 0 means do not wait.
+  MIGRATION_LOCK_TIMEOUT_S: z.coerce.number().int().min(0).max(3600).default(60),
 };
 
 export const configSchema = z

@@ -193,8 +193,8 @@ by running them, the gaps between frontend and schema, and open decisions Q1–Q
 Decided: **NestJS 12 on Node 24, TypeScript 6.0 (ESM, `nodenext`)**, Express 5,
 zod 4 for config and request validation, pino (`nestjs-pino`) for logs, `mysql2`
 for the MySQL 8.4 pool, Vitest 5, ESLint 10 (type-aware) with Prettier, husky and
-lint-staged. The query layer on top of the pool (query builder or ORM) is still an
-M0 decision.
+lint-staged. Schema: owned here, as SQL migrations run by our own per-step runner
+(`src/core/db/migrator`); query layer: Kysely (both decided in `docs/m1-plan.md`).
 
 - **TypeScript stays on 6.0.x**: typescript-eslint 8 supports `<6.1.0`. Dependabot
   ignores TypeScript minor and major bumps.
@@ -212,6 +212,7 @@ M0 decision.
 | install                                         | `npm ci`                                                                                     |
 | build                                           | `npm run build`                                                                              |
 | dev server (reload, reads `.env`)               | `docker compose up -d mysql && npm run dev`                                                  |
+| migrate / roll back one (reads `.env`)          | `npm run migrate` / `npm run migrate:down` (`-- --all`, `-- --to <name>`)                    |
 | verify (format + lint + types + openapi + unit) | `npm run verify`                                                                             |
 | unit                                            | `npm test`                                                                                   |
 | integration (real MySQL 8.4)                    | `docker compose up -d mysql && npm run test:int`                                             |

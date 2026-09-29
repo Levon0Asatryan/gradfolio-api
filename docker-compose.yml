@@ -27,6 +27,20 @@ services:
       retries: 20
       start_period: 20s
 
+  # Applies pending migrations, then exits. The api starts only after it
+  # succeeded, so `docker compose up -d --build` always serves a current
+  # schema. Re-running it is a no-op: `docker compose run --rm migrate`.
+  migrate:
+    build: .
+    command: ['node', 'dist/core/db/migrator/cli.js', 'up']
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: mysql://gradfolio:gradfolio@mysql:3306/gradfolio
+    restart: 'no'
+    depends_on:
+      mysql:
+        condition: service_healthy
+
   api:
     build: .
     environment:
@@ -55,6 +69,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   mysqldata:

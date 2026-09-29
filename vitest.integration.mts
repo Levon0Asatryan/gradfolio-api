@@ -11,6 +11,8 @@ export default defineConfig({
     environment: 'node',
     // One database, so files must not interleave their writes.
     fileParallelism: false,
+    // Migrates the test database to the latest schema before any file runs.
+    globalSetup: ['src/testing/global-setup.ts'],
     testTimeout: 20_000,
     hookTimeout: 30_000,
   },
