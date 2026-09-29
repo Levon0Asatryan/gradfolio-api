@@ -25,6 +25,16 @@ export default defineConfig({
         // runs as its own job. A unit test would assert against a mocked pool.
         'src/core/db/pool.ts',
         'src/core/db/db.service.ts',
+        // The migration runner, its registry and the schema dump are MySQL
+        // behaviour -- implicit DDL commits, GET_LOCK, SHOW CREATE TABLE --
+        // covered by runner.int.test.ts and baseline.int.test.ts against a
+        // real MySQL 8.4, and by the CI migrations job end to end.
+        'src/core/db/migrator/runner.ts',
+        'src/core/db/migrator/registry.ts',
+        'src/core/db/migrator/schema-dump.ts',
+        // argv in, the runner out; exercised by the CI migrations job.
+        'src/core/db/migrator/cli.ts',
+        'src/core/db/migrator/dump-cli.ts',
         // Test-only helpers, never shipped.
         'src/testing/**',
       ],

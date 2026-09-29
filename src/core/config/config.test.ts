@@ -16,6 +16,7 @@ describe('loadConfig', () => {
       TRUST_PROXY: false,
       DATABASE_POOL_MAX: 10,
       DATABASE_SSL: 'off',
+      MIGRATION_LOCK_TIMEOUT_S: 60,
     });
   });
 
@@ -45,6 +46,12 @@ describe('loadConfig', () => {
 
   it.each(['64kbb', 'abc', '0kb', '64', '9mb'])('refuses body limit %j', (value) => {
     expect(() => loadConfig({ DATABASE_URL, API_BODY_LIMIT: value })).toThrow(/API_BODY_LIMIT/);
+  });
+
+  it.each(['-1', '3601', '1.5', 'soon'])('refuses migration lock timeout %j', (value) => {
+    expect(() => loadConfig({ DATABASE_URL, MIGRATION_LOCK_TIMEOUT_S: value })).toThrow(
+      /MIGRATION_LOCK_TIMEOUT_S/,
+    );
   });
 
   it('names the root when the environment is not an object at all', () => {
