@@ -204,6 +204,17 @@ describe('migration runner against MySQL 8.4', () => {
     expect(await dumpSchema(conn)).toBe(before);
   });
 
+  it('rolls back a migration that failed part-way up, leaving nothing behind', async () => {
+    const before = await dumpSchema(conn);
+    await up(conn, opts([broken])).catch(() => undefined);
+    expect(await recorded()).toEqual(['0001_two_steps.up.1']);
+
+    // Its down steps are guarded, so undoing the step that never ran is a no-op.
+    expect(await down(conn, opts([broken]))).toEqual(['0001_two_steps']);
+    expect(await recorded()).toEqual([]);
+    expect(await dumpSchema(conn)).toBe(before);
+  });
+
   it('rolls back the latest by default, everything after --to, or everything with --all', async () => {
     const m = (n: string) =>
       migration(
