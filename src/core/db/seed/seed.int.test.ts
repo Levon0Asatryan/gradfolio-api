@@ -32,6 +32,30 @@ describe('seed', () => {
     return result;
   };
 
+  /**
+   * Every seed-owned row, by content: all columns except the generated child
+   * ids and the timestamps the database stamps on insert, sorted. Equal
+   * snapshots mean a reload wrote the same data, not just as many rows.
+   */
+  const snapshot = async () => {
+    const unstable = new Set(['id', 'created_at', 'updated_at']);
+    const result: Record<string, string[]> = {};
+    for (const table of Object.keys(await counts())) {
+      const columns = await sql<{ name: string }>`
+        SELECT column_name AS name FROM information_schema.columns
+         WHERE table_schema = DATABASE() AND table_name = ${table}
+         ORDER BY ordinal_position`.execute(db);
+      // users.id is a fixed seed id, so it stays; every other id is generated.
+      const kept = columns.rows
+        .map((c) => c.name)
+        .filter((c) => !unstable.has(c) || (table === 'users' && c === 'id'));
+      const rows = await sql<Record<string, unknown>>`
+        SELECT ${sql.join(kept.map((c) => sql.ref(c)))} FROM ${sql.table(table)}`.execute(db);
+      result[table] = rows.rows.map((r) => JSON.stringify(kept.map((c) => r[c]))).sort();
+    }
+    return result;
+  };
+
   it('loads on the migrated schema, and loading again gives the same rows', async () => {
     const bystander = await createUser(db, { name: 'not part of the seed' });
     await seed(db);
@@ -51,8 +75,10 @@ describe('seed', () => {
       activities: 5,
       notifications: 4,
     });
+    const before = await snapshot();
     await seed(db);
     expect(await counts()).toEqual(first);
+    expect(await snapshot()).toEqual(before);
     // Only the seed's own rows are replaced.
     expect(
       await db.selectFrom('users').select('id').where('id', '=', bystander.id).execute(),
