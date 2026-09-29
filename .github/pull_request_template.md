@@ -12,6 +12,7 @@
 - [ ] `npm run test:coverage` stays at or above the threshold
 - [ ] `npm run test:int` passes (needs `docker compose up -d mysql`)
 - [ ] `/gradfolio-review` ran clean on the head commit (or the receipt's method is named below)
+- [ ] Copilot and Codex requested on this head (`sh scripts/request-review.sh`)
 
 **Guards proved by removal.** List each check, guard or filter this PR adds, and the
 test that fails when it is removed. For authorization, that is a second user getting

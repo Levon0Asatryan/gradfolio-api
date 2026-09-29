@@ -54,7 +54,9 @@ Follow the approved plan. Put any deviations in the report under "Decisions made
 ## Phase 4: Re-review
 - Finish Phase 3 before the first push. Push a PR you would merge.
 - Run /gradfolio-review. It writes the receipt that the pre-push gate requires.
-- After the last push, wait for the reviewer to review the head commit. Check each
+- After every push, request both reviewers: `sh scripts/request-review.sh`. Wait until
+  `sh scripts/review-status.sh` says Copilot and Codex have both reviewed the head
+  commit. Check each
   finding's premise before acting on it; push back with evidence when it is wrong.
 - Two rounds, then fix-now findings only. The last fix push gets one confirmation
   round on the head commit, limited to the new commits.
@@ -69,7 +71,8 @@ Follow the approved plan. Put any deviations in the report under "Decisions made
 
 ## When to report, and when not to
 Send one report per pull request, when it is finished: pushed, CI green, the
-reviewer's rounds done, threads resolved, machine clean. Do not report per push, per
+reviewers' rounds done (Copilot and Codex on the head commit), threads resolved,
+machine clean. Do not report per push, per
 review round or per fix.
 
 Report mid-flight only in these cases, and immediately:
@@ -105,7 +108,8 @@ from docs/handoff-template.md, part 2.
 ## What changed      3–8 lines: behaviour, not a list of files
 ## Revalidation      gaps between plan and code; fresh clone commands and results
 ## Re-review         self-review findings; review rounds; threads; regressions caught
-                     by the post-fix gate; reviewer commit and time; deferrals
+                     by the post-fix gate; head commit reviewed by Copilot and
+                     Codex (times); deferrals
 ## Decisions made    anything not in the plan, with the reason
 ## Evidence          tests (unit, integration, coverage);
                      | guard removed | test that failed |;

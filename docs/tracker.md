@@ -50,13 +50,17 @@ setup PR #6 went green. `main` is at `da3d495`.
   - Q9 in M9;
   - Q10 in M8.
 - **Merge gate:**
-  - Merge a code PR only after the reviewer has reviewed the head commit (or given it
-    a 👍) and the orchestrator has validated it.
-  - Docs-only PRs skip the wait.
+  - Merge a code PR only after **both reviewers (GitHub Copilot and Codex)** have
+    reviewed the head commit (`sh scripts/review-status.sh <n>` exits 0) and the
+    orchestrator has validated it. Both are requested on every push with
+    `sh scripts/request-review.sh`.
+  - Docs-only PRs: both reviewers are still requested, but merging does not wait for
+    them.
 - **Levon's setup (kit §9), still open:**
   - turn on auto-delete of head branches (it is **off**);
-  - install the Codex GitHub app on `gradfolio-api`;
   - turn on Dependabot security updates;
+  - optional: a branch ruleset with "Automatically request Copilot code review", so
+    Copilot is requested even when a push forgets the script;
   - run `/reload-skills` in any chat that should run `/gradfolio-review`.
 
 ## Release definition: v1.0
@@ -161,17 +165,17 @@ relevant checks, and Levon decides the product calls.
 
 **Goal:** the repository, process and decisions every later milestone builds on.
 
-| ID  | Task                                                                                                                       | Repo | Status | Source                        |
-| --- | -------------------------------------------------------------------------------------------------------------------------- | ---- | ------ | ----------------------------- |
-| 0.1 | Orchestrator kit: CLAUDE.md, AGENTS.md, handoff template, push gates, `.review/`, `gradfolio-review` skill                 | api  | done   | #1, #2                        |
-| 0.2 | Investigation, tracker, rename to `gradfolio-api`, README                                                                  | api  | done   | #3, #4                        |
-| 0.3 | Repo hygiene: editorconfig, gitattributes, license, CoC, contributing, security, templates, Dependabot, VS Code            | api  | done   | #5                            |
-| 0.4 | NestJS skeleton: config, logging, errors, MySQL pool (UTC session), health, OpenAPI, Docker, compose, CI (4 jobs), `http/` | api  | review | #6                            |
-| 0.5 | Levon's settings: auto-delete branches, Codex app, Dependabot security updates                                             | ops  | todo   | kit §9                        |
-| 0.6 | Architecture decisions, made per module rather than up front (see Now). Q1 decided; Q8 decided                             | api  | done   | investigation §6              |
-| 0.7 | Frontend baseline: `npm ci`, build, lint and knip on `gradfolio` main. Record what fails.                                  | fe   | todo   | —                             |
-| 0.8 | Frontend CI (lint, typecheck, build) plus a PR template, so more developers can work in the repo safely                    | fe   | todo   | —                             |
-| 0.9 | Workspace docs into version control: spec + competitor analysis → `gradfolio-api/docs/spec/` (or the frontend repo)        | api  | todo   | spec lives outside every repo |
+| ID  | Task                                                                                                                             | Repo | Status | Source                        |
+| --- | -------------------------------------------------------------------------------------------------------------------------------- | ---- | ------ | ----------------------------- |
+| 0.1 | Orchestrator kit: CLAUDE.md, AGENTS.md, handoff template, push gates, `.review/`, `gradfolio-review` skill                       | api  | done   | #1, #2                        |
+| 0.2 | Investigation, tracker, rename to `gradfolio-api`, README                                                                        | api  | done   | #3, #4                        |
+| 0.3 | Repo hygiene: editorconfig, gitattributes, license, CoC, contributing, security, templates, Dependabot, VS Code                  | api  | done   | #5                            |
+| 0.4 | NestJS skeleton: config, logging, errors, MySQL pool (UTC session), health, OpenAPI, Docker, compose, CI (4 jobs), `http/`       | api  | review | #6                            |
+| 0.5 | Levon's settings: auto-delete branches, Dependabot security updates, optional Copilot auto-review ruleset (Codex app: installed) | ops  | todo   | kit §9                        |
+| 0.6 | Architecture decisions, made per module rather than up front (see Now). Q1 decided; Q8 decided                                   | api  | done   | investigation §6              |
+| 0.7 | Frontend baseline: `npm ci`, build, lint and knip on `gradfolio` main. Record what fails.                                        | fe   | todo   | —                             |
+| 0.8 | Frontend CI (lint, typecheck, build) plus a PR template, so more developers can work in the repo safely                          | fe   | todo   | —                             |
+| 0.9 | Workspace docs into version control: spec + competitor analysis → `gradfolio-api/docs/spec/` (or the frontend repo)              | api  | todo   | spec lives outside every repo |
 
 **Exit:** #6 merged; the M0 plan merged, with every Q decided or explicitly deferred;
 frontend baseline recorded.
