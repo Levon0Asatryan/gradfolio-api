@@ -213,6 +213,7 @@ lint-staged. Schema: owned here, as SQL migrations run by our own per-step runne
 | build                                           | `npm run build`                                                                              |
 | dev server (reload, reads `.env`)               | `docker compose up -d mysql && npm run dev`                                                  |
 | migrate / roll back one (reads `.env`)          | `npm run migrate` / `npm run migrate:down` (`-- --all`, `-- --to <name>`)                    |
+| demo data / regenerate row types                | `npm run db:seed` / `npm run db:types` (CI runs `db:types:check`)                            |
 | verify (format + lint + types + openapi + unit) | `npm run verify`                                                                             |
 | unit                                            | `npm test`                                                                                   |
 | integration (real MySQL 8.4)                    | `docker compose up -d mysql && npm run test:int`                                             |
@@ -300,17 +301,23 @@ so a move silently re-admits an excluded file.
 
 These are established in `docs/investigation.md`; do not re-argue them.
 
-- **The backend generates ids.** An INSERT that relies on `DEFAULT (UUID())` cannot
-  return the new id (`LAST_INSERT_ID()` = 0).
-- **The database validates almost nothing.** It has no CHECK constraints. JSON
-  columns must hold arrays of the documented shape, and `YYYY-MM` columns must match
-  that format. Only the API enforces either.
+- **The backend generates ids** (`newId()`). An INSERT that relies on `DEFAULT (UUID())`
+  cannot return the new id (`LAST_INSERT_ID()` = 0); the row types make `id` required.
+- **The API validates; CHECKs are the backstop.** Every JSON column and `YYYY-MM`
+  column has a CHECK (0002: shape only). Lengths, URL schemes and item rules are the
+  API's: `src/core/validation` (`columnString` counts what MySQL counts: characters for
+  `VARCHAR`, bytes for `TEXT`). JSON is written only through `toJsonColumn(schema, v)`.
 - **Session `time_zone` = `+00:00`.** `DATETIME` stores no time zone.
-- **Tags and technologies are compared case-insensitively.** `JSON_CONTAINS` itself
-  is case-sensitive.
+- **Skills, technologies and tags are one case-insensitive namespace.** They live in
+  `user_skills`, `project_technologies` and `project_tags`; the `terms` registry fixes
+  each one's spelling (`setUserSkills` / `setProjectTerms`). Never match with
+  `JSON_CONTAINS` (exact), and never write a correlated `EXISTS`/`IN` over
+  `JSON_TABLE(outer.col)`: MySQL 8.4.11 returns no rows for it.
+- **Retry deadlocks with `inTransaction`.** A competing insert of the same unique key
+  that rolls back makes InnoDB deadlock a waiter (1213), whatever the upsert SQL.
 - **FULLTEXT ignores words shorter than 3 characters.** Search needs a fallback for
   terms like `AI`, `ML` and `Go`.
 - **Column names are snake_case in the database and camelCase in the API.**
 - **Identity:** the Auth0 access token's `sub` maps to `users.auth0_id`.
-- **The local `gradfolio-sql` compose file fails on a fresh volume** (issue S1). Do
-  not base tests on it until that is fixed.
+- **This repository owns the schema** (`src/core/db/migrations`). `gradfolio-sql` is
+  reference docs; its `schema.sql` is frozen as `0001_baseline`.

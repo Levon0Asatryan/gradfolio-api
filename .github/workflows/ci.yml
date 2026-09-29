@@ -139,6 +139,15 @@ jobs:
           npm run -s db:schema > schema-second.sql
           diff schema-first.sql schema-second.sql
 
+      # The row types in types.generated.ts must describe the migrated schema.
+      - name: Generated row types match the migrated schema
+        run: npm run -s db:types:check
+
+      - name: The demo seed loads, and loads again to the same rows
+        run: |
+          npm run -s db:seed
+          npm run -s db:seed
+
       # baseline.int.test.ts proves 0001_baseline equals this fixture; this
       # proves the fixture is still gradfolio-sql's schema.sql at the commit
       # the baseline was taken from.
@@ -174,10 +183,10 @@ jobs:
         run: |
           code=$(docker inspect gradfolio-api-migrate-1 --format '{{.State.ExitCode}}')
           [ "$code" = "0" ] || { echo "::error::migrate exited with $code"; docker compose logs migrate; exit 1; }
-          docker compose logs migrate | grep -q 'migrations: applied 0001_baseline'
+          docker compose logs migrate | grep -q 'migrations: applied 0004_project_source'
           tables=$(docker compose exec -T mysql mysql -ugradfolio -pgradfolio gradfolio -N -e \
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'gradfolio' AND table_name <> 'schema_migrations'")
-          [ "$tables" = "11" ] || { echo "::error::expected 11 tables, found $tables"; exit 1; }
+          [ "$tables" = "14" ] || { echo "::error::expected 14 tables, found $tables"; exit 1; }
           docker compose run --rm migrate | grep -qx 'migrations: nothing to apply'
 
       - name: Liveness, readiness, version prefix, JSON 404, docs

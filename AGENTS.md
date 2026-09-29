@@ -8,7 +8,7 @@ evidence attached, to recruiters and peers. The API serves the Next.js frontend
 
 - **Stack:** NestJS 12, Node 24, TypeScript 6.0 (ESM). zod validates config and
   requests, and generates `openapi.yaml`. pino for logging, `mysql2` for the pool,
-  Vitest for tests. The query layer is still an M0 decision.
+  Vitest for tests. Kysely is the query layer; SQL migrations here own the schema.
 - `src/core` depends on nothing else in `src/`, and `src/api` depends on `core`.
   `src/architecture.test.ts` enforces this.
 - `npm run verify` runs format, lint, types, the OpenAPI check and the unit tests.
