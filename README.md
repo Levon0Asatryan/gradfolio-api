@@ -25,6 +25,7 @@ in [docs/investigation.md](docs/investigation.md) §6, and progress is tracked i
 Requires Docker and Node 24 (`nvm use`).
 
 ```sh
+cp .env.example .env                # compose reads the Auth0 settings from it
 docker compose up -d --build        # MySQL 8.4, migrations, then the api
 curl localhost:3000/healthz         # {"status":"ok"}
 curl localhost:3000/readyz          # {"status":"ok","database":"ok"}
@@ -82,8 +83,12 @@ Every variable is declared in [`src/core/config/schema.ts`](src/core/config/sche
 and validated before anything else is constructed. An invalid or missing value stops
 the process at boot, and the error names every offending key.
 
-- `DATABASE_URL` is the only variable with no default.
-- In production `DATABASE_SSL=required` is enforced (Aiven requires TLS).
+- `DATABASE_URL`, `AUTH0_ISSUER_BASE_URL` and `AUTH0_AUDIENCE` have no default
+  ([docs/auth0-setup.md](docs/auth0-setup.md)). The database tools (`migrate`,
+  `db:seed`, `db:schema`) need only the database settings.
+- In production `DATABASE_SSL=required` and an `https:` issuer are enforced.
+- `TRUST_PROXY` is `false` or a hop count, never `true`: `true` would believe the
+  client-written left-most `X-Forwarded-For` entry.
 
 See [`.env.example`](.env.example) for the full list.
 
@@ -93,7 +98,7 @@ See [`.env.example`](.env.example) for the full list.
 | -------------- | -------------------------------------------------------- | ---------------------------------------------- |
 | `GET /healthz` | Liveness: the process is running. Touches no dependency. | the process is dead                            |
 | `GET /readyz`  | Readiness: it can serve traffic. Runs `SELECT 1`.        | MySQL is unreachable or too slow, giving `503` |
-| `/v1/...`      | Every product route, versioned                           | —                                              |
+| `/v1/...`      | Every product route, versioned; needs a bearer token     | `401` without a valid token                    |
 | `/docs`        | Swagger UI, when `API_DOCS_ENABLED=true`                 | —                                              |
 
 Every failure returns the same shape and never includes internal detail:
@@ -104,6 +109,16 @@ Every failure returns the same shape and never includes internal detail:
 
 Unmatched routes included. A database outage is `503 DATABASE_UNAVAILABLE` on every
 route, not a `500`.
+
+**Authentication.** Every route requires `Authorization: Bearer <Auth0 access token>`
+unless it is marked `@Public()` (the health routes). A missing or invalid token is
+`401 UNAUTHENTICATED`, the same body whatever the reason; when Auth0's signing keys
+cannot be fetched it is `503 AUTH_UNAVAILABLE`.
+
+**Rate limits.** Every route has a per-caller budget (`RATE_LIMIT_DEFAULT` per
+`RATE_LIMIT_WINDOW_S`), keyed by the verified user, or by address without a token;
+search, import and AI routes add their own. Over budget: `429 RATE_LIMITED` with
+`Retry-After`.
 
 ## Documentation
 

@@ -50,6 +50,10 @@ services:
       API_PORT: '3000'
       # Browsable API documentation at http://127.0.0.1:3000/docs
       API_DOCS_ENABLED: 'true'
+      # From .env or the shell (docs/auth0-setup.md). Unset, the api refuses to
+      # boot and says which; `docker compose up -d mysql` alone still works.
+      AUTH0_ISSUER_BASE_URL: ${AUTH0_ISSUER_BASE_URL}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE}
     ports:
       - '${API_HOST_PORT:-3000}:3000'
     restart: unless-stopped

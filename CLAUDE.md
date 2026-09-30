@@ -291,7 +291,12 @@ so a move silently re-admits an excluded file.
 
 - **Configuration** is injected through `APP_CONFIG`, never read from a module-level
   singleton. Every variable is declared in `src/core/config/schema.ts` and validated
-  at boot.
+  at boot. The database tools use `loadDatabaseConfig()` (database settings only), so
+  the compose `migrate` service needs no Auth0 settings.
+- **Tests that read logs** create one `captureLogs()` per file and `clear()` it
+  between tests: nestjs-pino's root logger is static, so later applications' injected
+  loggers keep writing to the first capture. Tokens for tests come from
+  `src/testing/jwks.ts` (a local JWKS over real HTTP).
 - **Logging** uses a static message, with variable data in fields. Tokens and private
   profile fields are redacted, and the query string is never logged.
 - **Errors** carry a stable `code`. Internal detail goes to the log, never to a
@@ -319,5 +324,15 @@ These are established in `docs/investigation.md`; do not re-argue them.
   terms like `AI`, `ML` and `Go`.
 - **Column names are snake_case in the database and camelCase in the API.**
 - **Identity:** the Auth0 access token's `sub` maps to `users.auth0_id`.
+- **Every route needs a token unless it is `@Public()`** (`AccessTokenGuard`, global).
+  Tokens: RS256 only, fixed issuer (one trailing slash) and audience, `exp` required
+  (jose accepts a token without one unless told). A failure to fetch Auth0's keys is
+  `503 AUTH_UNAVAILABLE`, never 401 (`docs/m2-plan.md` §2.2). Never log a jose error
+  or its message: claim errors carry the token's whole payload.
+- **Rate limits** (`RateLimitGuard`, after the token guard): keyed by the verified
+  `sub`, else the address. The frontend calls from its server, so an address key would
+  be shared by every user. Expensive routes add `@RateBudget('search' | 'import' |
+'ai')`; never give two routes one budget. `@nestjs/throttler` takes `ttl` in
+  **milliseconds**. `TRUST_PROXY` is a hop count, never `true`.
 - **This repository owns the schema** (`src/core/db/migrations`). `gradfolio-sql` is
   reference docs; its `schema.sql` is frozen as `0001_baseline`.
