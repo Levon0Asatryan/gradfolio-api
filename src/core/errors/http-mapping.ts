@@ -15,6 +15,8 @@ export interface MappedError {
   /** The cause, for the log only. */
   logDetail: string;
   isServerFault: boolean;
+  /** Headers the response must carry. */
+  headers?: Readonly<Record<string, string>>;
 }
 
 /** Stable codes for the statuses Nest and Express raise on their own. */
@@ -100,8 +102,9 @@ export function toErrorResponse(err: unknown): MappedError {
     return {
       status: err.status,
       body,
-      logDetail: describeError(err),
+      logDetail: err.logDetail ?? describeError(err),
       isServerFault: err.status >= 500,
+      ...(err.headers ? { headers: err.headers } : {}),
     };
   }
 
