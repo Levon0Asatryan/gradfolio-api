@@ -10,6 +10,7 @@ request as the change that affects it.
 | [tracker.md](tracker.md)                   | Status of every milestone, PR and follow-up. Read it first.                   |
 | [investigation.md](investigation.md)       | Database and frontend analysis, facts verified on MySQL 8.4, decisions Q1–Q10 |
 | [handoff-template.md](handoff-template.md) | How work is handed to a worker chat and reported back                         |
+| [auth0-setup.md](auth0-setup.md)           | The Auth0 tenant configuration the API and frontend depend on (a checklist)   |
 | [../openapi.yaml](../openapi.yaml)         | The API surface, generated from the zod schemas                               |
 | `mN-plan.md`                               | The investigation and plan each milestone was built from                      |
 | `mN-verification.md`                       | What was run to accept each milestone, and what it produced                   |
