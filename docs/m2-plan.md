@@ -387,7 +387,9 @@ OpenAPI document uses).
 `src/api/rate-limit/`: `RateLimitGuard extends ThrottlerGuard`, `@RateBudget(name)`.
 
 - `ThrottlerModule.forRoot` gets `default`, `search`, `import`, `ai` with limits from
-  config and `ttl = RATE_LIMIT_WINDOW_S`. `search`/`import`/`ai` have
+  config and `ttl = seconds(RATE_LIMIT_WINDOW_S)`: throttler v6 takes `ttl` (and
+  `blockDuration`) in **milliseconds** (`throttler.service.js` `ttlMilliseconds = ttl`;
+  the probe in §2.6 passed `60_000` and saw `reset=60`). `search`/`import`/`ai` have
   `skipIf: route has no @RateBudget(<name>)`. `default` applies everywhere.
 - `getTracker`: `user:<sub>` when `req.auth` is set, else `ip:<normalized req.ip>`.
   `generateKey` is **not** overridden (throttler#2709).
@@ -425,6 +427,7 @@ Every guard ships with a test that fails when it is removed (Phase 3 table).
 | Protected by default; health and docs public                        | a test controller without `@Public()` → 401; `/healthz`, `/readyz`, `/docs`, `/docs-json` → 200 without a token; removing `@Public()` from health → its test fails                                                                                                      |
 | `TRUST_PROXY=true` refused; spoofed XFF ignored                     | config test; app test: 4th anonymous request with a new `X-Forwarded-For` each → 429                                                                                                                                                                                    |
 | Default budget → 429 `RATE_LIMITED` + `Retry-After`                 | app test; removing the override → header `Retry-After` missing / body code differs                                                                                                                                                                                      |
+| The window is seconds, not milliseconds                             | limit 1, window 60 s: request, advance the clock 1 s (`vi.setSystemTime`), request again → still 429. With `ttl = RATE_LIMIT_WINDOW_S` (60 ms) the second is 200.                                                                                                       |
 | Budgets per user, not per shared IP                                 | alice exhausted → bob (same IP) still 200                                                                                                                                                                                                                               |
 | Named budgets apply only where opted in, and each blocks on its own | `search` route blocks at its limit; a route without `@RateBudget` never sees `search`; two budgets on one route both block (throttler#2709)                                                                                                                             |
 | Throttle before provisioning                                        | int: exhaust `sub` X's budget on `/v1/me`, delete X's row, request again → 429 and still **no row**. With provisioning before the throttle the row comes back.                                                                                                          |
