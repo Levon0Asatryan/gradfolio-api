@@ -11,6 +11,8 @@ import { AuthModule } from './auth/auth.module.js';
 import { AccessTokenGuard } from './auth/guards/access-token.guard.js';
 import { ErrorFilter } from './common/filters/error.filter.js';
 import { HealthModule } from './health/health.module.js';
+import { RateLimitGuard } from './rate-limit/guards/rate-limit.guard.js';
+import { RateLimitModule } from './rate-limit/rate-limit.module.js';
 
 @Module({
   imports: [
@@ -23,12 +25,15 @@ import { HealthModule } from './health/health.module.js';
     }),
     DbModule,
     AuthModule,
+    RateLimitModule,
     HealthModule,
   ],
   providers: [
     ErrorFilter,
-    // Global guards run in the order listed here (run, docs/m2-plan.md §2.6).
+    // Global guards run in the order listed here (run, docs/m2-plan.md §2.6):
+    // the token first, so the rate limit can key on the verified caller.
     { provide: APP_GUARD, useClass: AccessTokenGuard },
+    { provide: APP_GUARD, useClass: RateLimitGuard },
   ],
 })
 export class AppModule {}
