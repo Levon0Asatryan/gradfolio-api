@@ -37,6 +37,22 @@ const runtime = {
   LOG_FORMAT: z.enum(['json', 'pretty']).default('json'),
 };
 
+/**
+ * `false`, or how many proxies to believe. The hop count takes the address the
+ * last trusted proxy appended, which a client cannot forge.
+ */
+const trustProxy = z
+  .string()
+  .default('false')
+  .refine((v) => v !== 'true', {
+    message: 'must be "false" or a hop count such as "1"; "true" trusts a client-written header',
+  })
+  // `true` has its own message above.
+  .refine((v) => v === 'true' || v === 'false' || /^([1-9]|10)$/.test(v), {
+    message: 'must be "false" or a hop count from 1 to 10',
+  })
+  .transform((v): false | number => (v === 'false' ? false : Number(v)));
+
 /** HTTP server. */
 const api = {
   API_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
@@ -58,12 +74,60 @@ const api = {
   // for people building against the API. docker compose turns it on.
   API_DOCS_ENABLED: envBoolean('false'),
 
-  // Whether X-Forwarded-For may be believed. Off unless a deployment behind a
-  // proxy opts in: a header any client can set must not decide who the client is.
-  TRUST_PROXY: envBoolean('false'),
+  // How many proxies in front of the api may be believed about the client's
+  // address: `false` (none) or a hop count. Not `true`: Express would then take
+  // the left-most X-Forwarded-For entry, which the client itself writes (run:
+  // `6.6.6.6, 203.0.113.9` -> 6.6.6.6), and the rate limiter keys on it.
+  TRUST_PROXY: trustProxy,
 
   // Bounds the readiness check's response, not the query itself.
   HEALTH_TIMEOUT_MS: z.coerce.number().int().min(100).max(30_000).default(3000),
+};
+
+/**
+ * The Auth0 tenant's issuer: an origin, nothing after it. Normalized to exactly
+ * one trailing slash, because that is the `iss` Auth0 writes and jose compares
+ * `iss` exactly (run: a token whose `iss` lacks the slash is refused).
+ */
+const issuerBaseUrl = z
+  .url()
+  .refine(
+    (v) => {
+      const u = URL.parse(v);
+      return (
+        u !== null &&
+        (u.protocol === 'https:' || u.protocol === 'http:') &&
+        u.pathname === '/' &&
+        u.search === '' &&
+        u.hash === '' &&
+        u.username === '' &&
+        u.password === ''
+      );
+    },
+    { message: 'must be an http(s) origin such as "https://tenant.eu.auth0.com/"' },
+  )
+  .transform((v) => `${new URL(v).origin}/`);
+
+/** Verifying Auth0 access tokens (docs/m2-plan.md §3.2). */
+const auth = {
+  AUTH0_ISSUER_BASE_URL: issuerBaseUrl,
+  // The Auth0 API identifier. Any non-empty string; not fetched.
+  AUTH0_AUDIENCE: z.string().trim().min(1),
+  // Bounds fetching the key set. An outage answers 503 after this long.
+  AUTH0_JWKS_TIMEOUT_MS: z.coerce.number().int().min(100).max(30_000).default(3000),
+  // Accepted skew between Auth0's clock and ours, for `exp` and `nbf`.
+  AUTH0_CLOCK_TOLERANCE_S: z.coerce.number().int().min(0).max(60).default(5),
+};
+
+/** Request budgets per window, per route, per client (docs/m2-plan.md §3.6). */
+const rateLimit = {
+  RATE_LIMIT_WINDOW_S: z.coerce.number().int().min(1).max(3600).default(60),
+  // Every route.
+  RATE_LIMIT_DEFAULT: z.coerce.number().int().min(1).max(100_000).default(120),
+  // Only routes that opt in with @RateBudget: search (M6), import (M7), AI (M8).
+  RATE_LIMIT_SEARCH: z.coerce.number().int().min(1).max(100_000).default(30),
+  RATE_LIMIT_IMPORT: z.coerce.number().int().min(1).max(100_000).default(5),
+  RATE_LIMIT_AI: z.coerce.number().int().min(1).max(100_000).default(10),
 };
 
 /** MySQL 8.4. */
@@ -85,11 +149,27 @@ const database = {
   MIGRATION_LOCK_TIMEOUT_S: z.coerce.number().int().min(0).max(3600).default(60),
 };
 
+const tlsInProduction = (c: { NODE_ENV: string; DATABASE_SSL: string }) =>
+  c.NODE_ENV !== 'production' || c.DATABASE_SSL === 'required';
+const TLS_IN_PRODUCTION = { message: 'must be "required" in production', path: ['DATABASE_SSL'] };
+
+/**
+ * What the database tools need (migrate, seed, schema dump). They never verify
+ * a token, so they must not require the Auth0 settings: the compose `migrate`
+ * service runs with DATABASE_URL alone.
+ */
+export const databaseConfigSchema = z
+  .object({ ...runtime, ...database })
+  .refine(tlsInProduction, TLS_IN_PRODUCTION);
+
+/** Everything the api process needs. */
 export const configSchema = z
-  .object({ ...runtime, ...api, ...database })
-  .refine((c) => c.NODE_ENV !== 'production' || c.DATABASE_SSL === 'required', {
-    message: 'must be "required" in production',
-    path: ['DATABASE_SSL'],
+  .object({ ...runtime, ...api, ...database, ...auth, ...rateLimit })
+  .refine(tlsInProduction, TLS_IN_PRODUCTION)
+  .refine((c) => c.NODE_ENV !== 'production' || c.AUTH0_ISSUER_BASE_URL.startsWith('https:'), {
+    message: 'must be https in production',
+    path: ['AUTH0_ISSUER_BASE_URL'],
   });
 
+export type DatabaseConfig = z.infer<typeof databaseConfigSchema>;
 export type AppConfig = z.infer<typeof configSchema>;

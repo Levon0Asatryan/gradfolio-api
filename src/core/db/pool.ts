@@ -1,5 +1,5 @@
 import { createPool as createMysqlPool, type Pool, type PoolOptions } from 'mysql2/promise';
-import type { AppConfig } from '../config/schema.js';
+import type { DatabaseConfig } from '../config/schema.js';
 
 /** The column mysql2 hands a `typeCast` function. */
 type TypeCastField = Parameters<
@@ -17,7 +17,7 @@ type TypeCastField = Parameters<
 export const SESSION_TIME_ZONE = '+00:00';
 
 type DbConfig = Pick<
-  AppConfig,
+  DatabaseConfig,
   | 'DATABASE_URL'
   | 'DATABASE_POOL_MAX'
   | 'DATABASE_CONNECT_TIMEOUT_MS'

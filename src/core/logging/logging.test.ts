@@ -68,7 +68,11 @@ describe('requestSerializer', () => {
 });
 
 describe('loggerOptions', () => {
-  const base = { DATABASE_URL: 'mysql://u:p@localhost:3306/db' };
+  const base = {
+    DATABASE_URL: 'mysql://u:p@localhost:3306/db',
+    AUTH0_ISSUER_BASE_URL: 'https://tenant.test/',
+    AUTH0_AUDIENCE: 'https://api.test',
+  };
 
   it('pretty-prints only when asked, never by default -- the image has no pino-pretty', () => {
     const pretty = loggerOptions(loadConfig({ ...base, LOG_FORMAT: 'pretty' }));

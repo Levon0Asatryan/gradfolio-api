@@ -7,7 +7,7 @@
  * Refuses in production, and on a database with pending migrations: the seed
  * is written for the latest schema.
  */
-import { loadConfig } from '../../config/index.js';
+import { loadDatabaseConfig } from '../../config/index.js';
 import { describeError } from '../../errors/describe.js';
 import { createDatabase } from '../database.js';
 import { loadMigrations } from '../migrator/files.js';
@@ -16,7 +16,7 @@ import { createPool } from '../pool.js';
 import { seed } from './seed.js';
 
 async function main(): Promise<void> {
-  const cfg = loadConfig();
+  const cfg = loadDatabaseConfig();
   if (cfg.NODE_ENV === 'production') {
     throw new Error('refusing to seed with NODE_ENV=production');
   }
