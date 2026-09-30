@@ -23,6 +23,9 @@ export const REDACT_PATHS = [
   '*.client_secret',
   '*.phone',
   '*.birthday',
+  // A user row or a token's identity, if a handler ever logs one (M2).
+  '*.email',
+  '*.claims',
 ] as const;
 
 export const REDACT_CENSOR = '[redacted]';

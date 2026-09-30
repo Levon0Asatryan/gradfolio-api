@@ -36,7 +36,7 @@ describe('redaction', () => {
     expect(line).toContain(REDACT_CENSOR);
   });
 
-  it.each(['phone', 'birthday', 'accessToken', 'refresh_token'])(
+  it.each(['phone', 'birthday', 'accessToken', 'refresh_token', 'email', 'claims'])(
     'never writes a nested %s',
     (field) => {
       const { logger, lines } = capture();
