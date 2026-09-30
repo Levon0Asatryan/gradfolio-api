@@ -1,6 +1,6 @@
 import type { RowDataPacket } from 'mysql2/promise';
 import { describeError } from '../../errors/describe.js';
-import type { Direction, Migration, Step } from './files.js';
+import { type Direction, isDml, type Migration, type Step } from './files.js';
 import {
   type Connection,
   ensureRegistry,
@@ -33,9 +33,10 @@ interface Progress {
  *
  * Each step is recorded the moment it succeeds, so a failure part-way leaves a
  * registry that says exactly which steps are in effect, and the next run
- * resumes at the failed step. Steps are guarded, so a crash between running a
- * step and recording it is also safe: the re-run finds the step in effect and
- * records it without running it again.
+ * resumes at the failed step. A DML step commits in one transaction with its
+ * record. A DDL step cannot (MySQL commits DDL implicitly), so it is guarded:
+ * after a crash between running it and recording it, the re-run finds it in
+ * effect and records it without running it again.
  */
 export async function up(conn: Connection, opts: RunOptions, to?: string): Promise<string[]> {
   return withLock(conn, opts.lockTimeoutS, async () => {
@@ -179,9 +180,29 @@ async function runStep(
   direction: Direction,
   step: Step,
 ): Promise<void> {
+  const record = { name, direction, step: step.index, checksum: step.checksum };
   try {
-    if (!(await alreadyInEffect(conn, step))) await conn.query(step.sql);
-    await recordStep(conn, { name, direction, step: step.index, checksum: step.checksum });
+    if (isDml(step)) {
+      // DML is transactional: the statement and its record commit together,
+      // so a failure (or a killed process) in between leaves neither.
+      await conn.query('START TRANSACTION');
+      try {
+        if (!(await alreadyInEffect(conn, step))) await conn.query(step.sql);
+        await recordStep(conn, record);
+        await conn.query('COMMIT');
+      } catch (err) {
+        // A failed ROLLBACK means the session is gone, and the server rolls an
+        // open transaction back when its session ends; the error that matters
+        // is the one being rethrown.
+        await conn.query('ROLLBACK').catch(() => undefined);
+        throw err;
+      }
+    } else {
+      // DDL commits implicitly, so no transaction can hold it and its record
+      // together; the step's guard closes that window instead.
+      if (!(await alreadyInEffect(conn, step))) await conn.query(step.sql);
+      await recordStep(conn, record);
+    }
   } catch (err) {
     throw new MigrationError(
       `${name} (${direction}) step ${step.index} failed: ${describeError(err)}`,

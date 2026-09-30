@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { scratchDatabase, type ScratchDatabase, testConfig } from '../../../testing/database.js';
 import { createPool } from '../pool.js';
 import { loadMigrations, type Migration, parseSteps } from './files.js';
-import { type Connection, REGISTRY_TABLE } from './registry.js';
+import { type Connection, ensureRegistry, REGISTRY_TABLE } from './registry.js';
 import { down, MigrationError, pending, type RunOptions, up } from './runner.js';
 import { dumpSchema } from './schema-dump.js';
 
@@ -213,6 +213,53 @@ describe('migration runner against MySQL 8.4', () => {
     expect(await down(conn, opts([broken]))).toEqual(['0001_two_steps']);
     expect(await recorded()).toEqual([]);
     expect(await dumpSchema(conn)).toBe(before);
+  });
+
+  describe('a DML step', () => {
+    // Deletes the blank skill: DML, so it commits with its record or not at all.
+    const dml = migration(
+      '0001_dml',
+      "DELETE FROM skills WHERE skill_name = '';\n",
+      'DROP TABLE IF EXISTS nothing_to_undo;\n',
+    );
+    const skills = async () =>
+      (await rows('SELECT skill_name AS s FROM skills ORDER BY id')).map((r) => r.s as string);
+
+    beforeEach(async () => {
+      await conn.query('CREATE TABLE skills (id INT PRIMARY KEY, skill_name VARCHAR(50))');
+      await conn.query("INSERT INTO skills VALUES (1, 'React'), (2, '')");
+    });
+
+    it('commits the statement and its record together', async () => {
+      expect(await up(conn, opts([dml]))).toEqual(['0001_dml']);
+      expect(await skills()).toEqual(['React']);
+      expect(await recorded()).toEqual(['0001_dml.up.1']);
+    });
+
+    it('leaves neither the change nor the record when recording fails after the statement', async () => {
+      // The statement succeeds; then the server refuses the record, as a
+      // dropped connection or a killed process would leave it unwritten.
+      await ensureRegistry(conn);
+      await conn.query(`
+        CREATE TRIGGER refuse_record BEFORE INSERT ON ${REGISTRY_TABLE} FOR EACH ROW
+        BEGIN
+          IF NEW.name = '0001_dml' THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'record refused';
+          END IF;
+        END`);
+
+      await expect(up(conn, opts([dml]))).rejects.toThrow(
+        /0001_dml \(up\) step 1 failed: .*record refused/,
+      );
+      expect(await skills()).toEqual(['React', '']);
+      expect(await recorded()).toEqual([]);
+
+      // Nothing half-done to repair: once recording works, the step just runs.
+      await conn.query('DROP TRIGGER refuse_record');
+      expect(await up(conn, opts([dml]))).toEqual(['0001_dml']);
+      expect(await skills()).toEqual(['React']);
+      expect(await recorded()).toEqual(['0001_dml.up.1']);
+    });
   });
 
   it('reports which migrations are not fully applied', async () => {
