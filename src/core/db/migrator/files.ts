@@ -115,6 +115,24 @@ export function isRerunnable(step: Step): boolean {
   return step.guard !== undefined || RERUNNABLE.some((re) => re.test(step.sql));
 }
 
+/**
+ * A step MySQL runs inside a transaction: plain INSERT, UPDATE, DELETE or
+ * REPLACE. The runner then commits the statement together with its record, so
+ * a failure between the two leaves neither.
+ *
+ * Deliberately narrow: anything else -- DDL, TRUNCATE, `CREATE TABLE … SELECT`,
+ * CALL, SET, a statement starting with a comment or a CTE -- counts as DDL and
+ * keeps the guarded scheme. Treating a DDL statement as DML would be the unsafe
+ * mistake (its implicit commit would split the transaction); the reverse only
+ * loses the atomicity this adds. A step is one statement, so it cannot mix the
+ * two: with multipleStatements off, a second statement is a syntax error.
+ */
+const DML = /^(INSERT|UPDATE|DELETE|REPLACE)\b/i;
+
+export function isDml(step: Step): boolean {
+  return DML.test(step.sql);
+}
+
 /** Every migration in the directory, in name order, with both directions parsed. */
 export async function loadMigrations(dir = MIGRATIONS_DIR): Promise<Migration[]> {
   const entries = (await readdir(dir)).filter((f) => f.endsWith('.sql')).sort();
