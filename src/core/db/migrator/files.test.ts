@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { isRerunnable, loadMigrations, MigrationFileError, parseSteps } from './files.js';
+import { isDml, isRerunnable, loadMigrations, MigrationFileError, parseSteps } from './files.js';
 
 describe('parseSteps', () => {
   it('splits on a semicolon at the end of a line, one statement per step', () => {
@@ -93,6 +93,38 @@ describe('isRerunnable', () => {
   });
 });
 
+describe('isDml', () => {
+  const step = (text: string) => parseSteps(text)[0]!;
+
+  it.each([
+    'INSERT INTO t (a) SELECT a FROM s ON DUPLICATE KEY UPDATE t.a = t.a;',
+    'insert into t values (1);',
+    'UPDATE t SET a = 1;',
+    'UPDATE /*+ SET_VAR(group_concat_max_len = 1048576) */ t SET a = 1;',
+    'DELETE s1 FROM t s1 JOIN t s2 ON s1.a = s2.a;',
+    'REPLACE INTO t VALUES (1);',
+  ])('runs %j in a transaction', (text) => {
+    expect(isDml(step(text))).toBe(true);
+  });
+
+  // Anything not provably DML keeps the guarded DDL scheme. TRUNCATE and
+  // CREATE … SELECT commit implicitly, so a transaction would be a lie.
+  it.each([
+    'CREATE TABLE IF NOT EXISTS a (id INT);',
+    'CREATE TABLE a2 AS SELECT * FROM a;',
+    'ALTER TABLE a ADD COLUMN c INT;',
+    'DROP TABLE IF EXISTS a;',
+    'TRUNCATE TABLE a;',
+    'RENAME TABLE a TO b;',
+    'SET @x = 1;',
+    'CALL do_something();',
+    'WITH x AS (SELECT 1) DELETE FROM a;',
+    '/* note */ DELETE FROM a;',
+  ])('treats %j as DDL', (text) => {
+    expect(isDml(step(text))).toBe(false);
+  });
+});
+
 describe('the migrations in this repository', () => {
   it('are named in order, with both halves, and every step can be re-run', async () => {
     const migrations = await loadMigrations();
@@ -107,6 +139,19 @@ describe('the migrations in this repository', () => {
       ),
     );
     expect(unguarded).toEqual([]);
+  });
+
+  it('run exactly 0003’s backfills as DML; every other step is DDL', async () => {
+    const dml = (await loadMigrations()).flatMap((m) =>
+      (['up', 'down'] as const).flatMap((d) =>
+        m[d].filter(isDml).map((s) => `${m.name}.${d}.${s.index}`),
+      ),
+    );
+    expect(dml).toEqual([
+      ...[4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map((i) => `0003_project_terms.up.${i}`),
+      '0003_project_terms.down.2',
+      '0003_project_terms.down.3',
+    ]);
   });
 
   it('the baseline creates the 11 tables of gradfolio-sql, and its down drops them', async () => {
