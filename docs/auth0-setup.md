@@ -214,13 +214,13 @@ refresh-token rotation, or Branding. Those rows say "check in the dashboard".
 
 ### What is already in place
 
-| Step                                      | State                                                                                                          |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| §2 API `https://api.gradfolio.app`        | Done: RS256, access-token lifetime 3600 s, offline access on, consent skipped for first-party apps, RBAC off   |
-| §3 App `Gradfolio` (`AlVr5…`): grants     | Partly: Authorization Code + Refresh Token on, but **Client Credentials is also on** (10.2)                    |
-| §4 Callback and logout URLs               | Done for localhost and `https://gradfolio-navy.vercel.app`; no preview URLs yet (add them per §4 when testing) |
-| §6 Action `Gradfolio access-token claims` | Created, built and deployed (node22, version 1). **Its trigger binding cannot be read: check it (10.1)**       |
-| §7 Test tokens                            | `gradfolio-api-m2/.env` has 5 token entries (17:16 UTC). Tokens live 1 h; refresh them before Phase 3 runs     |
+| Step                                      | State                                                                                                                                                     |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| §2 API `https://api.gradfolio.app`        | Done: RS256, access-token lifetime 3600 s, offline access on, consent skipped for first-party apps, RBAC off                                              |
+| §3 App `Gradfolio` (`AlVr5…`): grants     | Partly: Authorization Code + Refresh Token on, but **Client Credentials is also on** (10.2)                                                               |
+| §4 Callback and logout URLs               | Done for localhost and `https://gradfolio-navy.vercel.app`; no preview URLs yet (add them per §4 when testing)                                            |
+| §6 Action `Gradfolio access-token claims` | Created, built and deployed (node22, version 1). **Its trigger binding cannot be read: check it (10.1)**                                                  |
+| §7 Test tokens                            | **Not done.** `gradfolio-api-m2/.env` has the issuer, the audience and the five `M2_TEST_TOKEN_*` names, but only as commented placeholders: no token yet |
 
 ### Missing or different from this checklist
 
