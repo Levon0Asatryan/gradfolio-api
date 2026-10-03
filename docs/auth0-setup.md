@@ -8,6 +8,9 @@ written here (Auth0 moves things), do the equivalent and note the difference in 
 Auth0 and Vercel; the test tokens (§7) go only into the gitignored `.env` of the API
 worktree.
 
+**Progress:** §10 records what the tenant actually held on 2026-10-02, and the steps
+that were still missing. Check it before re-running anything above.
+
 Values used below (change them if you prefer, then use yours everywhere):
 
 | Name                 | Value                                                                       |
@@ -200,3 +203,58 @@ Tokens live 1 hour, so do this right before you say "ready".
 - Which connections have a token in `.env`, and which you could not test.
 - Your answers to §8.
 - Anything in the dashboard that did not match this checklist.
+
+## 10. Tenant state on 2026-10-02, and the remaining steps
+
+The orchestrator read this tenant (`dev-wkthnyn8b8mjn5ae`) through the Auth0 MCP on
+2026-10-02, after the setup session's changes at 17:12–17:16 UTC.
+
+**Limits of that read.** The MCP cannot read connections, Action trigger bindings,
+refresh-token rotation, or Branding. Those rows say "check in the dashboard".
+
+### What is already in place
+
+| Step                                      | State                                                                                                                                                     |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| §2 API `https://api.gradfolio.app`        | Done: RS256, access-token lifetime 3600 s, offline access on, consent skipped for first-party apps, RBAC off                                              |
+| §3 App `Gradfolio` (`AlVr5…`): grants     | Partly: Authorization Code + Refresh Token on, but **Client Credentials is also on** (10.2)                                                               |
+| §4 Callback and logout URLs               | Done for localhost and `https://gradfolio-navy.vercel.app`; no preview URLs yet (add them per §4 when testing)                                            |
+| §6 Action `Gradfolio access-token claims` | Created, built and deployed (node22, version 1). **Its trigger binding cannot be read: check it (10.1)**                                                  |
+| §7 Test tokens                            | **Not done.** `gradfolio-api-m2/.env` has the issuer, the audience and the five `M2_TEST_TOKEN_*` names, but only as commented placeholders: no token yet |
+
+### Missing or different from this checklist
+
+- [ ] **10.1 Put the Action in the Login flow.** Actions → Triggers → **post-login** →
+      drag `Gradfolio access-token claims` in → **Apply**. - The MCP can create and deploy an Action, but it cannot bind it to a trigger. - An unbound Action never runs, so access tokens carry **none** of the
+      `https://gradfolio.app/` claims, and every user stays unverified. - Check it: decode a fresh test token (§7 step 5) and look for
+      `https://gradfolio.app/email_verified`.
+- [ ] **10.2 Turn off Client Credentials** on `Gradfolio`: Settings → Advanced →
+      Grant Types. Keep only Authorization Code + Refresh Token. The app never acts as
+      a machine-to-machine client, and an unused grant only widens what a leaked secret
+      allows.
+- [ ] **10.3 Only `Gradfolio` may get API tokens for users.** The API's user access
+      policy is **`allow_all`**: every application in the tenant can request a user
+      token for `https://api.gradfolio.app`. That includes the legacy app in 10.4,
+      which still has the Implicit grant. - Set the API's Application Access → user-delegated access to **Per-app
+      authorization**. - Grant only `Gradfolio` (§2, last part).
+- [ ] **10.4 Remove the legacy application `gradfolio` (`R6OR…`, "Vercel
+      Application").** - Auth0's Vercel integration created it on 2025-12-08. It uses the SDK v3
+      routes (`/api/auth/callback`), is not OIDC-conformant, and has the
+      **Implicit** grant on. - The live site signs in with `Gradfolio` (`AlVr5…`, seen in the login redirect
+      on 2026-09-28). - Before deleting, confirm Vercel's `AUTH0_CLIENT_ID` (Production and Preview)
+      is `AlVr5…`. If the Vercel–Auth0 integration is installed, uninstall it, so it
+      stops managing variables. - Then delete `gradfolio`. Also delete `Default App`, which is unused.
+- [ ] **10.5 Clear the origin lists** on `Gradfolio`: - Allowed Web Origins and Allowed Origins (CORS) currently list localhost and the
+      Vercel URL. §4 says leave them empty, because the browser never talks to
+      Auth0 from script with the server-side SDK. - Also set Cross-Origin Authentication **off**. - If login breaks after this, put them back and note it under §9.
+- [ ] **10.6 Check the login page.** `Gradfolio` has `custom_login_page_on: true`. - In Branding → Universal Login, confirm the **New** Universal Login experience
+      is in use, and that no customized classic HTML page is overriding it. - Otherwise the social buttons from §5 may not appear.
+- [ ] **10.7 Check refresh tokens** (the MCP shows them as redacted). - `Gradfolio` → Settings → Refresh Token Rotation **off**. - Absolute Expiration 30 days; Inactivity Expiration 7 days (§3).
+- [ ] **10.8 Check connections** (the MCP cannot read them; §5): - database with email verification on, Google, GitHub and LinkedIn, each
+      **enabled for `Gradfolio`**; - the two database test users, one verified and one unverified. - Record which ones exist under §9.
+- [ ] **10.9 Vercel environment** (tracker 2.8; the frontend session also needs this): - Production and Preview get `AUTH0_AUDIENCE=https://api.gradfolio.app`, and
+      `AUTH0_SCOPE` including `offline_access`. Today the production login redirect
+      carries no `audience`. - Previews additionally get their own `APP_BASE_URL`. - Redeploy, then confirm `/auth/login`'s redirect includes `audience=`.
+- [ ] **10.10 Leave the ID-token lifetime as is** (36000 s on `Gradfolio`). It only
+      governs the SDK session cookie's ID token, and the API never accepts ID tokens.
+      Noted so nobody "fixes" it while chasing the access-token lifetime.
