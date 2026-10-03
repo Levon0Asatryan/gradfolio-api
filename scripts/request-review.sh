@@ -19,6 +19,26 @@ fi
 pr=${1:-$(gh pr view --json number --jq .number)}
 scope=${2:-}
 head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid)
+
+# Right after a push GitHub's API can still report the previous head for a few
+# seconds. A request naming that commit is judged against the wrong one by
+# review-status.sh. git itself is authoritative on what the PR's branch holds,
+# whatever the local branch is called (`git push origin HEAD:other-name`), so
+# wait until the API reports what `git ls-remote` does. Tested by
+# src/testing/push-gates.test.ts.
+pushed=$(git ls-remote origin "refs/heads/$(gh pr view "$pr" --json headRefName --jq .headRefName)" 2>/dev/null | cut -f1)
+if [ -n "$pushed" ]; then
+  waited=0
+  while [ "$head" != "$pushed" ]; do
+    if [ "$waited" -ge "${REQUEST_REVIEW_WAIT_S:-30}" ]; then
+      echo "request-review: GitHub reports $(printf '%s' "$head" | cut -c1-7) for #$pr, its branch holds $(printf '%s' "$pushed" | cut -c1-7). Try again in a minute." >&2
+      exit 1
+    fi
+    sleep 1
+    waited=$((waited + 1))
+    head=$(gh pr view "$pr" --json headRefOid --jq .headRefOid)
+  done
+fi
 short=$(printf '%s' "$head" | cut -c1-7)
 
 gh pr edit "$pr" --add-reviewer @copilot >/dev/null
