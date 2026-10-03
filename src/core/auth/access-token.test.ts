@@ -4,6 +4,7 @@ import { b64url, startTestTenant, type TestTenant } from '../../testing/jwks.js'
 import {
   type AccessTokenVerifier,
   bearerToken,
+  CLAIM_LIMITS,
   CLAIM_NAMESPACE,
   createAccessTokenVerifier,
   type KeySetTiming,
@@ -89,6 +90,33 @@ describe('access token verification', () => {
     expect(identity.email).toBeUndefined();
     expect(identity.emailVerified).toBe(false);
     expect(identity.identities).toEqual([]);
+  });
+
+  it('keeps a profile claim up to its bound, so the pre-fill can cut it to the column', async () => {
+    const name = 'n'.repeat(300);
+    const identity = await verifier().verify(await tenant.sign({ profile: { name } }));
+    expect(identity.name).toBe(name);
+  });
+
+  it.each([
+    ['email', `${'e'.repeat(CLAIM_LIMITS.email)}@x.test`],
+    ['name', '😀'.repeat(CLAIM_LIMITS.name + 1)],
+    ['picture', `https://x.test/${'p'.repeat(CLAIM_LIMITS.picture)}`],
+    ['headline', 'h'.repeat(CLAIM_LIMITS.headline + 1)],
+  ] as const)('drops a %s claim over its bound instead of passing it on', async (claim, value) => {
+    const identity = await verifier().verify(await tenant.sign({ profile: { [claim]: value } }));
+    expect(identity[claim]).toBeUndefined();
+  });
+
+  it('drops an identities claim with too many entries, or an entry too long', async () => {
+    const many = Array.from({ length: CLAIM_LIMITS.identities + 1 }, (_, i) => `p${i}`);
+    const tooMany = await verifier().verify(await tenant.sign({ profile: { identities: many } }));
+    expect(tooMany.identities).toEqual([]);
+    const long = 'x'.repeat(CLAIM_LIMITS.provider + 1);
+    const tooLong = await verifier().verify(
+      await tenant.sign({ profile: { identities: ['github', long] } }),
+    );
+    expect(tooLong.identities).toEqual([]);
   });
 
   it.each([

@@ -61,17 +61,45 @@ function sourceOf(err: unknown): string {
 const subject = z.string().min(1).max(255);
 
 /**
- * Profile claims come from our Action (namespace stripped). One of the wrong
- * type is dropped rather than trusted; it never fails the request.
+ * Bounds on the profile claims, in code points. Above the columns they feed
+ * (users.name 255, users.email 255, users.headline 500), so a value a
+ * provider sent slightly too long still reaches the pre-fill, which cuts it to
+ * the column; far beyond any real value, so nothing unbounded travels on in
+ * `req.auth`. An email is at most 254 characters (RFC 5321); a URL rarely
+ * exceeds 2,000.
  */
-const optionalString = z.string().optional().catch(undefined);
+export const CLAIM_LIMITS = {
+  email: 320,
+  name: 1_000,
+  picture: 2_048,
+  headline: 2_000,
+  identities: 20,
+  provider: 100,
+} as const;
+
+const bounded = (max: number) =>
+  z
+    .string()
+    .refine((v) => [...v].length <= max)
+    .optional()
+    .catch(undefined);
+
+/**
+ * Profile claims come from our Action (namespace stripped). One of the wrong
+ * type, or over its bound, is dropped rather than trusted; it never fails the
+ * request (docs/m2-plan.md §3.3).
+ */
 const profileSchema = z.object({
-  email: optionalString,
+  email: bounded(CLAIM_LIMITS.email),
   email_verified: z.boolean().optional().catch(undefined),
-  name: optionalString,
-  picture: optionalString,
-  headline: optionalString,
-  identities: z.array(z.string()).optional().catch(undefined),
+  name: bounded(CLAIM_LIMITS.name),
+  picture: bounded(CLAIM_LIMITS.picture),
+  headline: bounded(CLAIM_LIMITS.headline),
+  identities: z
+    .array(z.string().max(CLAIM_LIMITS.provider))
+    .max(CLAIM_LIMITS.identities)
+    .optional()
+    .catch(undefined),
 });
 
 function identityOf(payload: JWTPayload): AccessTokenIdentity {
