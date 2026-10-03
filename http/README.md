@@ -8,6 +8,7 @@ after the module it exercises.
 | [health.http](health.http)   | `api/health`  | liveness, readiness                         |
 | [common.http](common.http)   | `api/common`  | not-found fallback, error shape, body limit |
 | [openapi.http](openapi.http) | `api/openapi` | Swagger UI and the document it renders      |
+| [me.http](me.http)           | `api/me`      | the caller's account; 401 without a token   |
 
 **A module added later gets a file here in the same pull request.** A file that
 does not list every route its module serves is worse than none: the gap reads as
