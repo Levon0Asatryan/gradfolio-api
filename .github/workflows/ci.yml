@@ -203,6 +203,14 @@ jobs:
           curl -s http://localhost:3000/nope | grep -q '"code":"NOT_FOUND"'
           curl -fsS http://localhost:3000/docs-json | grep -q '"Gradfolio API"'
 
+      - name: A protected route refuses a request without a valid token
+        run: |
+          body=$(curl -s -w ' %{http_code}' http://localhost:3000/v1/me)
+          [ "$body" = '{"code":"UNAUTHENTICATED","message":"authentication required"} 401' ] \
+            || { echo "::error::/v1/me without a token answered: $body"; exit 1; }
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer junk' http://localhost:3000/v1/me)
+          [ "$code" = "401" ] || { echo "::error::/v1/me with a junk token answered $code"; exit 1; }
+
       - name: Public routes do not verify tokens
         run: |
           # The health routes are @Public(): a junk token must not turn them
