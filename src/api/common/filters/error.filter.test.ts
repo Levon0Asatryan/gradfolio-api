@@ -2,19 +2,21 @@ import type { ArgumentsHost } from '@nestjs/common';
 import { NotFoundException } from '@nestjs/common';
 import type { PinoLogger } from 'nestjs-pino';
 import { describe, expect, it, vi } from 'vitest';
+import { UnauthenticatedError } from '../../../core/auth/errors.js';
 import { ErrorFilter } from './error.filter.js';
 
 function harness(url = '/v1/projects/abc?q=secret') {
   const logger = { error: vi.fn(), warn: vi.fn() } as unknown as PinoLogger;
   const json = vi.fn();
   const status = vi.fn(() => ({ json }));
+  const setHeader = vi.fn();
   const host = {
     switchToHttp: () => ({
-      getResponse: () => ({ status }),
+      getResponse: () => ({ status, setHeader }),
       getRequest: () => ({ method: 'GET', url }),
     }),
   } as unknown as ArgumentsHost;
-  return { filter: new ErrorFilter(logger), logger, host, status, json };
+  return { filter: new ErrorFilter(logger), logger, host, status, json, setHeader };
 }
 
 describe('ErrorFilter', () => {
@@ -52,5 +54,14 @@ describe('ErrorFilter', () => {
     const [fields] = vi.mocked(logger.warn).mock.calls[0] as [Record<string, unknown>];
     expect(fields.path).toBe('/v1/search');
     expect(JSON.stringify(fields)).not.toContain('private-term');
+  });
+
+  it('sets the headers the error requires, and sets none for others', () => {
+    const { filter, host, setHeader } = harness();
+    filter.catch(new NotFoundException(), host);
+    expect(setHeader).not.toHaveBeenCalled();
+
+    filter.catch(new UnauthenticatedError('missing'), host);
+    expect(setHeader).toHaveBeenCalledWith('WWW-Authenticate', 'Bearer');
   });
 });

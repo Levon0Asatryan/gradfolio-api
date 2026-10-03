@@ -8,7 +8,7 @@
  * Covered against a real MySQL by runner.int.test.ts and by the CI migrations
  * job (apply, no-op, roll back, re-apply) rather than by unit tests of a mock.
  */
-import { loadConfig } from '../../config/index.js';
+import { loadDatabaseConfig } from '../../config/index.js';
 import { describeError } from '../../errors/describe.js';
 import { createPool } from '../pool.js';
 import { parseCommand } from './args.js';
@@ -17,7 +17,7 @@ import { down, up } from './runner.js';
 
 async function main(): Promise<void> {
   const cmd = parseCommand(process.argv.slice(2));
-  const cfg = loadConfig();
+  const cfg = loadDatabaseConfig();
   // One connection: the migration lock and every step belong to one session.
   const pool = createPool({ ...cfg, DATABASE_POOL_MAX: 1 });
   try {

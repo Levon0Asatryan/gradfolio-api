@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { loadConfig, parseByteSize } from './index.js';
+import { loadConfig, loadDatabaseConfig, parseByteSize } from './index.js';
 
 const DATABASE_URL = 'mysql://gradfolio:gradfolio@localhost:3306/gradfolio';
+const AUTH = {
+  AUTH0_ISSUER_BASE_URL: 'https://tenant.eu.auth0.com/',
+  AUTH0_AUDIENCE: 'https://api.gradfolio.app',
+};
+const REQUIRED = { DATABASE_URL, ...AUTH };
 
 describe('loadConfig', () => {
   it('applies defaults when only the required keys are set', () => {
-    const cfg = loadConfig({ DATABASE_URL });
+    const cfg = loadConfig(REQUIRED);
 
     expect(cfg).toMatchObject({
       NODE_ENV: 'development',
@@ -17,11 +22,74 @@ describe('loadConfig', () => {
       DATABASE_POOL_MAX: 10,
       DATABASE_SSL: 'off',
       MIGRATION_LOCK_TIMEOUT_S: 60,
+      AUTH0_JWKS_TIMEOUT_MS: 3000,
+      AUTH0_CLOCK_TOLERANCE_S: 5,
+      RATE_LIMIT_WINDOW_S: 60,
+      RATE_LIMIT_DEFAULT: 120,
+      RATE_LIMIT_SEARCH: 30,
+      RATE_LIMIT_IMPORT: 5,
+      RATE_LIMIT_AI: 10,
     });
   });
 
   it('refuses to boot without DATABASE_URL', () => {
-    expect(() => loadConfig({})).toThrow(/DATABASE_URL/);
+    expect(() => loadConfig(AUTH)).toThrow(/DATABASE_URL/);
+  });
+
+  it.each(['AUTH0_ISSUER_BASE_URL', 'AUTH0_AUDIENCE'])('refuses to boot without %s', (key) => {
+    const env: NodeJS.ProcessEnv = { ...REQUIRED };
+    delete env[key];
+    expect(() => loadConfig(env)).toThrow(new RegExp(key));
+  });
+
+  it('refuses an empty audience', () => {
+    expect(() => loadConfig({ ...REQUIRED, AUTH0_AUDIENCE: '  ' })).toThrow(/AUTH0_AUDIENCE/);
+  });
+
+  it.each([
+    ['https://tenant.eu.auth0.com/', 'https://tenant.eu.auth0.com/'],
+    ['https://tenant.eu.auth0.com', 'https://tenant.eu.auth0.com/'],
+    ['https://TENANT.eu.auth0.com', 'https://tenant.eu.auth0.com/'],
+    ['http://127.0.0.1:4010/', 'http://127.0.0.1:4010/'],
+  ])('normalizes the issuer %j to %j (one trailing slash)', (input, issuer) => {
+    expect(loadConfig({ ...REQUIRED, AUTH0_ISSUER_BASE_URL: input }).AUTH0_ISSUER_BASE_URL).toBe(
+      issuer,
+    );
+  });
+
+  it.each([
+    'tenant.eu.auth0.com',
+    'https://tenant.eu.auth0.com/api/v2/',
+    'https://tenant.eu.auth0.com/?x=1',
+    'https://tenant.eu.auth0.com/#x',
+    'https://user:pass@tenant.eu.auth0.com/',
+    'ftp://tenant.eu.auth0.com/',
+  ])('refuses the issuer %j', (value) => {
+    expect(() => loadConfig({ ...REQUIRED, AUTH0_ISSUER_BASE_URL: value })).toThrow(
+      /AUTH0_ISSUER_BASE_URL/,
+    );
+  });
+
+  it('requires an https issuer in production', () => {
+    const prod = { ...REQUIRED, NODE_ENV: 'production', DATABASE_SSL: 'required' };
+    expect(() => loadConfig({ ...prod, AUTH0_ISSUER_BASE_URL: 'http://tenant.test/' })).toThrow(
+      /AUTH0_ISSUER_BASE_URL: must be https in production/,
+    );
+    expect(loadConfig(prod).AUTH0_ISSUER_BASE_URL).toBe('https://tenant.eu.auth0.com/');
+  });
+
+  it.each([
+    ['AUTH0_JWKS_TIMEOUT_MS', '99'],
+    ['AUTH0_JWKS_TIMEOUT_MS', '30001'],
+    ['AUTH0_CLOCK_TOLERANCE_S', '-1'],
+    ['AUTH0_CLOCK_TOLERANCE_S', '61'],
+    ['RATE_LIMIT_WINDOW_S', '0'],
+    ['RATE_LIMIT_DEFAULT', '0'],
+    ['RATE_LIMIT_SEARCH', 'many'],
+    ['RATE_LIMIT_IMPORT', '1.5'],
+    ['RATE_LIMIT_AI', '-3'],
+  ])('refuses %s=%j', (key, value) => {
+    expect(() => loadConfig({ ...REQUIRED, [key]: value })).toThrow(new RegExp(key));
   });
 
   it('refuses a non-mysql database URL', () => {
@@ -29,27 +97,44 @@ describe('loadConfig', () => {
   });
 
   it('names every offending key, not only the first', () => {
-    expect(() => loadConfig({ DATABASE_URL, API_PORT: '0', LOG_LEVEL: 'loud' })).toThrow(
+    expect(() => loadConfig({ ...REQUIRED, API_PORT: '0', LOG_LEVEL: 'loud' })).toThrow(
       /API_PORT[\s\S]*LOG_LEVEL|LOG_LEVEL[\s\S]*API_PORT/,
     );
   });
 
   it.each(['yes', '1', 'TRUE', ''])('refuses %j as a boolean switch', (value) => {
-    expect(() => loadConfig({ DATABASE_URL, API_DOCS_ENABLED: value })).toThrow(/API_DOCS_ENABLED/);
+    expect(() => loadConfig({ ...REQUIRED, API_DOCS_ENABLED: value })).toThrow(/API_DOCS_ENABLED/);
   });
 
   it('parses boolean switches', () => {
-    const cfg = loadConfig({ DATABASE_URL, API_DOCS_ENABLED: 'true', TRUST_PROXY: 'true' });
-    expect(cfg.API_DOCS_ENABLED).toBe(true);
-    expect(cfg.TRUST_PROXY).toBe(true);
+    expect(loadConfig({ ...REQUIRED, API_DOCS_ENABLED: 'true' }).API_DOCS_ENABLED).toBe(true);
+  });
+
+  it.each([
+    ['false', false],
+    ['1', 1],
+    ['10', 10],
+  ])('reads TRUST_PROXY=%j as %j', (value, expected) => {
+    expect(loadConfig({ ...REQUIRED, TRUST_PROXY: value }).TRUST_PROXY).toBe(expected);
+  });
+
+  it('refuses TRUST_PROXY=true, which would believe a client-written header', () => {
+    expect(() => loadConfig({ ...REQUIRED, TRUST_PROXY: 'true' })).not.toThrow(/from 1 to 10/);
+    expect(() => loadConfig({ ...REQUIRED, TRUST_PROXY: 'true' })).toThrow(
+      /TRUST_PROXY: .*"true" trusts a client-written header/,
+    );
+  });
+
+  it.each(['0', '11', '1.5', 'yes', ''])('refuses TRUST_PROXY=%j', (value) => {
+    expect(() => loadConfig({ ...REQUIRED, TRUST_PROXY: value })).toThrow(/TRUST_PROXY/);
   });
 
   it.each(['64kbb', 'abc', '0kb', '64', '9mb'])('refuses body limit %j', (value) => {
-    expect(() => loadConfig({ DATABASE_URL, API_BODY_LIMIT: value })).toThrow(/API_BODY_LIMIT/);
+    expect(() => loadConfig({ ...REQUIRED, API_BODY_LIMIT: value })).toThrow(/API_BODY_LIMIT/);
   });
 
   it.each(['-1', '3601', '1.5', 'soon'])('refuses migration lock timeout %j', (value) => {
-    expect(() => loadConfig({ DATABASE_URL, MIGRATION_LOCK_TIMEOUT_S: value })).toThrow(
+    expect(() => loadConfig({ ...REQUIRED, MIGRATION_LOCK_TIMEOUT_S: value })).toThrow(
       /MIGRATION_LOCK_TIMEOUT_S/,
     );
   });
@@ -59,10 +144,24 @@ describe('loadConfig', () => {
   });
 
   it('requires TLS to the database in production', () => {
-    expect(() => loadConfig({ DATABASE_URL, NODE_ENV: 'production' })).toThrow(/DATABASE_SSL/);
+    expect(() => loadConfig({ ...REQUIRED, NODE_ENV: 'production' })).toThrow(/DATABASE_SSL/);
     expect(
-      loadConfig({ DATABASE_URL, NODE_ENV: 'production', DATABASE_SSL: 'required' }).DATABASE_SSL,
+      loadConfig({ ...REQUIRED, NODE_ENV: 'production', DATABASE_SSL: 'required' }).DATABASE_SSL,
     ).toBe('required');
+  });
+});
+
+describe('loadDatabaseConfig', () => {
+  it('needs only the database settings: the migrate service has no Auth0 settings', () => {
+    const cfg = loadDatabaseConfig({ DATABASE_URL });
+    expect(cfg.DATABASE_URL).toBe(DATABASE_URL);
+    expect(cfg).not.toHaveProperty('AUTH0_AUDIENCE');
+  });
+
+  it('still requires TLS to the database in production', () => {
+    expect(() => loadDatabaseConfig({ DATABASE_URL, NODE_ENV: 'production' })).toThrow(
+      /DATABASE_SSL/,
+    );
   });
 });
 

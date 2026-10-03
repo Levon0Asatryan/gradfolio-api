@@ -4,8 +4,11 @@ import { APP_CONFIG } from '../../core/config/config.module.js';
 import type { AppConfig } from '../../core/config/schema.js';
 import { DbService } from '../../core/db/db.service.js';
 import { describeError } from '../../core/errors/describe.js';
+import { Public } from '../auth/decorators/public.decorator.js';
 import { LIVENESS_PATH, READINESS_PATH } from './constants.js';
 
+/** Public: a platform's health probe carries no token. */
+@Public()
 @Controller()
 export class HealthController {
   constructor(

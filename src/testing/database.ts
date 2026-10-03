@@ -18,8 +18,18 @@ export function testDatabaseUrl(): string {
   );
 }
 
+/** Placeholders: never reached. Tests that verify tokens pass a local JWKS issuer. */
+export const TEST_ISSUER = 'https://gradfolio-test.invalid/';
+export const TEST_AUDIENCE = 'https://api.gradfolio.test';
+
 export function testConfig(overrides: NodeJS.ProcessEnv = {}): AppConfig {
-  return loadConfig({ NODE_ENV: 'test', DATABASE_URL: testDatabaseUrl(), ...overrides });
+  return loadConfig({
+    NODE_ENV: 'test',
+    DATABASE_URL: testDatabaseUrl(),
+    AUTH0_ISSUER_BASE_URL: TEST_ISSUER,
+    AUTH0_AUDIENCE: TEST_AUDIENCE,
+    ...overrides,
+  });
 }
 
 /**

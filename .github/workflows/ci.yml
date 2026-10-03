@@ -161,6 +161,11 @@ jobs:
     name: Container stack
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # Required by the api at boot. Never contacted here: the job exercises
+      # public routes and a request without a token.
+      AUTH0_ISSUER_BASE_URL: https://gradfolio-ci.invalid/
+      AUTH0_AUDIENCE: https://api.gradfolio.test
     steps:
       - uses: actions/checkout@v7
 
@@ -197,6 +202,13 @@ jobs:
           [ "$code" = "404" ] || { echo "::error::/v1/healthz answered $code"; exit 1; }
           curl -s http://localhost:3000/nope | grep -q '"code":"NOT_FOUND"'
           curl -fsS http://localhost:3000/docs-json | grep -q '"Gradfolio API"'
+
+      - name: Public routes do not verify tokens
+        run: |
+          # The health routes are @Public(): a junk token must not turn them
+          # into 401s for a platform probe that happens to send one.
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer junk' http://localhost:3000/healthz)
+          [ "$code" = "200" ] || { echo "::error::public /healthz answered $code with a junk token"; exit 1; }
 
       # An unhandled pool error event is fatal in Node; a database restart must
       # not take the api down with it.

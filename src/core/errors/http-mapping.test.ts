@@ -5,7 +5,8 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
-import { ConflictError, NotFoundError, ValidationError } from './app-error.js';
+import { AuthUnavailableError, UnauthenticatedError } from '../auth/errors.js';
+import { ConflictError, NotFoundError, RateLimitedError, ValidationError } from './app-error.js';
 import { toErrorResponse } from './http-mapping.js';
 
 describe('toErrorResponse', () => {
@@ -116,6 +117,33 @@ describe('toErrorResponse', () => {
     expect(toErrorResponse(new NotFoundError('project')).logDetail).toBe(
       'NOT_FOUND: project not found',
     );
+  });
+
+  it('carries the headers an AppError requires, and logs its log detail instead of its message', () => {
+    expect(toErrorResponse(new UnauthenticatedError('claim:aud'))).toEqual({
+      status: 401,
+      body: { code: 'UNAUTHENTICATED', message: 'authentication required' },
+      headers: { 'WWW-Authenticate': 'Bearer' },
+      logDetail: 'access token rejected: claim:aud',
+      isServerFault: false,
+    });
+    expect(toErrorResponse(new AuthUnavailableError('JWKSTimeout ERR_JWKS_TIMEOUT'))).toEqual({
+      status: 503,
+      body: { code: 'AUTH_UNAVAILABLE', message: 'authentication is temporarily unavailable' },
+      logDetail: 'token signing keys unavailable: JWKSTimeout ERR_JWKS_TIMEOUT',
+      isServerFault: true,
+    });
+  });
+
+  it.each([
+    [59.2, '60'],
+    [0, '1'],
+    [1, '1'],
+  ])('rounds Retry-After %d s up to %s, never below one second', (seconds, header) => {
+    const mapped = toErrorResponse(new RateLimitedError(seconds));
+    expect(mapped.status).toBe(429);
+    expect(mapped.body).toEqual({ code: 'RATE_LIMITED', message: 'too many requests' });
+    expect(mapped.headers).toEqual({ 'Retry-After': header });
   });
 
   it('maps a database outage to 503, not 500', () => {
