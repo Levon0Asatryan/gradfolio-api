@@ -22,6 +22,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 const CHECK_BRANCH = resolve(import.meta.dirname, '../../scripts/check-branch.sh');
 const REQUIRE_REVIEW = resolve(import.meta.dirname, '../../scripts/require-review.sh');
 const REQUEST_REVIEW = resolve(import.meta.dirname, '../../scripts/request-review.sh');
+const SCRIPTS_DIR = resolve(import.meta.dirname, '../../scripts');
+const HOOK_SOURCE = readFileSync(resolve(import.meta.dirname, '../../.husky/pre-push'), 'utf8');
+// The hook before this fix: each gate ran with no stdin of its own, inheriting
+// the hook's fd directly. The first gate's `cat` drained it, so the second
+// gate always saw EOF and fell back to judging the checkout.
+const HOOK_SOURCE_UNFIXED = `sh scripts/check-branch.sh
+sh scripts/require-review.sh
+npm run verify
+`;
 const ZERO = '0'.repeat(40);
 
 // The gh calls the scripts make, answered from $FIXTURES:
@@ -296,5 +305,54 @@ describe('request-review.sh', () => {
     fx('new-head', other);
     expect(gate(REQUEST_REVIEW, '', ['7']).code).toBe(0);
     expect(log()).toContain(`head \`${other.slice(0, 7)}\``);
+  });
+});
+
+describe('.husky/pre-push (the real hook, not the scripts in isolation)', () => {
+  // cpSync keeps the throwaway repo self-contained, so relative `scripts/...`
+  // paths in the hook resolve the way they do in a real checkout.
+  function runHook(hookSource: string, stdin: string): { code: number; out: string } {
+    mkdirSync(join(dir, 'scripts'), { recursive: true });
+    for (const name of ['check-branch.sh', 'require-review.sh']) {
+      writeFileSync(join(dir, 'scripts', name), readFileSync(join(SCRIPTS_DIR, name)));
+      chmodSync(join(dir, 'scripts', name), 0o755);
+    }
+    const hook = join(dir, 'hook.sh');
+    // `npm run verify` is unrelated to how refs reach the gates, and would
+    // need a real package.json; neutralise it identically in both variants.
+    writeFileSync(hook, hookSource.replace('npm run verify', 'true'));
+    chmodSync(hook, 0o755);
+    try {
+      // husky's wrapper runs the hook with `sh -e`; match that.
+      const out = execFileSync('sh', ['-e', hook], {
+        cwd: dir,
+        env: env(),
+        input: stdin,
+        stdio: 'pipe',
+      });
+      return { code: 0, out: out.toString() };
+    } catch (e) {
+      const x = e as { status: number; stderr: Buffer; stdout: Buffer };
+      return { code: x.status, out: x.stdout.toString() + x.stderr.toString() };
+    }
+  }
+
+  it('routes the pushed refs to both gates: a push of another branch is refused even with a clean receipt for HEAD', () => {
+    receipt(feat); // clean, for the checked-out branch
+    const r = runHook(HOOK_SOURCE, push(other, 'other'));
+    expect(r.code).not.toBe(0);
+    expect(r.out).toContain('which is not HEAD');
+  });
+
+  it('the unfixed hook lets the same push through: the second gate never saw the ref update', () => {
+    receipt(feat);
+    const r = runHook(HOOK_SOURCE_UNFIXED, push(other, 'other'));
+    expect(r.out).not.toContain('which is not HEAD');
+  });
+
+  it('still passes a normal push of HEAD with a clean receipt', () => {
+    receipt(feat);
+    const r = runHook(HOOK_SOURCE, push(feat, 'feat'));
+    expect(r.code).toBe(0);
   });
 });
