@@ -40,6 +40,12 @@ export async function buildApp(
   configureApp(app, cfg);
   setupApiDocs(app, cfg);
   await registerNotFoundFallback(app);
+  // Listen on an explicit loopback address before supertest sees the server.
+  // Left to itself, supertest binds the wildcard address on a random port and
+  // connects to 127.0.0.1:<port>; when another server in the run bound
+  // 127.0.0.1 on that same port (the OS allows a specific and a wildcard bind
+  // side by side), the request reaches the wrong server and answers 404.
+  await app.listen(0, '127.0.0.1');
   return app;
 }
 
