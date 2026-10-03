@@ -10,6 +10,9 @@ import { APP_CONFIG } from '../core/config/config.module.js';
 import type { AppConfig } from '../core/config/schema.js';
 import { DbService } from '../core/db/db.service.js';
 import { LOG_DESTINATION } from '../core/logging/index.js';
+import type { AccessTokenIdentity } from '../core/auth/access-token.js';
+import type { UserRow } from '../api/users/repositories/user.repository.js';
+import { UsersService } from '../api/users/services/users.service.js';
 
 export interface BuildOptions {
   /** Extra controllers, for routes the application does not have yet. */
@@ -31,7 +34,16 @@ export async function buildApp(
   let builder = Test.createTestingModule({ imports: [AppModule], controllers })
     .overrideProvider(APP_CONFIG)
     .useValue(cfg);
-  if (db) builder = builder.overrideProvider(DbService).useValue(db);
+  if (db) {
+    // Without a database there is no row to resolve: the caller gets a
+    // synthetic one, so unit-level HTTP tests can reach protected routes.
+    // Integration tests (real MySQL) pass no `db` and get the real resolver.
+    builder = builder
+      .overrideProvider(DbService)
+      .useValue(db)
+      .overrideProvider(UsersService)
+      .useValue(stubUsers);
+  }
   if (logs) builder = builder.overrideProvider(LOG_DESTINATION).useValue(logs.stream);
 
   const moduleRef = await builder.compile();
@@ -91,3 +103,28 @@ export function captureLogs(): LogCapture {
         .map((l) => JSON.parse(l) as Record<string, unknown>),
   };
 }
+
+/** UsersService without a database: a row made from the token, never stored. */
+export const stubUsers: Pick<UsersService, 'resolve'> = {
+  resolve: (identity: AccessTokenIdentity): Promise<UserRow> =>
+    Promise.resolve({
+      id: `stub-${identity.sub}`,
+      auth0Id: identity.sub,
+      name: identity.name ?? 'Stub User',
+      headline: '',
+      location: null,
+      verified: identity.emailVerified,
+      isPublic: true,
+      email: identity.email ?? null,
+      avatarUrl: null,
+      bio: null,
+      github: null,
+      linkedin: null,
+      twitter: null,
+      website: null,
+      phone: null,
+      birthday: null,
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+    }),
+};

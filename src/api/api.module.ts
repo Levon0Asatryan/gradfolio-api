@@ -13,6 +13,8 @@ import { ErrorFilter } from './common/filters/error.filter.js';
 import { HealthModule } from './health/health.module.js';
 import { RateLimitGuard } from './rate-limit/guards/rate-limit.guard.js';
 import { RateLimitModule } from './rate-limit/rate-limit.module.js';
+import { CurrentUserGuard } from './users/guards/current-user.guard.js';
+import { UsersModule } from './users/users.module.js';
 
 @Module({
   imports: [
@@ -26,6 +28,7 @@ import { RateLimitModule } from './rate-limit/rate-limit.module.js';
     DbModule,
     AuthModule,
     RateLimitModule,
+    UsersModule,
     HealthModule,
   ],
   providers: [
@@ -34,6 +37,9 @@ import { RateLimitModule } from './rate-limit/rate-limit.module.js';
     // the token first, so the rate limit can key on the verified caller.
     { provide: APP_GUARD, useClass: AccessTokenGuard },
     { provide: APP_GUARD, useClass: RateLimitGuard },
+    // Last: resolves the caller's row, after the limit so a flood never
+    // reaches MySQL.
+    { provide: APP_GUARD, useClass: CurrentUserGuard },
   ],
 })
 export class AppModule {}
