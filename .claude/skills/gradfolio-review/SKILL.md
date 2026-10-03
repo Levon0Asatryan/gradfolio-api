@@ -25,8 +25,10 @@ Run the commands from `CLAUDE.md` → "Commands" and report failures as a block:
 fills that table there is nothing to run: say so under NOT CHECKED.
 
 Then the `**Check:**` regexes in `.review/rules/gradfolio.md` against the changed
-files, reporting file:line plus the message. If pass 0 fails, stop — there is no
-point reviewing code that does not build.
+files, reporting file:line plus the message. A match is a pointer for pass 1 to
+judge, not a failure by itself: correct code can match. Every command must have
+run; one that did not is not clean. If a command fails, stop — there is no point
+reviewing code that does not build.
 
 ## Pass 1 — the rule corpus
 
@@ -70,11 +72,17 @@ then NOT CHECKED. "Nothing" is a valid finding list.
 
 ## The receipt — this is what unblocks the push
 
-Write `.review/.last-review.json`:
-`{"sha": "<git rev-parse HEAD>", "at": "<ISO timestamp>", "findings_open": 0, "method": "gradfolio-review"}`
-`findings_open` is what the author still has to act on — deferring is a
-decision to record, not a way to reach zero. A hand-written receipt uses an
-honest `method` and the PR says which passes ran.
+Write `.review/.last-review.json` **every time**, with the real count:
+`{"sha": "<git rev-parse HEAD>", "at": "<ISO timestamp>", "findings_open": <N>, "method": "gradfolio-review"}`
+
+- `N` is every finding still open: each FINDING above, plus one per pass 0 failure.
+  `scripts/require-review.sh` refuses the push unless it is `0`.
+- `N` reaches `0` only by fixing (then re-running this review on the new commit) or
+  by an explicit deferral recorded in the PR with a follow-up tracker row. Deferring
+  is a decision to record, not a way to reach zero.
+- A pass that did not run (pass 0 stopped early, NOT CHECKED items) is not clean:
+  say so, and do not write `0` for it.
+- A hand-written receipt uses an honest `method`, and the PR says which passes ran.
 
 ## After the review
 
