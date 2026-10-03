@@ -347,6 +347,10 @@ describe('.husky/pre-push (the real hook, not the scripts in isolation)', () => 
   it('the unfixed hook lets the same push through: the second gate never saw the ref update', () => {
     receipt(feat);
     const r = runHook(HOOK_SOURCE_UNFIXED, push(other, 'other'));
+    // Both assertions matter: a refusal for some other reason (check-branch.sh
+    // itself rejecting the branch) would also omit the message below without
+    // demonstrating the bug this proves.
+    expect(r.code).toBe(0);
     expect(r.out).not.toContain('which is not HEAD');
   });
 
