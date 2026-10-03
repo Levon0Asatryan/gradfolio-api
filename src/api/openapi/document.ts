@@ -1,5 +1,6 @@
 import { z, type ZodType } from 'zod';
 import { LIVENESS_PATH, READINESS_PATH } from '../health/constants.js';
+import { meResponseSchema } from '../me/dto/me.dto.js';
 
 /**
  * The OpenAPI document, built from the same zod schemas the request pipeline
@@ -41,9 +42,20 @@ export interface Operation {
   summary: string;
   description?: string;
   responses: Record<string, { description: string; schema?: ZodType }>;
+  /** Needs `Authorization: Bearer <Auth0 access token>`. Every route except `@Public()` ones. */
+  bearer?: boolean;
 }
 
 const error = (description: string) => ({ description, schema: errorResponseSchema });
+
+/** The failures every authenticated route shares. */
+const authenticatedFailures = {
+  '401': error('UNAUTHENTICATED: no access token, or one that is invalid or expired'),
+  '429': error('RATE_LIMITED: over budget; see the Retry-After header'),
+  '503': error(
+    'AUTH_UNAVAILABLE: Auth0 signing keys unreachable, or DATABASE_UNAVAILABLE: MySQL unreachable',
+  ),
+};
 
 export const OPERATIONS: readonly Operation[] = [
   {
@@ -65,6 +77,22 @@ export const OPERATIONS: readonly Operation[] = [
     responses: {
       '200': { description: 'Ready', schema: readinessSchema },
       '503': error('DATABASE_UNAVAILABLE: MySQL is unreachable or too slow'),
+    },
+  },
+  {
+    method: 'get',
+    path: '/v1/me',
+    operationId: 'getMe',
+    tag: 'me',
+    summary: 'The caller’s own account',
+    description:
+      'The first call after a login creates the account from the access token’s profile ' +
+      'claims (name, email, picture); later calls return the same id. `verified` follows ' +
+      'the token’s `email_verified`.',
+    bearer: true,
+    responses: {
+      '200': { description: 'The caller’s account', schema: meResponseSchema },
+      ...authenticatedFailures,
     },
   },
 ];
@@ -100,6 +128,7 @@ export function buildOpenApiDocument(
       tags: [op.tag],
       summary: op.summary,
       ...(op.description ? { description: op.description } : {}),
+      ...(op.bearer ? { security: [{ bearerAuth: [] }] } : {}),
       responses,
     };
   }
@@ -116,11 +145,25 @@ export function buildOpenApiDocument(
       version: '0.1.0',
       description:
         'Backend for Gradfolio, a student portfolio platform. Every route except the health ' +
-        'checks is under `/v1`. Every failure answers with an `ErrorResponse`.',
+        'checks is under `/v1` and needs an Auth0 access token. Every failure answers with ' +
+        'an `ErrorResponse`.',
       license: { name: 'MIT' },
     },
-    tags: [{ name: 'health', description: 'Liveness and readiness, outside `/v1`' }],
+    tags: [
+      { name: 'health', description: 'Liveness and readiness, outside `/v1`' },
+      { name: 'me', description: 'The caller’s own account' },
+    ],
     paths,
-    components: { schemas: { ErrorResponse: errorSchema } },
+    components: {
+      schemas: { ErrorResponse: errorSchema },
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description: 'An Auth0 access token for the Gradfolio API audience.',
+        },
+      },
+    },
   };
 }

@@ -2,12 +2,14 @@ openapi: 3.0.3
 info:
   title: Gradfolio API
   version: 0.1.0
-  description: Backend for Gradfolio, a student portfolio platform. Every route except the health checks is under `/v1`. Every failure answers with an `ErrorResponse`.
+  description: Backend for Gradfolio, a student portfolio platform. Every route except the health checks is under `/v1` and needs an Auth0 access token. Every failure answers with an `ErrorResponse`.
   license:
     name: MIT
 tags:
   - name: health
     description: Liveness and readiness, outside `/v1`
+  - name: me
+    description: The caller’s own account
 paths:
   /healthz:
     get:
@@ -64,6 +66,75 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /v1/me:
+    get:
+      operationId: getMe
+      tags:
+        - me
+      summary: The caller’s own account
+      description: The first call after a login creates the account from the access token’s profile claims (name, email, picture); later calls return the same id. `verified` follows the token’s `email_verified`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The caller’s account
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: The user id (UUID)
+                    example: 0b6f2c1e-…
+                  name:
+                    type: string
+                  email:
+                    nullable: true
+                    type: string
+                  avatarUrl:
+                    nullable: true
+                    type: string
+                  headline:
+                    type: string
+                  verified:
+                    type: boolean
+                    description: Email verified with Auth0 (GitHub from M7).
+                  isPublic:
+                    type: boolean
+                  identities:
+                    type: array
+                    items:
+                      type: string
+                    description: Login providers linked to the account, e.g. `google-oauth2`.
+                required:
+                  - id
+                  - name
+                  - email
+                  - avatarUrl
+                  - headline
+                  - verified
+                  - isPublic
+                  - identities
+                additionalProperties: false
+        "401":
+          description: "UNAUTHENTICATED: no access token, or one that is invalid or expired"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: "RATE_LIMITED: over budget; see the Retry-After header"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: "AUTH_UNAVAILABLE: Auth0 signing keys unreachable, or DATABASE_UNAVAILABLE: MySQL unreachable"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     ErrorResponse:
@@ -82,3 +153,9 @@ components:
         - code
         - message
       additionalProperties: false
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: An Auth0 access token for the Gradfolio API audience.

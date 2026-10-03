@@ -1,0 +1,27 @@
+### api/me -- every request the module serves
+#
+# Needs an Auth0 access token for the Gradfolio API audience. Locally: log in
+# through the frontend and open http://localhost:3000/auth/access-token
+# (docs/auth0-setup.md §7); put the token in .env as `accessToken=…`.
+
+@baseUrl = {{$dotenv baseUrl}}
+@accessToken = {{$dotenv accessToken}}
+
+###
+# @name me
+# 200 the caller's account. The first call after a login creates it from the
+# token's claims (name, email, picture); later calls return the same id.
+GET {{baseUrl}}/v1/me
+Authorization: Bearer {{accessToken}}
+
+###
+# @name meWithoutToken
+# 401 {"code":"UNAUTHENTICATED","message":"authentication required"},
+# with WWW-Authenticate: Bearer. Nothing is created.
+GET {{baseUrl}}/v1/me
+
+###
+# @name meWithBadToken
+# 401, the same body: the response never says why a token failed.
+GET {{baseUrl}}/v1/me
+Authorization: Bearer not.a.token
