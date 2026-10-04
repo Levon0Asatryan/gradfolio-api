@@ -33,6 +33,8 @@ export async function seed(db: Database): Promise<void> {
           location: u.location,
           bio: u.bio,
           email: u.email,
+          contactEmail: u.email,
+          onboardedAt: new Date(),
           avatarUrl: u.avatarUrl,
           github: u.github,
           linkedin: u.linkedin,

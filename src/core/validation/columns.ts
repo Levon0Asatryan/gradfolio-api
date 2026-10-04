@@ -13,6 +13,7 @@ export const COLUMN_LIMITS = {
   'users.headline': chars(500),
   'users.location': chars(255),
   'users.email': chars(255),
+  'users.contact_email': chars(255),
   'users.avatar_url': TEXT,
   'users.bio': TEXT,
   'users.github': chars(500),

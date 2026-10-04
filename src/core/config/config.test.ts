@@ -29,6 +29,7 @@ describe('loadConfig', () => {
       RATE_LIMIT_SEARCH: 30,
       RATE_LIMIT_IMPORT: 5,
       RATE_LIMIT_AI: 10,
+      PROFILE_PROJECTS_LIMIT: 50,
     });
   });
 
@@ -88,6 +89,8 @@ describe('loadConfig', () => {
     ['RATE_LIMIT_SEARCH', 'many'],
     ['RATE_LIMIT_IMPORT', '1.5'],
     ['RATE_LIMIT_AI', '-3'],
+    ['PROFILE_PROJECTS_LIMIT', '0'],
+    ['PROFILE_PROJECTS_LIMIT', '501'],
   ])('refuses %s=%j', (key, value) => {
     expect(() => loadConfig({ ...REQUIRED, [key]: value })).toThrow(new RegExp(key));
   });
