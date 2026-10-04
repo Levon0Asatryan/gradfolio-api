@@ -46,7 +46,10 @@ side merged (#15 plan, #17, #20). `main` is at `1116ba4`.
 - **M2: API side done** (#15 plan, #17, #20 merged; [m2-verification](m2-verification.md)).
   Production login verified on 2026-10-03: Auth0 issues access tokens for
   `https://api.gradfolio.app`, and a real token creates exactly one `users` row through
-  `GET /v1/me`. Frontend tasks 2.9–2.15 next.
+  `GET /v1/me`.
+- **M2: frontend done** (gradfolio#21): login required on personal pages, a
+  server-only API client, login-aware navigation, `/account` on `GET /v1/me`. 2.12 and
+  2.14 moved to M3, which builds the profile API they need.
 - **Blocking the merge gate:** Copilot's review quota is exhausted, so every Copilot
   "review" since 2026-09-29 is a quota failure. Until Levon decides (wait, upgrade,
   or temporarily accept Codex alone), no code PR can pass
@@ -145,18 +148,18 @@ relevant checks, and Levon decides the product calls.
 
 ## Milestones
 
-| #   | Name                                   | Repos          | Status                                                        | Depends on                | Plan                  | Verification                          |
-| --- | -------------------------------------- | -------------- | ------------------------------------------------------------- | ------------------------- | --------------------- | ------------------------------------- |
-| M0  | Foundations: setup + architecture plan | api, all       | done; 0.5, 0.7–0.9 open                                       | —                         | —                     | —                                     |
-| M1  | Data layer, schema ownership, DB fixes | api, sql       | done (sql#1 and the DML-atomicity follow-up open)             | M0                        | [m1-plan](m1-plan.md) | [m1-verification](m1-verification.md) |
-| M2  | Auth and identity, end to end          | auth0, api, fe | api done (#15, #17, #20); fe 2.9–2.15 todo; auth0 2.17 partly | M0, M1                    | [m2-plan](m2-plan.md) | [m2-verification](m2-verification.md) |
-| M3  | Profiles                               | api, fe        | todo                                                          | M2                        | —                     | —                                     |
-| M4  | Projects and media                     | api, fe        | todo                                                          | M3                        | —                     | —                                     |
-| M5  | Teams and notifications                | api, fe        | todo                                                          | M4                        | —                     | —                                     |
-| M6  | Discovery and dashboard                | api, fe        | todo                                                          | M4 (M5 for team projects) | —                     | —                                     |
-| M7  | GitHub + LinkedIn (export) import      | api, fe, auth0 | todo                                                          | M4                        | —                     | —                                     |
-| M8  | Utilities: résumé PDF, AI summary      | api, fe        | todo                                                          | M3, M4                    | —                     | —                                     |
-| M9  | Hardening, deployment and v1.0 release | all            | todo                                                          | M1–M8                     | —                     | —                                     |
+| #   | Name                                   | Repos          | Status                                                                                     | Depends on                | Plan                  | Verification                          |
+| --- | -------------------------------------- | -------------- | ------------------------------------------------------------------------------------------ | ------------------------- | --------------------- | ------------------------------------- |
+| M0  | Foundations: setup + architecture plan | api, all       | done; 0.5, 0.7–0.9 open                                                                    | —                         | —                     | —                                     |
+| M1  | Data layer, schema ownership, DB fixes | api, sql       | done (sql#1 and the DML-atomicity follow-up open)                                          | M0                        | [m1-plan](m1-plan.md) | [m1-verification](m1-verification.md) |
+| M2  | Auth and identity, end to end          | auth0, api, fe | done: api (#15, #17, #20), fe (gradfolio#21); 2.12 and 2.14 moved to M3; auth0 2.17 partly | M0, M1                    | [m2-plan](m2-plan.md) | [m2-verification](m2-verification.md) |
+| M3  | Profiles                               | api, fe        | todo                                                                                       | M2                        | —                     | —                                     |
+| M4  | Projects and media                     | api, fe        | todo                                                                                       | M3                        | —                     | —                                     |
+| M5  | Teams and notifications                | api, fe        | todo                                                                                       | M4                        | —                     | —                                     |
+| M6  | Discovery and dashboard                | api, fe        | todo                                                                                       | M4 (M5 for team projects) | —                     | —                                     |
+| M7  | GitHub + LinkedIn (export) import      | api, fe, auth0 | todo                                                                                       | M4                        | —                     | —                                     |
+| M8  | Utilities: résumé PDF, AI summary      | api, fe        | todo                                                                                       | M3, M4                    | —                     | —                                     |
+| M9  | Hardening, deployment and v1.0 release | all            | todo                                                                                       | M1–M8                     | —                     | —                                     |
 
 **Working in parallel** once M2 lands:
 
@@ -237,23 +240,21 @@ verifies, and it resolves to exactly one `users` row.
 | 2.6  | API: `@CurrentUser`; race-safe first-login provisioning (upsert on `auth0_id`, barrier test with two concurrent first requests); `GET /v1/me`                                                                                                                                                                                   | api   | done (#20)                                                                                                                                                                                                                      | Q7                |
 | 2.7  | API: global rate limiter (`@nestjs/throttler`), with per-endpoint budgets reserved for search, import and AI                                                                                                                                                                                                                    | api   | done (#17)                                                                                                                                                                                                                      | AGENTS.md         |
 | 2.8  | FE: set `AUTH0_AUDIENCE` (and the scope) locally and on Vercel; confirm the authorize URL carries the audience                                                                                                                                                                                                                  | fe    | done (Vercel `AUTH0_AUDIENCE` set 2026-10-02; the production authorize URL carries `audience=`)                                                                                                                                 | this check        |
-| 2.9  | FE: API client (server-only, per Q11): `auth0.getAccessToken()`, base URL from env, error envelope → typed errors, generated types (Q5)                                                                                                                                                                                         | fe    | todo                                                                                                                                                                                                                            | Q5, Q11           |
-| 2.10 | FE: route policy. Public: `/`, `/profile/[id]`, `/projects/[id]`, `/search`, browse. Login required: dashboard, editing, new/edit project, integrations, account                                                                                                                                                                | fe    | todo                                                                                                                                                                                                                            | spec §8d          |
-| 2.11 | FE: middleware fails closed on protected routes (no swallowed errors)                                                                                                                                                                                                                                                           | fe    | todo                                                                                                                                                                                                                            | F2                |
-| 2.12 | FE: remove hardcoded `u_001` (3 places); "My profile" and `isOwnProfile` come from `/v1/me`                                                                                                                                                                                                                                     | fe    | todo                                                                                                                                                                                                                            | F3                |
-| 2.13 | FE: auth-aware navigation (login vs avatar/logout; hide "Login" and "Login Connections" when signed in)                                                                                                                                                                                                                         | fe    | todo                                                                                                                                                                                                                            | nav check         |
-| 2.14 | FE: first-login profile initialization (name, photo, bio pre-filled from Auth0; LinkedIn provides no headline, m2-plan §8.2), replacing the stepper's free-text steps                                                                                                                                                           | fe    | todo                                                                                                                                                                                                                            | spec §1, F4       |
-| 2.15 | FE docs: Auth0 v4 variable names in CLAUDE.md/README; add `.env.example`                                                                                                                                                                                                                                                        | fe    | todo                                                                                                                                                                                                                            | F6                |
+| 2.9  | FE: API client (server-only, per Q11): `auth0.getAccessToken()`, base URL from env, error envelope → typed errors, generated types (Q5)                                                                                                                                                                                         | fe    | done (gradfolio#21): `src/lib/api/client.ts`, server-only, typed `ApiError`; generated types wait for Q5 (M4)                                                                                                                   | Q5, Q11           |
+| 2.10 | FE: route policy. Public: `/`, `/profile/[id]`, `/projects/[id]`, `/search`, browse. Login required: dashboard, editing, new/edit project, integrations, account                                                                                                                                                                | fe    | done (gradfolio#21): `routePolicy.ts`; `/` is the dashboard, so it requires login (see follow-up)                                                                                                                               | spec §8d          |
+| 2.11 | FE: middleware fails closed on protected routes (no swallowed errors)                                                                                                                                                                                                                                                           | fe    | done (gradfolio#21): `proxy.ts` answers 503 on a protected page when the session check fails                                                                                                                                    | F2                |
+| 2.12 | FE: remove hardcoded `u_001` (3 places); "My profile" and `isOwnProfile` come from `/v1/me`                                                                                                                                                                                                                                     | fe    | moved to M3 (needs the profile API, 3.1/3.2)                                                                                                                                                                                    | F3                |
+| 2.13 | FE: auth-aware navigation (login vs avatar/logout; hide "Login" and "Login Connections" when signed in)                                                                                                                                                                                                                         | fe    | done (gradfolio#21)                                                                                                                                                                                                             | nav check         |
+| 2.14 | FE: first-login profile initialization (name, photo, bio pre-filled from Auth0; LinkedIn provides no headline, m2-plan §8.2), replacing the stepper's free-text steps                                                                                                                                                           | fe    | moved to M3 (needs `PATCH /v1/me/profile`, 3.2)                                                                                                                                                                                 | spec §1, F4       |
+| 2.15 | FE docs: Auth0 v4 variable names in CLAUDE.md/README; add `.env.example`                                                                                                                                                                                                                                                        | fe    | done (gradfolio#21)                                                                                                                                                                                                             | F6                |
 | 2.16 | Verified badge v1: email verified (Auth0) + linked GitHub (M7) → `users.verified`                                                                                                                                                                                                                                               | api   | done for email (#20); GitHub part in M7                                                                                                                                                                                         | spec §5           |
 
 **Exit:** on a Vercel preview, log in with each connection, then `GET /v1/me` returns
 the same user id on a second login. Logged out, a public profile URL renders and
 `/dashboard` redirects to login.
 
-**M2 follow-ups** (from #15, #17, #20 and the 2026-10-03 production check):
+**M2 follow-ups** (from #15, #17, #20, gradfolio#21 and the 2026-10-03 production check):
 
-- (fe, 2.9) Turn off the SDK's `/auth/access-token` route; refresh tokens in `proxy.ts`
-  near expiry (`tokenRefreshBuffer`); the error envelope mapping (m2-plan §10).
 - (fe, M9 9.3) Login started on a Vercel alias host (`gradfolio-git-main-…`,
   deployment URLs) fails: `APP_BASE_URL` is the production host, so the callback lands
   where the login cookie is missing. Use `gradfolio-navy.vercel.app`, or set an
@@ -264,6 +265,15 @@ the same user id on a second login. Logged out, a public profile URL renders and
 - (api, M6) Anonymous requests from the frontend share Vercel's address in the rate
   limiter (m2-plan §8.4); revisit with public search.
 - (ops, 9.2) Set `TRUST_PROXY` to the hop count of the API's host.
+- (fe, 2.10) The route policy protects `/`, because `/` is the dashboard; 2.10 listed it
+  as public. Decide in M6 whether a logged-out `/` should show a landing page instead.
+- (fe, M9 9.3) Login on Vercel previews is not set up: no preview callback URLs in
+  Auth0, and no `API_BASE_URL` for previews. The M2 exit check ran on production and
+  locally instead.
+- (fe) `/projects/[id]` reads `params` synchronously; Next.js 16 logs an error for it.
+  Fix with the M4 projects page.
+- (fe) `next dev` writes a `nextjs-agent-rules` block into `AGENTS.md`. Decide whether
+  to commit it or ignore it.
 - (auth0) Real-token checks for the database, GitHub and LinkedIn connections were not
   recorded (Levon expects them to work); the Action on refresh-token exchange was not
   observed.
@@ -271,6 +281,10 @@ the same user id on a second login. Logged out, a public profile URL renders and
 ## M3: Profiles
 
 **Goal:** the profile page and edit mode run on real data.
+
+Also in M3: 2.12 (current user from `/v1/me`, no hardcoded `u_001`) and 2.14
+(first-login profile pre-fill), moved from M2 because they need this milestone's
+profile API.
 
 | ID   | Task                                                                                                                                                      | Repo | Status | Source     |
 | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ------ | ---------- |
