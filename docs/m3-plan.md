@@ -14,9 +14,9 @@ behaviour is re-proved by tests in the PRs (§5). Frontend facts were read from
 
 | ID         | Decision                                                                                                                                                                                                                                                                           | Evidence  |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| Q3         | **Levon decides**, see §2. Recommended: private profile = 404 to everyone but the owner. One predicate (`visibleTo`) so a change is one function and its tests.                                                                                                                    | §2        |
+| Q3         | **Decided (Levon, 2026-10-04): option A**, see §2. Private profile = 404 to everyone but the owner. One predicate (`visibleTo`) so a change is one function and its tests.                                                                                                         | §2        |
 | Q5         | `openapi.yaml` → `openapi-typescript` in the frontend, pinned to an API commit, regenerated and diffed in frontend CI. See §3.                                                                                                                                                     | §3        |
-| 3.6        | **Levon decides**, see §2. Recommended: in v1, `DELETE /v1/me`, database data only; Auth0 account stays.                                                                                                                                                                           | P6, P7    |
+| 3.6        | **Decided (Levon, 2026-10-04): in v1, `DELETE /v1/me`, database data only; Auth0 account stays.**                                                                                                                                                                                  | P6, P7    |
 | Write lock | Every write that depends on a user's _set_ of rows (create, reorder, skills, delete account) first takes `SELECT … FROM users WHERE id = ? FOR UPDATE`. One order everywhere: user row, then section rows, then `terms`.                                                           | P3–P5, P7 |
 | Row count  | `numUpdatedRows` is the **matched** count (1 for a same-value UPDATE), so "0 rows → 404" never fires on a no-op edit.                                                                                                                                                              | P1        |
 | Contact    | New column `users.contact_email` (public, default NULL). `users.email` (Auth0 pre-fill) stays private. Pre-filling a public field from the login would publish an address the user never chose to show.                                                                            | §4.1      |
@@ -44,7 +44,7 @@ Levon wants B or C for projects only, it is a different predicate in M4, not a
 rework here. A team member whose profile is private still appears by name on a
 public project; their profile link 404s (a Q4 / M5 detail).
 
-**Levon decides.**
+**Decided: A (Levon, 2026-10-04).**
 
 ### 3.6: account deletion in v1?
 
@@ -55,8 +55,7 @@ public project; their profile link 404s (a Q4 / M5 detail).
 | Out of v1                           | Drop 3.6 and the account-page button (3.9). The cascades stay untested in the API.                                                                                                                                                                                                                                                         |
 
 Deletion is small now (the foreign keys already cascade) and expensive to add after
-M4 puts files in storage: M4 must then delete blobs too. **Levon decides.** If out,
-PR (c) disappears.
+M4 puts files in storage: M4 must then delete blobs too. **Decided: in v1, database only (Levon, 2026-10-04).**
 
 ## 3. Q5: contract and type sharing
 
