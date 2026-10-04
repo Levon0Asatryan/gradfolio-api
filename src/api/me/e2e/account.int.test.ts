@@ -117,6 +117,17 @@ async function populate(owner: Account, other: Account) {
     })
     .execute();
   await db
+    .insertInto('projectTeamMembers')
+    .values({
+      id: newId(),
+      projectId: theirs.project.id,
+      userId: other.user.id,
+      name: 'Staying Person',
+      avatarUrl: 'https://photos.example/staying.png',
+      status: 'accepted',
+    })
+    .execute();
+  await db
     .insertInto('integrations')
     .values({
       id: newId(),
@@ -227,6 +238,7 @@ describe('DELETE /v1/me', () => {
       .selectFrom('projectTeamMembers')
       .select(['userId', 'name', 'role', 'avatarUrl', 'status'])
       .where('projectId', '=', theirs.project.id)
+      .orderBy('name')
       .execute();
     expect(rows).toEqual([
       {
@@ -234,6 +246,14 @@ describe('DELETE /v1/me', () => {
         name: 'Leaving Person',
         role: 'developer',
         avatarUrl: null,
+        status: 'accepted',
+      },
+      // someone else's membership on the same project is untouched, photo included
+      {
+        userId: bob.user.id,
+        name: 'Staying Person',
+        role: null,
+        avatarUrl: 'https://photos.example/staying.png',
         status: 'accepted',
       },
     ]);
