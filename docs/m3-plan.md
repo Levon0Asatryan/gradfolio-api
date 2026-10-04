@@ -255,7 +255,7 @@ reorder: `PUT /me/skills` order is the order. The helper takes the table and
 owner column so M4 can reuse it for attachments.
 **Skills**: `inTransaction`: `lockUser` → `setUserSkills` (M1) → return list. Empty
 list clears. Over `PROFILE_MAX_SKILLS` → 400.
-**Onboarding**: `UPDATE users SET onboarded_at = COALESCE(onboarded_at, UTC_TIMESTAMP()) WHERE id = ?`.
+**Onboarding**: `UPDATE users SET onboarded_at = COALESCE(onboarded_at, UTC_TIMESTAMP()) WHERE id = ?`. Matched rows must be 1, else 404 (P1: a repeat call matches 1). The same rule holds for `PATCH /me/profile`: a `users` UPDATE that matches 0 rows (account deleted after the guard resolved it) is a 404, never a 200.
 **Delete account** (if in): log `account deletion started` (user id only) →
 `inTransaction`: `lockUser` → `UPDATE project_team_members SET avatar_url = NULL
 WHERE user_id = ?` → `DELETE FROM users WHERE id = ?` (0 → 404) → log `completed`.
