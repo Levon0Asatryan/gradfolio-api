@@ -247,6 +247,25 @@ export const OPERATIONS: readonly Operation[] = [
     },
   },
   {
+    method: 'delete',
+    path: '/v1/me',
+    operationId: 'deleteMe',
+    tag: 'me',
+    summary: 'Delete the caller’s account and all its data',
+    description:
+      'Removes the profile, every section, skills, projects (with attachments, tags and team ' +
+      'rows), integrations and notifications. The caller’s name stays on other people’s ' +
+      'projects as a plain team-member name, without a photo or a link to an account. ' +
+      'Irreversible. The Auth0 login is not deleted: sign the user out afterwards, because a ' +
+      'token that is still valid creates a new, empty account on its next request.',
+    bearer: true,
+    responses: {
+      '204': { description: 'Deleted' },
+      '404': error('NOT_FOUND: the account no longer exists'),
+      ...authenticatedFailures,
+    },
+  },
+  {
     method: 'post',
     path: '/v1/me/onboarding/complete',
     operationId: 'completeOnboarding',
