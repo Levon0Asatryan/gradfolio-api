@@ -1,0 +1,68 @@
+### api/profiles -- every request the module serves
+#
+# Needs an Auth0 access token for the Gradfolio API audience (see me.http).
+# Put a user id from GET /v1/me in .env as `userId=…`.
+
+@baseUrl = {{$dotenv baseUrl}}
+@accessToken = {{$dotenv accessToken}}
+@userId = {{$dotenv userId}}
+
+###
+# @name profileAnonymous
+# 200 the profile, with education, experience, certifications, skills and
+# projects, when it is public; no token needed. 404 when it is private or does
+# not exist (the same body). Never birthday, phone, the login email or tokens.
+GET {{baseUrl}}/v1/users/{{userId}}
+
+###
+# @name profileSignedIn
+# 200 with "isOwner": true for your own profile (a private one included).
+GET {{baseUrl}}/v1/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+###
+# @name profileBadToken
+# 401, not an anonymous read: a token that is sent must be valid.
+GET {{baseUrl}}/v1/users/{{userId}}
+Authorization: Bearer not.a.token
+
+###
+# @name myProfile
+# 200 the editable header: name, headline, bio, location, avatarUrl,
+# contactEmail, isPublic, links.
+GET {{baseUrl}}/v1/me/profile
+Authorization: Bearer {{accessToken}}
+
+###
+# @name updateMyProfile
+# 200 the header after the change. Any non-empty subset; null or "" clears a
+# nullable field; links change only the keys named. Unknown keys (verified,
+# email, auth0Id, phone, birthday …) are 400.
+PATCH {{baseUrl}}/v1/me/profile
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "headline": "Computer Science, NPUA",
+  "bio": "Plain text only.",
+  "contactEmail": "me@example.com",
+  "links": { "github": "https://github.com/me" }
+}
+
+###
+# @name makeProfilePrivate
+# After this, GET /v1/users/{{userId}} without your token is 404.
+PATCH {{baseUrl}}/v1/me/profile
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "isPublic": false }
+
+###
+# @name massAssignment
+# 400 VALIDATION_FAILED: `verified` is not a field a user can write.
+PATCH {{baseUrl}}/v1/me/profile
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "verified": true }

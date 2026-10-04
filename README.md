@@ -111,7 +111,9 @@ Unmatched routes included. A database outage is `503 DATABASE_UNAVAILABLE` on ev
 route, not a `500`.
 
 **Authentication.** Every route requires `Authorization: Bearer <Auth0 access token>`
-unless it is marked `@Public()` (the health routes). A missing or invalid token is
+unless it is marked `@Public()` (the health routes) or `@OptionalAuth()` (reading a profile: no
+token means an anonymous caller who sees public profiles only; a token that is sent but invalid is
+still 401). A missing or invalid token is
 `401 UNAUTHENTICATED`, the same body whatever the reason; when Auth0's signing keys
 cannot be fetched it is `503 AUTH_UNAVAILABLE`.
 

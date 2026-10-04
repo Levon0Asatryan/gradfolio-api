@@ -76,6 +76,7 @@ describe('GET /v1/me', () => {
       headline: '',
       verified: true,
       isPublic: true,
+      onboarded: false,
       identities: ['google-oauth2'],
     });
     const second = await http.get('/v1/me').set(auth).expect(200);
@@ -93,7 +94,17 @@ describe('GET /v1/me', () => {
       .set(await as(google(`auth0|${newId()}`)))
       .expect(200);
     expect(Object.keys(res.body).sort()).toEqual(
-      ['avatarUrl', 'email', 'headline', 'id', 'identities', 'isPublic', 'name', 'verified'].sort(),
+      [
+        'avatarUrl',
+        'email',
+        'headline',
+        'id',
+        'identities',
+        'isPublic',
+        'name',
+        'onboarded',
+        'verified',
+      ].sort(),
     );
   });
 
