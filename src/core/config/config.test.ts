@@ -30,6 +30,8 @@ describe('loadConfig', () => {
       RATE_LIMIT_IMPORT: 5,
       RATE_LIMIT_AI: 10,
       PROFILE_PROJECTS_LIMIT: 50,
+      PROFILE_MAX_SECTION_ITEMS: 50,
+      PROFILE_MAX_SKILLS: 100,
     });
   });
 
@@ -89,6 +91,8 @@ describe('loadConfig', () => {
     ['RATE_LIMIT_SEARCH', 'many'],
     ['RATE_LIMIT_IMPORT', '1.5'],
     ['RATE_LIMIT_AI', '-3'],
+    ['PROFILE_MAX_SECTION_ITEMS', '0'],
+    ['PROFILE_MAX_SKILLS', '1001'],
     ['PROFILE_PROJECTS_LIMIT', '0'],
     ['PROFILE_PROJECTS_LIMIT', '501'],
   ])('refuses %s=%j', (key, value) => {

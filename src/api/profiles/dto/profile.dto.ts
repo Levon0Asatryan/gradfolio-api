@@ -1,52 +1,6 @@
 import { z } from 'zod';
-import { columnString } from '../../../core/validation/columns.js';
-import { httpUrl } from '../../../core/validation/http-url.js';
-import { chars, fits, TEXT } from '../../../core/validation/text.js';
-
-const emptyToNull = (v: string): string | null => (v === '' ? null : v);
-
-/** A trimmed string that fits the column; used for required text. */
-const text = (column: Parameters<typeof columnString>[0]) =>
-  z.string().trim().pipe(columnString(column));
-
-/** Nullable text: `null` or a blank string clears the field. */
-const nullableText = (column: Parameters<typeof columnString>[0]) =>
-  z.union([
-    z.null(),
-    z
-      .string()
-      .trim()
-      .transform(emptyToNull)
-      .pipe(z.union([z.null(), columnString(column)])),
-  ]);
-
-/** A nullable `http(s)` URL: `null` or a blank string clears the field. */
-const nullableUrl = (limit: Parameters<typeof httpUrl>[0]) =>
-  z.union([
-    z.null(),
-    z
-      .string()
-      .trim()
-      .transform(emptyToNull)
-      .pipe(z.union([z.null(), httpUrl(limit)])),
-  ]);
-
-const CONTACT_EMAIL_LIMIT = chars(255);
-const nullableEmail = z.union([
-  z.null(),
-  z
-    .string()
-    .trim()
-    .transform(emptyToNull)
-    .pipe(
-      z.union([
-        z.null(),
-        z.email().refine((v) => fits(v, CONTACT_EMAIL_LIMIT), {
-          message: 'must be at most 255 characters',
-        }),
-      ]),
-    ),
-]);
+import { chars, TEXT } from '../../../core/validation/text.js';
+import { nullableEmail, nullableText, nullableUrl, text } from './fields.js';
 
 // ---------------------------------------------------------------- responses
 
