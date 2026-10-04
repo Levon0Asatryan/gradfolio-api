@@ -25,3 +25,9 @@ GET {{baseUrl}}/v1/me
 # 401, the same body: the response never says why a token failed.
 GET {{baseUrl}}/v1/me
 Authorization: Bearer not.a.token
+
+###
+# @name completeOnboarding
+# 200 {"onboarded":true}. Idempotent; GET /v1/me then shows onboarded: true.
+POST {{baseUrl}}/v1/me/onboarding/complete
+Authorization: Bearer {{accessToken}}

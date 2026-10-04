@@ -130,6 +130,12 @@ const rateLimit = {
   RATE_LIMIT_AI: z.coerce.number().int().min(1).max(100_000).default(10),
 };
 
+/** Profile page bounds (docs/m3-plan.md §1, Limits). */
+const profile = {
+  // Projects listed on one profile (own and accepted-team together).
+  PROFILE_PROJECTS_LIMIT: z.coerce.number().int().min(1).max(500).default(50),
+};
+
 /** MySQL 8.4. */
 const database = {
   DATABASE_URL: z
@@ -164,7 +170,7 @@ export const databaseConfigSchema = z
 
 /** Everything the api process needs. */
 export const configSchema = z
-  .object({ ...runtime, ...api, ...database, ...auth, ...rateLimit })
+  .object({ ...runtime, ...api, ...database, ...auth, ...rateLimit, ...profile })
   .refine(tlsInProduction, TLS_IN_PRODUCTION)
   .refine((c) => c.NODE_ENV !== 'production' || c.AUTH0_ISSUER_BASE_URL.startsWith('https:'), {
     message: 'must be https in production',

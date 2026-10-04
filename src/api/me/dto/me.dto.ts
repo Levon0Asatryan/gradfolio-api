@@ -9,6 +9,9 @@ export const meResponseSchema = z.object({
   headline: z.string(),
   verified: z.boolean().meta({ description: 'Email verified with Auth0 (GitHub from M7).' }),
   isPublic: z.boolean(),
+  onboarded: z
+    .boolean()
+    .meta({ description: 'false: the frontend should offer first-login onboarding.' }),
   identities: z
     .array(z.string())
     .meta({ description: 'Login providers linked to the account, e.g. `google-oauth2`.' }),

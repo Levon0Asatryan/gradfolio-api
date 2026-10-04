@@ -56,6 +56,7 @@ describe('GET /v1/me (no database)', () => {
       headline: '',
       verified: true,
       isPublic: true,
+      onboarded: false,
       identities: ['github'],
     });
   });

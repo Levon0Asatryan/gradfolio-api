@@ -196,3 +196,38 @@ describe('the route policy', () => {
       .expect(404);
   });
 });
+
+describe('@OptionalAuth()', () => {
+  it('serves a caller with no Authorization header as anonymous', async () => {
+    const http = await start();
+    const res = await http.get('/v1/probe/optional').expect(200);
+    expect(res.body).toEqual({});
+  });
+
+  it('knows the caller when a valid token is sent', async () => {
+    const http = await start();
+    const res = await http
+      .get('/v1/probe/optional')
+      .set(bearer(await tenant.sign({ sub: 'github|7' })))
+      .expect(200);
+    expect(res.body).toEqual({ sub: 'github|7' });
+  });
+
+  it.each([
+    ['a garbage token', 'Bearer garbage'],
+    ['a non-bearer scheme', 'Basic dXNlcjpwdw=='],
+    ['an empty header value', ''],
+  ])('refuses %s with 401, never as anonymous', async (_name, header) => {
+    const http = await start();
+    const res = await http.get('/v1/probe/optional').set('Authorization', header).expect(401);
+    expect(res.body).toEqual(UNAUTHENTICATED);
+  });
+
+  it('refuses an expired token with 401', async () => {
+    const http = await start();
+    await http
+      .get('/v1/probe/optional')
+      .set(bearer(await tenant.sign({ expIn: -60 })))
+      .expect(401);
+  });
+});

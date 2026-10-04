@@ -1,6 +1,6 @@
 import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { IS_PUBLIC } from '../../auth/auth.constants.js';
+import { IS_OPTIONAL_AUTH, IS_PUBLIC } from '../../auth/auth.constants.js';
 import type { UserRow } from '../repositories/user.repository.js';
 import { UsersService } from '../services/users.service.js';
 import type { AuthenticatedRequest } from '../../auth/auth.constants.js';
@@ -30,6 +30,12 @@ export class CurrentUserGuard implements CanActivate {
     if (isPublic) return true;
 
     const req = context.switchToHttp().getRequest<UserRequest>();
+    const isOptional = this.reflector.getAllAndOverride<boolean | undefined>(IS_OPTIONAL_AUTH, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    // An anonymous caller on an @OptionalAuth route has no row to resolve.
+    if (isOptional && req.auth === undefined) return true;
     // The access-token guard ran first and refuses a request without one.
     if (req.auth === undefined) throw new Error('CurrentUserGuard ran before AccessTokenGuard');
     req.user = await this.users.resolve(req.auth);

@@ -12,6 +12,7 @@ import { AccessTokenGuard } from './auth/guards/access-token.guard.js';
 import { ErrorFilter } from './common/filters/error.filter.js';
 import { HealthModule } from './health/health.module.js';
 import { MeModule } from './me/me.module.js';
+import { ProfilesModule } from './profiles/profiles.module.js';
 import { RateLimitGuard } from './rate-limit/guards/rate-limit.guard.js';
 import { RateLimitModule } from './rate-limit/rate-limit.module.js';
 import { CurrentUserGuard } from './users/guards/current-user.guard.js';
@@ -32,6 +33,7 @@ import { UsersModule } from './users/users.module.js';
     UsersModule,
     HealthModule,
     MeModule,
+    ProfilesModule,
   ],
   providers: [
     ErrorFilter,

@@ -158,6 +158,7 @@ export interface Users {
   avatarUrl: string | null;
   bio: string | null;
   birthday: DateText;
+  contactEmail: string | null;
   createdAt: Generated<Date>;
   email: string | null;
   github: string | null;
@@ -167,6 +168,7 @@ export interface Users {
   linkedin: string | null;
   location: string | null;
   name: string;
+  onboardedAt: Date | null;
   phone: string | null;
   twitter: string | null;
   updatedAt: Generated<Date>;

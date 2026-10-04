@@ -116,6 +116,8 @@ export const stubUsers: Pick<UsersService, 'resolve'> = {
       verified: identity.emailVerified,
       isPublic: true,
       email: identity.email ?? null,
+      contactEmail: null,
+      onboardedAt: null,
       avatarUrl: null,
       bio: null,
       github: null,
