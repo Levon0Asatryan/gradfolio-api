@@ -355,6 +355,19 @@ Copilot failed on quota on every head (tracker, 2026-09-29).
 
 The worktree `gradfolio-api-m2` is removed after the last PR merges.
 
+## 14. Frontend (gradfolio#21)
+
+Tracker 2.9, 2.10, 2.11, 2.13 and 2.15. Run on 2026-10-04.
+
+| Check                                                    | Result                                                                                                      |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| verify, knip, coverage, build                            | pass; 147 unit tests                                                                                        |
+| guard proofs (each guard removed, its test seen failing) | route policy, fail-closed proxy, logout label, http(s)-only avatars, trilingual 503: all failed as expected |
+| logged out, production build (`next start`)              | `/account`, `/projects/new` → 307 to `/auth/login?returnTo=…`; `/search`, `/profile/u_001` → 200            |
+| `/auth/login`                                            | 307 to Auth0 with `audience=https://api.gradfolio.app`                                                      |
+| logged in, local (Levon), API on 3001                    | nav shows name and logout; `/account` shows `GET /v1/me` data; logout ends the session                      |
+| review                                                   | Codex: 3 findings in round 1, all fixed; round 2 on `e9c6fa2` found nothing. CI green                       |
+
 ## Not verified
 
 - **Real tokens for the database, GitHub and LinkedIn connections.** They wait on the
@@ -364,3 +377,6 @@ The worktree `gradfolio-api-m2` is removed after the last PR merges.
 - **The Auth0 Action on refresh-token exchange:** not observed with a real refreshed
   token.
 - **Copilot reviews:** quota exhausted.
+- **Frontend login on a Vercel preview** (the M2 exit check): previews have no Auth0
+  callbacks or `API_BASE_URL` yet (tracker follow-up). Checked locally and on
+  production instead.
