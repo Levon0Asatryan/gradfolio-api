@@ -1,0 +1,87 @@
+### api/profiles -- the ordered sections and skills (education, experience, certifications)
+#
+# Needs an Auth0 access token (see me.http). Put an entry id from a create
+# response in .env as `entryId=…`. The same five requests exist for
+# /v1/me/experience and /v1/me/certifications (bodies differ, see openapi.yaml).
+
+@baseUrl = {{$dotenv baseUrl}}
+@accessToken = {{$dotenv accessToken}}
+@entryId = {{$dotenv entryId}}
+
+###
+# @name createEducation
+# 201 the new entry, placed first. Required fields must be non-empty; endYear
+# may not precede startYear. 409 LIMIT_REACHED at the per-user cap.
+POST {{baseUrl}}/v1/me/education
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "institution": "NPUA",
+  "degree": "BSc",
+  "field": "Computer Science",
+  "startYear": 2022,
+  "endYear": 2026,
+  "highlights": ["Dean's list"]
+}
+
+###
+# @name updateEducation
+# 200 the entry after the change. Any non-empty subset; the whole result is
+# validated. Someone else's id is 404, the same as an unknown one.
+PATCH {{baseUrl}}/v1/me/education/{{entryId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "degree": "MSc" }
+
+###
+# @name deleteEducation
+# 204; a second call is 404.
+DELETE {{baseUrl}}/v1/me/education/{{entryId}}
+Authorization: Bearer {{accessToken}}
+
+###
+# @name reorderEducation
+# 200 the section in the new order. `ids` must be exactly your entries, each
+# once: a foreign or unknown id is 404, an incomplete list 409 ORDER_STALE.
+PUT {{baseUrl}}/v1/me/education/order
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "ids": ["{{entryId}}"] }
+
+###
+# @name createExperience
+# end null means present; months are YYYY-MM ("Present" is 400).
+POST {{baseUrl}}/v1/me/experience
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Intern",
+  "organization": "Picsart",
+  "start": "2024-06",
+  "end": null,
+  "summary": "Built things",
+  "achievements": ["Shipped a feature"],
+  "skills": ["TypeScript"]
+}
+
+###
+# @name createCertification
+POST {{baseUrl}}/v1/me/certifications
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "name": "AWS Cloud Practitioner", "issuer": "AWS", "date": "2025-01", "credentialUrl": "https://example.com/c/1" }
+
+###
+# @name replaceSkills
+# 200 {"skills": [...]} in the order given, one spelling per name
+# (case-insensitive duplicates collapse). [] clears the list.
+PUT {{baseUrl}}/v1/me/skills
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "skills": ["TypeScript", "React", "react", "Go"] }

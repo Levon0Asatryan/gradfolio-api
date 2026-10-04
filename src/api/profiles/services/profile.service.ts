@@ -6,12 +6,10 @@ import { NotFoundError } from '../../../core/errors/app-error.js';
 import type { ProfileHeader, ProfileResponse, UpdateProfile } from '../dto/profile.dto.js';
 import { listProfileProjects } from '../repositories/project-summary.repository.js';
 import { findVisibleUser, toHeader, updateHeader } from '../repositories/profile.repository.js';
-import {
-  listCertifications,
-  listEducation,
-  listExperience,
-  listSkills,
-} from '../repositories/section.repository.js';
+import { certificationSection } from '../repositories/certification.repository.js';
+import { educationSection } from '../repositories/education.repository.js';
+import { experienceSection } from '../repositories/experience.repository.js';
+import { listSkills } from '../repositories/skill.repository.js';
 
 @Injectable()
 export class ProfileService {
@@ -32,9 +30,9 @@ export class ProfileService {
 
     const isOwner = viewerId !== undefined && viewerId === user.id;
     const [education, experience, certifications, skills, projects] = await Promise.all([
-      listEducation(db, user.id),
-      listExperience(db, user.id),
-      listCertifications(db, user.id),
+      educationSection.list(db, user.id),
+      experienceSection.list(db, user.id),
+      certificationSection.list(db, user.id),
       listSkills(db, user.id),
       listProfileProjects(db, user.id, {
         viewerIsOwner: isOwner,
