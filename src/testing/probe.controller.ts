@@ -1,6 +1,7 @@
 import { Controller, Get, Req } from '@nestjs/common';
 import { Public } from '../api/auth/decorators/public.decorator.js';
 import type { AuthenticatedRequest } from '../api/auth/auth.constants.js';
+import { OptionalAuth } from '../api/auth/decorators/optional-auth.decorator.js';
 import { RateBudget } from '../api/rate-limit/decorators/rate-budget.decorator.js';
 
 /**
@@ -18,6 +19,12 @@ export class ProbeController {
   @Public()
   @Get('public')
   open(@Req() req: AuthenticatedRequest): { sub: string | undefined } {
+    return { sub: req.auth?.sub };
+  }
+
+  @OptionalAuth()
+  @Get('optional')
+  optional(@Req() req: AuthenticatedRequest): { sub: string | undefined } {
     return { sub: req.auth?.sub };
   }
 

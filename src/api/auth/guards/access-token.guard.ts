@@ -2,7 +2,12 @@ import { type CanActivate, type ExecutionContext, Inject, Injectable } from '@ne
 import { Reflector } from '@nestjs/core';
 import { type AccessTokenVerifier, bearerToken } from '../../../core/auth/access-token.js';
 import { UnauthenticatedError } from '../../../core/auth/errors.js';
-import { ACCESS_TOKEN_VERIFIER, type AuthenticatedRequest, IS_PUBLIC } from '../auth.constants.js';
+import {
+  ACCESS_TOKEN_VERIFIER,
+  type AuthenticatedRequest,
+  IS_OPTIONAL_AUTH,
+  IS_PUBLIC,
+} from '../auth.constants.js';
 
 /**
  * Global guard, first in line: every route needs a valid Auth0 access token
@@ -25,6 +30,13 @@ export class AccessTokenGuard implements CanActivate {
     if (isPublic) return true;
 
     const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const isOptional = this.reflector.getAllAndOverride<boolean | undefined>(IS_OPTIONAL_AUTH, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    // Anonymous only when no Authorization header was sent at all (@OptionalAuth).
+    if (isOptional && req.headers.authorization === undefined) return true;
+
     const token = bearerToken(req.headers.authorization);
     if (token === undefined) throw new UnauthenticatedError('missing');
 
