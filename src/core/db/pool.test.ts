@@ -5,6 +5,7 @@ const base = {
   DATABASE_URL: 'mysql://u:p@localhost:3306/gradfolio',
   DATABASE_POOL_MAX: 7,
   DATABASE_CONNECT_TIMEOUT_MS: 1234,
+  DATABASE_SOCKET_PATH: undefined,
   DATABASE_SSL: 'off' as const,
   DATABASE_SSL_CA: undefined,
 };
@@ -19,6 +20,18 @@ describe('poolOptions', () => {
       charset: 'utf8mb4_unicode_ci',
       typeCast: castTinyIntBoolean,
       dateStrings: ['DATE'],
+    });
+  });
+
+  it('connects by TCP unless a socket is configured', () => {
+    expect(poolOptions(base)).not.toHaveProperty('socketPath');
+  });
+
+  it('connects through the socket when one is configured', () => {
+    const socketPath = '/cloudsql/p:r:i';
+    expect(poolOptions({ ...base, DATABASE_SOCKET_PATH: socketPath })).toMatchObject({
+      uri: base.DATABASE_URL,
+      socketPath,
     });
   });
 
