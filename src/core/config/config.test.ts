@@ -156,6 +156,48 @@ describe('loadConfig', () => {
       loadConfig({ ...REQUIRED, NODE_ENV: 'production', DATABASE_SSL: 'required' }).DATABASE_SSL,
     ).toBe('required');
   });
+
+  describe('DATABASE_SOCKET_PATH', () => {
+    const SOCKET = '/cloudsql/project:us-east1:gradfolio-db';
+    const prod = { ...REQUIRED, NODE_ENV: 'production' };
+
+    it('is unset by default', () => {
+      expect(loadConfig(REQUIRED).DATABASE_SOCKET_PATH).toBeUndefined();
+    });
+
+    it('replaces TLS in production: the socket alone is accepted', () => {
+      const cfg = loadConfig({ ...prod, DATABASE_SOCKET_PATH: SOCKET });
+      expect(cfg).toMatchObject({ DATABASE_SOCKET_PATH: SOCKET, DATABASE_SSL: 'off' });
+    });
+
+    it('still refuses production over the network without TLS', () => {
+      expect(() => loadConfig(prod)).toThrow(/DATABASE_SSL/);
+    });
+
+    it('refuses TLS together with a socket, in any environment', () => {
+      for (const NODE_ENV of ['production', 'development']) {
+        expect(() =>
+          loadConfig({
+            ...REQUIRED,
+            NODE_ENV,
+            DATABASE_SOCKET_PATH: SOCKET,
+            DATABASE_SSL: 'required',
+          }),
+        ).toThrow(/DATABASE_SSL: TLS does not apply to a Unix socket/);
+      }
+    });
+
+    it.each([
+      ['relative', 'cloudsql/x'],
+      ['whitespace', '/cloudsql/a b'],
+      ['too long', `/${'a'.repeat(107)}`],
+      ['empty', ''],
+    ])('refuses a %s path', (_why, value) => {
+      expect(() => loadConfig({ ...REQUIRED, DATABASE_SOCKET_PATH: value })).toThrow(
+        /DATABASE_SOCKET_PATH/,
+      );
+    });
+  });
 });
 
 describe('loadDatabaseConfig', () => {
@@ -168,6 +210,15 @@ describe('loadDatabaseConfig', () => {
   it('still requires TLS to the database in production', () => {
     expect(() => loadDatabaseConfig({ DATABASE_URL, NODE_ENV: 'production' })).toThrow(
       /DATABASE_SSL/,
+    );
+  });
+
+  it('accepts a socket in production without TLS, and refuses both together', () => {
+    const SOCKET = '/cloudsql/p:r:i';
+    const env = { DATABASE_URL, NODE_ENV: 'production', DATABASE_SOCKET_PATH: SOCKET };
+    expect(loadDatabaseConfig(env).DATABASE_SOCKET_PATH).toBe(SOCKET);
+    expect(() => loadDatabaseConfig({ ...env, DATABASE_SSL: 'required' })).toThrow(
+      /TLS does not apply/,
     );
   });
 });

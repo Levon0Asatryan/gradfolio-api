@@ -149,9 +149,19 @@ const database = {
   // Bounds acquiring a connection. A query on an established one is bounded
   // separately by whoever issues it.
   DATABASE_CONNECT_TIMEOUT_MS: z.coerce.number().int().min(100).max(60_000).default(5000),
-  // Aiven requires TLS. `required` verifies the server certificate against the
-  // system trust store (or DATABASE_SSL_CA when set); `off` is for the local
-  // container only.
+  // A Unix socket to the server, such as Cloud Run's `/cloudsql/<connection>`.
+  // When set it replaces the host and port of DATABASE_URL (which still carries
+  // the user, password and database). TLS does not apply to it: see
+  // `tlsRule` below.
+  DATABASE_SOCKET_PATH: z
+    .string()
+    .max(107, { message: 'must be at most 107 bytes (the Unix socket path limit)' })
+    .refine((v) => v.startsWith('/'), { message: 'must be an absolute path' })
+    .refine((v) => !/[\s\0]/.test(v), { message: 'must not contain whitespace or NUL' })
+    .optional(),
+  // `required` verifies the server certificate against the system trust store
+  // (or DATABASE_SSL_CA when set); `off` is for the local container, and for a
+  // socket, which the connector already encrypts.
   DATABASE_SSL: z.enum(['off', 'required']).default('off'),
   DATABASE_SSL_CA: z.string().min(1).optional(),
   // How long `migrate` waits for another runner on the same database to
@@ -159,9 +169,32 @@ const database = {
   MIGRATION_LOCK_TIMEOUT_S: z.coerce.number().int().min(0).max(3600).default(60),
 };
 
-const tlsInProduction = (c: { NODE_ENV: string; DATABASE_SSL: string }) =>
-  c.NODE_ENV !== 'production' || c.DATABASE_SSL === 'required';
-const TLS_IN_PRODUCTION = { message: 'must be "required" in production', path: ['DATABASE_SSL'] };
+interface TlsInputs {
+  NODE_ENV: string;
+  DATABASE_SSL: string;
+  DATABASE_SOCKET_PATH?: string | undefined;
+}
+
+/**
+ * Production over the network must use TLS. A Unix socket is not the network:
+ * the Cloud SQL connector behind it carries the traffic encrypted, and the
+ * server offers no TLS on the socket, so `required` there would only make
+ * every connection fail. The two settings are therefore exclusive.
+ */
+const tlsInProduction = (c: TlsInputs) =>
+  c.NODE_ENV !== 'production' ||
+  c.DATABASE_SOCKET_PATH !== undefined ||
+  c.DATABASE_SSL === 'required';
+const TLS_IN_PRODUCTION = {
+  message: 'must be "required" in production (unless DATABASE_SOCKET_PATH is set)',
+  path: ['DATABASE_SSL'],
+};
+const noTlsOnSocket = (c: TlsInputs) =>
+  c.DATABASE_SOCKET_PATH === undefined || c.DATABASE_SSL === 'off';
+const NO_TLS_ON_SOCKET = {
+  message: 'TLS does not apply to a Unix socket: leave it "off" when DATABASE_SOCKET_PATH is set',
+  path: ['DATABASE_SSL'],
+};
 
 /**
  * What the database tools need (migrate, seed, schema dump). They never verify
@@ -170,12 +203,14 @@ const TLS_IN_PRODUCTION = { message: 'must be "required" in production', path: [
  */
 export const databaseConfigSchema = z
   .object({ ...runtime, ...database })
-  .refine(tlsInProduction, TLS_IN_PRODUCTION);
+  .refine(tlsInProduction, TLS_IN_PRODUCTION)
+  .refine(noTlsOnSocket, NO_TLS_ON_SOCKET);
 
 /** Everything the api process needs. */
 export const configSchema = z
   .object({ ...runtime, ...api, ...database, ...auth, ...rateLimit, ...profile })
   .refine(tlsInProduction, TLS_IN_PRODUCTION)
+  .refine(noTlsOnSocket, NO_TLS_ON_SOCKET)
   .refine((c) => c.NODE_ENV !== 'production' || c.AUTH0_ISSUER_BASE_URL.startsWith('https:'), {
     message: 'must be https in production',
     path: ['AUTH0_ISSUER_BASE_URL'],
