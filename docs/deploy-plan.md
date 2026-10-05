@@ -308,7 +308,10 @@ Deletion protection and a 20 GiB storage cap bound a runaway.
 ## 10. Order of work after approval
 
 1. Code PR: `DATABASE_SOCKET_PATH` and the TLS rule (tests, guard-removal proofs, both
-   reviewers). Merges independently of the infrastructure.
+   reviewers). Merges independently of the infrastructure. **It also changes
+   `.github/workflows/ci.yml`**: the integration job gains a `socat` step that relays a
+   Unix socket to the MySQL service container, plus the env var the socket test reads.
+   `deploy.yml` is a separate, new workflow; `ci.yml` stays the gate it waits on.
 2. Infrastructure by `gcloud` (each command listed in `docs/deploy.md`): APIs, network
    peering, Cloud SQL, database, users, secrets, registry, service accounts, WIF.
 3. `deploy.yml` PR; first run builds, migrates, deploys.
