@@ -14,7 +14,7 @@ import {
   topSortOrder,
 } from '../repositories/ordered-section.repository.js';
 import type { SectionDefinition } from '../repositories/section-definition.js';
-import { lockUser } from '../utils/user-lock.js';
+import { lockUser } from '../../../core/db/user-lock.js';
 
 /** The generic flow of an ordered profile section; the definition owns the columns. */
 @Injectable()

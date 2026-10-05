@@ -5,7 +5,7 @@ import { DbService } from '../../../core/db/db.service.js';
 import { setUserSkills } from '../../../core/db/terms.js';
 import { inTransaction } from '../../../core/db/transaction.js';
 import { ValidationError } from '../../../core/errors/app-error.js';
-import { lockUser } from '../utils/user-lock.js';
+import { lockUser } from '../../../core/db/user-lock.js';
 
 @Injectable()
 export class SkillsService {

@@ -41,6 +41,7 @@ export default defineConfig({
         'src/core/db/database.ts',
         'src/core/db/terms.ts',
         'src/core/db/transaction.ts',
+        'src/core/db/user-lock.ts',
         'src/core/db/seed/seed.ts',
         'src/core/db/seed/cli.ts',
         // First-login provisioning: ON DUPLICATE KEY, FOR SHARE re-reads and the
