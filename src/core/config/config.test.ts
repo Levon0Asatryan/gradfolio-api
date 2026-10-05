@@ -191,6 +191,7 @@ describe('loadConfig', () => {
       ['relative', 'cloudsql/x'],
       ['whitespace', '/cloudsql/a b'],
       ['too long', `/${'a'.repeat(107)}`],
+      ['too long in bytes, short in characters', `/${'é'.repeat(54)}`],
       ['empty', ''],
     ])('refuses a %s path', (_why, value) => {
       expect(() => loadConfig({ ...REQUIRED, DATABASE_SOCKET_PATH: value })).toThrow(

@@ -152,10 +152,12 @@ const database = {
   // A Unix socket to the server, such as Cloud Run's `/cloudsql/<connection>`.
   // When set it replaces the host and port of DATABASE_URL (which still carries
   // the user, password and database). TLS does not apply to it: see
-  // `tlsRule` below.
+  // `tlsInProduction` below.
   DATABASE_SOCKET_PATH: z
     .string()
-    .max(107, { message: 'must be at most 107 bytes (the Unix socket path limit)' })
+    .refine((v) => Buffer.byteLength(v) <= 107, {
+      message: 'must be at most 107 bytes (the Unix socket path limit)',
+    })
     .refine((v) => v.startsWith('/'), { message: 'must be an absolute path' })
     .refine((v) => !/[\s\0]/.test(v), { message: 'must not contain whitespace or NUL' })
     .optional(),
