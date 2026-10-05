@@ -611,9 +611,12 @@ describe('rate limits', () => {
       ]),
     ];
     for (const [name, call] of calls) {
-      await call();
-      await call();
-      expect((await call()).status, name).toBe(429);
+      // The budget is 2: the first two calls must get through (whatever the
+      // handler answers), the third is refused. Asserting the first two keeps
+      // this from passing when a shared budget was already spent by an earlier route.
+      expect((await call()).status, `${name} #1`).not.toBe(429);
+      expect((await call()).status, `${name} #2`).not.toBe(429);
+      expect((await call()).status, `${name} #3`).toBe(429);
     }
   });
 });
