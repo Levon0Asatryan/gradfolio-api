@@ -42,4 +42,4 @@ Both social logins (GitHub and Google) work on `https://gradfolio-navy.vercel.ap
 
 ## Budget
 
-`Cost-Alert` raised by Levon after the min-instances-1 choice (about $19.3 / month).
+`Cost-Alert` raised by Levon to 25 USD (alerts at 90% and 100%) after the min-instances-1 choice (about $19.3 / month).
