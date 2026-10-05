@@ -14,31 +14,32 @@ test JWKS server; the real-token run (§7) used Levon's Google login.
 
 Pull requests:
 
-| PR      | What                                         | Head → merge          | Reviews                                                                          |
-| ------- | -------------------------------------------- | --------------------- | -------------------------------------------------------------------------------- |
-| #25     | plan                                         | `04f171b` → `e17a46b` | Codex round 1: 1 finding (0-row onboarding UPDATE → 404), fixed in the plan      |
-| #26     | (a) contract, reads, header, onboarding      | `5712abf` → `03f3c2a` | Codex: no findings                                                               |
-| #27     | (b) section writes, skills, reorder          | `ed292d0` → `d299f00` | Codex: 1 finding (rate-limit test could pass for the wrong reason); fixed in #28 |
-| #28     | (c) `DELETE /v1/me`                          | `66c4736` → `b0aa64d` | Codex on `66c4736`: 1 finding (lock order), fixed in #29                         |
-| #29     | follow-up: deletion takes the user row first | `e3790c1` → `d45aeea` | Copilot reviewed the head, no comments; CI 5/5                                   |
-| this PR | verification (docs only)                     |                       | requested; merge does not wait                                                   |
+| PR      | What                                                                                | Head → merge          | Reviews                                                                          |
+| ------- | ----------------------------------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------- |
+| #25     | plan                                                                                | `04f171b` → `e17a46b` | Codex round 1: 1 finding (0-row onboarding UPDATE → 404), fixed in the plan      |
+| #26     | (a) contract, reads, header, onboarding                                             | `5712abf` → `03f3c2a` | Codex: no findings                                                               |
+| #27     | (b) section writes, skills, reorder                                                 | `ed292d0` → `d299f00` | Codex: 1 finding (rate-limit test could pass for the wrong reason); fixed in #28 |
+| #28     | (c) `DELETE /v1/me`                                                                 | `66c4736` → `b0aa64d` | Codex on `66c4736`: 1 finding (lock order), fixed in #29                         |
+| #29     | follow-up: deletion takes the user row first                                        | `e3790c1` → `d45aeea` | Copilot reviewed the head, no comments; CI 5/5                                   |
+| #37     | fix: login email no longer pre-fills the display name (found by the real-token run) | `e12ff80`             | requested                                                                        |
+| this PR | verification (docs only)                                                            |                       | requested; merge does not wait                                                   |
 
 Copilot failed on quota on #25–#28 (tracker, 2026-09-29), so those pushes were reviewed by
 Codex alone; on #29 Copilot reviewed the head (no comments).
 
-| #   | Check                                          | Result                    |
-| --- | ---------------------------------------------- | ------------------------- |
-| 1   | Fresh clone: build and full gate               | PASS                      |
-| 2   | Second-user matrix over every write            | PASS                      |
-| 3   | Q3: owner / other user / anonymous             | PASS                      |
-| 4   | No private field in any public response (grep) | PASS                      |
-| 5   | Concurrency under barriers                     | PASS                      |
-| 6   | OpenAPI                                        | PASS                      |
-| 7   | Real Auth0 token, every section over HTTP      | RESULT_7                  |
-| 8   | Plan walk                                      | PASS, deviations listed   |
-| 9   | Guard proofs (39 removals, final code)         | PASS, 3 redundant (§11.2) |
-| 10  | CI on each PR's head                           | PASS (5/5 jobs on each)   |
-| 11  | Machine clean                                  | PASS                      |
+| #   | Check                                          | Result                                               |
+| --- | ---------------------------------------------- | ---------------------------------------------------- |
+| 1   | Fresh clone: build and full gate               | PASS                                                 |
+| 2   | Second-user matrix over every write            | PASS                                                 |
+| 3   | Q3: owner / other user / anonymous             | PASS                                                 |
+| 4   | No private field in any public response (grep) | PASS                                                 |
+| 5   | Concurrency under barriers                     | PASS                                                 |
+| 6   | OpenAPI                                        | PASS                                                 |
+| 7   | Real Auth0 token, every section over HTTP      | PASS (database connection) after #37; found a defect |
+| 8   | Plan walk                                      | PASS, deviations listed                              |
+| 9   | Guard proofs (39 removals, final code)         | PASS, 3 redundant (§11.2)                            |
+| 10  | CI on each PR's head                           | PASS (5/5 jobs on each)                              |
+| 11  | Machine clean                                  | PASS                                                 |
 
 ## 1. Fresh clone
 
@@ -148,7 +149,113 @@ the PR (b) head): bodies, path parameters and nullable fields come out as expect
 
 ## 7. Real Auth0 token
 
-REAL_TOKEN
+Method: [auth0-setup.md](auth0-setup.md) §7. Levon logged in through the local frontend
+and put the access token in the gitignored `.env` of this worktree (1 h life). **The
+token came from the Auth0 _database_ connection (a test user), not Google**: `sub`
+provider `auth0`, `identities` `["auth0"]`, `email_verified` false. Issuer
+`https://dev-wkthnyn8b8mjn5ae.us.auth0.com/`, audience `https://api.gradfolio.app` (the
+token's `aud` is that audience plus `…/userinfo`; the Action's namespaced claims are
+present). The API ran in compose against an **empty local MySQL volume** (never Aiven or
+production), configured with the real issuer and audience. The script prints no token, no
+`sub` and no email, and the stored-row checks compare them without printing them.
+
+First run, on `main` at `7488c1d`:
+
+```
+token: aud ["https://api.gradfolio.app","https://dev-wkthnyn8b8mjn5ae.us.auth0.com/userinfo"], sub provider auth0, has namespaced claims true
+PASS  GET /v1/me: 200, account created, onboarded false  verified false, identities ["auth0"]
+PASS  second call: same id, exactly one users row
+PASS  stored row: auth0_id = token sub, email = token email, pre-filled name/avatar  name set true, avatar set true
+PASS  anonymous GET /v1/users/:id (public by default) -> 200
+PASS  with the real token -> 200, isOwner true
+PASS  PATCH /v1/me/profile -> 200
+PASS  stored: header fields written
+PASS  PATCH {verified:false} -> 400
+PASS  stored: verified unchanged
+PASS  POST /v1/me/education x2 -> 201
+PASS  PATCH education
+PASS  PUT education/order -> a first
+PASS  stored education: 2 rows, order 0/1, patch applied
+PASS  DELETE education -> 204, 1 row left
+PASS  POST /v1/me/experience x2 -> 201
+PASS  PATCH experience
+PASS  PUT experience/order -> a first
+PASS  stored experience: 2 rows, order 0/1, patch applied
+PASS  DELETE experience -> 204, 1 row left
+PASS  POST /v1/me/certifications x2 -> 201
+PASS  PATCH certifications
+PASS  PUT certifications/order -> a first
+PASS  stored certifications: 2 rows, order 0/1, patch applied
+PASS  DELETE certifications -> 204, 1 row left
+PASS  PUT /v1/me/skills -> canonical list  ["TypeScript","react","Go"]
+PASS  stored: skills in order
+PASS  profile read shows every section
+PASS  stored experience.skills use the registry spelling  ["react","Go"]
+PASS  onboarding/complete -> /v1/me onboarded true; stored
+PASS  isPublic false: anonymous 404, owner (real token) 200
+PASS  grep: no auth0 id, phone, birthday, token in 29 real-token responses  0 hits
+FAIL  grep: the login email only in GET /v1/me  7 elsewhere
+PASS  DELETE /v1/me -> 204
+PASS  stored: user and every section row gone  {"e":0,"x":0,"c":0,"s":0,"u":0}
+PASS  deleted profile -> 404
+PASS  same token afterwards: a new blank account (documented)
+PASS  api log: no token, sub, login or contact email  0 hits over 83 lines
+```
+
+One check failed, and it is a real defect: **the login email was in 7 public responses.**
+An Auth0 database login's `name` claim is the email address, so M2's first-login pre-fill
+stored the login email as `users.name`, and `GET /v1/users/:id` (anonymous) returned it
+as the display name. (Google sets a real name, which is why M2's run did not show it.)
+Fixed in #37: a name claim that looks like an email counts as no name, and the local
+part is used (the existing fallback). Removing the check fails the new test. The same
+real-token run on the #37 branch:
+
+```
+token: aud ["https://api.gradfolio.app","https://dev-wkthnyn8b8mjn5ae.us.auth0.com/userinfo"], sub provider auth0, has namespaced claims true
+PASS  GET /v1/me: 200, account created, onboarded false  verified false, identities ["auth0"]
+PASS  second call: same id, exactly one users row
+PASS  stored row: auth0_id = token sub, email = token email, pre-filled name/avatar  name set true, avatar set true
+PASS  anonymous GET /v1/users/:id (public by default) -> 200
+PASS  with the real token -> 200, isOwner true
+PASS  PATCH /v1/me/profile -> 200
+PASS  stored: header fields written
+PASS  PATCH {verified:false} -> 400
+PASS  stored: verified unchanged
+PASS  POST /v1/me/education x2 -> 201
+PASS  PATCH education
+PASS  PUT education/order -> a first
+PASS  stored education: 2 rows, order 0/1, patch applied
+PASS  DELETE education -> 204, 1 row left
+PASS  POST /v1/me/experience x2 -> 201
+PASS  PATCH experience
+PASS  PUT experience/order -> a first
+PASS  stored experience: 2 rows, order 0/1, patch applied
+PASS  DELETE experience -> 204, 1 row left
+PASS  POST /v1/me/certifications x2 -> 201
+PASS  PATCH certifications
+PASS  PUT certifications/order -> a first
+PASS  stored certifications: 2 rows, order 0/1, patch applied
+PASS  DELETE certifications -> 204, 1 row left
+PASS  PUT /v1/me/skills -> canonical list  ["TypeScript","react","Go"]
+PASS  stored: skills in order
+PASS  profile read shows every section
+PASS  stored experience.skills use the registry spelling  ["react","Go"]
+PASS  onboarding/complete -> /v1/me onboarded true; stored
+PASS  isPublic false: anonymous 404, owner (real token) 200
+PASS  grep: no auth0 id, phone, birthday, token in 29 real-token responses  0 hits
+PASS  grep: the login email only in GET /v1/me  0 elsewhere
+PASS  DELETE /v1/me -> 204
+PASS  stored: user and every section row gone  {"e":0,"x":0,"c":0,"s":0,"u":0}
+PASS  deleted profile -> 404
+PASS  same token afterwards: a new blank account (documented)
+PASS  api log: no token, sub, login or contact email  0 hits over 83 lines
+```
+
+37 of 37 pass. Not changed: the Gravatar picture URL the provider sends (a hash of the
+email, not the email), and any row created earlier with `name = email` (none known; the
+production login is Google).
+
+**PASS** (after #37)
 
 ## 8. Plan walk
 
@@ -270,6 +377,8 @@ migrations on MySQL 8.4, container stack) passed on #25–#28 at their merged he
 6. **Coverage fell under the floor** (88.8%) when the profile code first landed; the
    DB-bound files were excluded with reasons, as M1's are, and the suite measures 97.8%.
 
+7. **The login email shown as the display name** (own real-token run, #37): §7.
+
 ### 11.2 Guards that no single test fails for
 
 - `ProfileService.updateHeader`'s "0 rows → 404" and `SectionService.update`'s "0 rows →
@@ -308,16 +417,16 @@ push; Copilot was unavailable (quota).
 
 ## 12. Machine clean
 
-| Started                                                                                  | Removed                                       |
-| ---------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `gradfolio-m3-mysql-1`, `-migrate-1`, `-api-1`, volume `gradfolio-m3_mysqldata`, network | TEARDOWN                                      |
-| local test tenants (JWKS servers), scratch clones, probe scripts                         | stopped / deleted from the session scratchpad |
-| worktree `gradfolio-api-m3` and its branches                                             | WORKTREE                                      |
+| Started                                                                                  | Removed                                        |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `gradfolio-m3-mysql-1`, `-migrate-1`, `-api-1`, volume `gradfolio-m3_mysqldata`, network | yes (`docker-compose -p gradfolio-m3 down -v`) |
+| local test tenants (JWKS servers), scratch clones, probe scripts                         | stopped / deleted from the session scratchpad  |
+| worktree `gradfolio-api-m3` and its branches                                             | removed after this PR is up                    |
 
 ## Not verified
 
-- **Real tokens for the database, GitHub and LinkedIn connections** (only Google), as in
-  M2. The second-user matrix uses local-tenant tokens: a real second account was not used.
+- **Real tokens for Google, GitHub and LinkedIn in M3** (M3's run used the database
+  connection; M2 verified Google). The second-user matrix uses local-tenant tokens: a real second account was not used.
 - **A real browser edit** of every section through the frontend: the frontend is not wired
   to these endpoints yet (3.7).
 - **Copilot reviews:** quota exhausted.
