@@ -27,6 +27,10 @@ function nonBlank(value: string | undefined): string | undefined {
   return trimmed === undefined || trimmed === '' ? undefined : trimmed;
 }
 
+/** `someone@host`: no spaces, one `@` with text on both sides. */
+const looksLikeEmail = (value: string | undefined): boolean =>
+  value !== undefined && /^[^\s@]+@[^\s@]+$/u.test(value.trim());
+
 const NAME_MAX = 255; // users.name VARCHAR(255)
 const HEADLINE_MAX = 500; // users.headline VARCHAR(500)
 
@@ -43,8 +47,12 @@ export function prefillFrom(identity: AccessTokenIdentity): UserPrefill {
       ? identity.email
       : null;
 
-  const name =
-    nonBlank(identity.name) ?? nonBlank(email?.slice(0, email.indexOf('@'))) ?? FALLBACK_NAME;
+  // An Auth0 database login's `name` claim *is* the email address. Used as is,
+  // it would publish the login email as the display name on a public profile
+  // (found with a real database-login token, docs/m3-verification.md §7), so a
+  // name that is an email address counts as no name: the local part is used.
+  const claimedName = looksLikeEmail(identity.name) ? undefined : nonBlank(identity.name);
+  const name = claimedName ?? nonBlank(email?.slice(0, email.indexOf('@'))) ?? FALLBACK_NAME;
 
   const avatarUrl =
     identity.picture !== undefined &&

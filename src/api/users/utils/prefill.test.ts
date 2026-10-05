@@ -35,6 +35,22 @@ describe('prefillFrom', () => {
     expect(prefillFrom(identity()).name).toBe(FALLBACK_NAME);
   });
 
+  it('does not use a name that is an email address (an Auth0 database login names the user by email)', () => {
+    const db = { sub: 'auth0|1', emailVerified: true };
+    expect(
+      prefillFrom(identity({ ...db, name: 'ani@example.com', email: 'ani@example.com' })).name,
+    ).toBe('ani');
+    expect(
+      prefillFrom(identity({ ...db, name: ' Ani.P@Example.com ', email: 'other@example.com' }))
+        .name,
+    ).toBe('other');
+    expect(prefillFrom(identity({ ...db, name: 'ani@example.com' })).name).toBe(FALLBACK_NAME);
+    // a real name that merely contains an @ is kept
+    expect(
+      prefillFrom(identity({ ...db, name: 'Ani @ NPUA', email: 'ani@example.com' })).name,
+    ).toBe('Ani @ NPUA');
+  });
+
   it('cuts a name to 255 characters, counted as MySQL counts them (code points)', () => {
     const name = prefillFrom(identity({ name: '😀'.repeat(300) })).name;
     expect([...name]).toHaveLength(255);
