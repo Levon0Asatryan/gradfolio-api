@@ -19,6 +19,7 @@ export const SESSION_TIME_ZONE = '+00:00';
 type DbConfig = Pick<
   DatabaseConfig,
   | 'DATABASE_URL'
+  | 'DATABASE_SOCKET_PATH'
   | 'DATABASE_POOL_MAX'
   | 'DATABASE_CONNECT_TIMEOUT_MS'
   | 'DATABASE_SSL'
@@ -43,6 +44,9 @@ export const castTinyIntBoolean = (field: TypeCastField, next: () => unknown): u
 export function poolOptions(cfg: DbConfig): PoolOptions {
   return {
     uri: cfg.DATABASE_URL,
+    // Replaces the URL's host and port (checked against mysql2: the URL still
+    // supplies user, password and database).
+    ...(cfg.DATABASE_SOCKET_PATH ? { socketPath: cfg.DATABASE_SOCKET_PATH } : {}),
     connectionLimit: cfg.DATABASE_POOL_MAX,
     connectTimeout: cfg.DATABASE_CONNECT_TIMEOUT_MS,
     // The driver converts DATETIME to and from JS Dates as UTC, matching the

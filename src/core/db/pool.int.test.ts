@@ -1,6 +1,10 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { connect, createServer, type Server } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { RowDataPacket } from 'mysql2/promise';
 import { afterEach, describe, expect, it } from 'vitest';
-import { testConfig } from '../../testing/database.js';
+import { testConfig, testDatabaseUrl } from '../../testing/database.js';
 import { createPool, SESSION_TIME_ZONE } from './pool.js';
 
 type Pool = ReturnType<typeof createPool>;
@@ -59,5 +63,50 @@ describe('createPool against MySQL 8.4', () => {
     const text = 'Ծրագրավորող Երևանից — 🎓';
     const [rows] = await pool.query<RowDataPacket[]>('SELECT ? AS t', [text]);
     expect(rows[0]?.t).toBe(text);
+  });
+});
+
+describe('createPool over a Unix socket', () => {
+  let pool: Pool | undefined;
+  let relay: Server | undefined;
+  let dir: string | undefined;
+
+  afterEach(async () => {
+    await pool?.end();
+    pool = undefined;
+    await new Promise((resolve) => (relay ? relay.close(resolve) : resolve(undefined)));
+    relay = undefined;
+    if (dir) await rm(dir, { recursive: true, force: true });
+    dir = undefined;
+  });
+
+  it('reaches MySQL through the socket, with the URL supplying credentials', async () => {
+    // A Unix socket that forwards to the test database: no extra tool in CI or
+    // locally. The URL's host is unreachable on purpose, so only a pool that
+    // really uses the socket can connect.
+    const target = new URL(testDatabaseUrl());
+    const upstreamHost = target.hostname;
+    const upstreamPort = Number(target.port);
+    dir = await mkdtemp(join(tmpdir(), 'gradfolio-sock-'));
+    const socketPath = join(dir, 'mysql.sock');
+    let relayed = 0;
+    relay = createServer((client) => {
+      relayed += 1;
+      const upstream = connect({ host: upstreamHost, port: upstreamPort });
+      client.pipe(upstream).pipe(client);
+      client.on('error', () => upstream.destroy());
+      upstream.on('error', () => client.destroy());
+    });
+    await new Promise<void>((resolve) => relay!.listen(socketPath, resolve));
+
+    target.hostname = '192.0.2.1'; // TEST-NET-1: never answers
+    pool = createPool({
+      ...testConfig({ DATABASE_URL: target.toString(), DATABASE_SOCKET_PATH: socketPath }),
+      DATABASE_CONNECT_TIMEOUT_MS: 2000,
+    });
+
+    const [rows] = await pool.query<RowDataPacket[]>('SELECT @@session.time_zone AS tz');
+    expect(rows[0]?.tz).toBe(SESSION_TIME_ZONE);
+    expect(relayed).toBeGreaterThan(0);
   });
 });
