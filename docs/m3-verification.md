@@ -136,7 +136,7 @@ Each test holds a lock on a second connection and uses `waitForLockWaiters` (the
 
 ## 6. OpenAPI
 
-`npm run openapi:check` → `openapi.yaml: up to date`. 22 operations; `document.test.ts`
+`npm run openapi:check` → `openapi.yaml: up to date`. 21 operations; `document.test.ts`
 compares them with Nest's route table both ways, resolves every `$ref`, requires path
 parameters to match the `{names}` in the path, and refuses two different schemas under
 one component name. `openapi-typescript` 7.13.0 generates types from the file (checked on
