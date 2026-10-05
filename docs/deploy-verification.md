@@ -1,7 +1,7 @@
 # Deployment verification (2026-10-05)
 
 API `https://gradfolio-api-1058577031182.us-east1.run.app`, revision `gradfolio-api-00001-phc`, built from the PR #33 branch
-(`f2e8f03`) by hand once, because the pipeline needs #33 and #34 merged first. The first pipeline run is not yet recorded here.
+(`f2e8f03`) by hand once, because the pipeline needs #33 and #34 merged first. The first pipeline run is recorded below.
 
 | #   | Check                                     | Result                                                                                                                                                                                                                                                         |
 | --- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -28,3 +28,18 @@ API `https://gradfolio-api-1058577031182.us-east1.run.app`, revision `gradfolio-
 
 - `/healthz` is unreachable on `*.run.app`: plan and smoke test changed to `/readyz`.
 - API-created Cloud SQL users hold `cloudsqlsuperuser` by default: revoked, then grants applied.
+
+## First pipeline run (2026-10-05)
+
+CI run 37283875234 was cancelled by the next push, so it was re-run; `Deploy` run 37284209780 then ran on `b80ff32` (the tip of `main`)
+and every step succeeded: stale-sha check, Workload Identity Federation login (no key), build and push `api:b80ff32`, migrate job,
+no-traffic candidate, `/readyz` smoke, traffic shift. Result: revision `gradfolio-api-00005-saf` serves 100% on that image;
+`/readyz` → 200 with the database ok; the migrate job's last execution succeeded.
+
+## Logins on production (tested by Levon)
+
+Both social logins (GitHub and Google) work on `https://gradfolio-navy.vercel.app` against the live API.
+
+## Budget
+
+`Cost-Alert` raised by Levon to 25 USD (alerts at 90% and 100%) after the min-instances-1 choice (about $19.3 / month).
