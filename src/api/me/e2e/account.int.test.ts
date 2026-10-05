@@ -325,6 +325,32 @@ describe('DELETE /v1/me', () => {
     expect(await db.selectFrom('education').select('id').execute()).toEqual([]);
   });
 
+  it('takes the user row before the team rows: a writer that holds the user row and wants a team row does not deadlock with it', async () => {
+    const http = await start();
+    const alice = await account('alice');
+    const bob = await account('bob');
+    await populate(alice, bob); // alice has a team row on bob's project
+
+    // A write that follows the documented order (user row, then child rows).
+    const writer = await createConnection({ uri: testDatabaseUrl() });
+    await writer.beginTransaction();
+    await writer.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [alice.user.id]);
+    const deletion = http
+      .delete('/v1/me')
+      .set(alice.auth)
+      .then((r) => r);
+    await waitForLockWaiters(1); // the deletion is queued on the user row
+    // Needs the team row. If the deletion had already locked it (team rows
+    // first), this would close the cycle and InnoDB would abort one side (1213).
+    await writer.query('SELECT id FROM project_team_members WHERE user_id = ? FOR UPDATE', [
+      alice.user.id,
+    ]);
+    await writer.commit();
+    await writer.end();
+
+    expect((await deletion).status).toBe(204);
+  });
+
   it('needs a token, and deletes only the caller’s account whoever else exists', async () => {
     const http = await start();
     await http.delete('/v1/me').expect(401);

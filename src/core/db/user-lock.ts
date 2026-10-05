@@ -1,6 +1,6 @@
 import type { Transaction } from 'kysely';
-import type { DB } from '../../../core/db/types.generated.js';
-import { NotFoundError } from '../../../core/errors/app-error.js';
+import type { DB } from './types.generated.js';
+import { NotFoundError } from '../errors/app-error.js';
 
 /**
  * Takes the write lock on a user's row (`SELECT … FOR UPDATE`), the mutex for
