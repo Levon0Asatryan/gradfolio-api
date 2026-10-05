@@ -86,6 +86,10 @@ gcloud run services update gradfolio-api --region us-east1 --revision-suffix rot
 gcloud secrets versions list gradfolio-database-url   # then: versions disable <old>
 ```
 
+Do it in a quiet moment: from `set-password` until the new revision is serving (about a minute), the old revision can still
+use its open connections, but a connection it opens in that window fails with the old password. Cloud SQL's API cannot keep both
+passwords (MySQL's `RETAIN CURRENT PASSWORD` is not exposed), so a brief error blip on new connections is accepted.
+
 The migrator needs no restart: each job run reads `:latest`. Check `/readyz` afterwards.
 
 ## Budget alert
