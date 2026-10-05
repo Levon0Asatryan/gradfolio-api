@@ -36,6 +36,20 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
+      # A re-run of an older successful CI run keeps its original sha: refuse to
+      # deploy anything but the tip of main (a stale run would act as a rollback
+      # without anyone choosing one; rollback is `update-traffic`, see docs/deploy.md).
+      - name: Refuse a stale commit
+        run: |
+          git fetch --quiet origin main
+          tip=$(git rev-parse origin/main)
+          if [ "$tip" != "$SHA" ]; then
+            echo "::error::$SHA is not the tip of main ($tip); not deploying"
+            exit 1
+          fi
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+
       - id: auth
         uses: google-github-actions/auth@v3
         with:
