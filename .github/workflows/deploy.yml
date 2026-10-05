@@ -1,0 +1,86 @@
+name: Deploy
+
+# Production: Cloud Run + Cloud SQL (docs/deploy-plan.md §6). Runs only after
+# the CI workflow succeeded on main, so a red main never deploys.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # Workload Identity Federation: no service-account key exists
+
+env:
+  REGION: us-east1
+  SERVICE: gradfolio-api
+  MIGRATE_JOB: gradfolio-migrate
+  IMAGE: us-east1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/gradfolio/api
+
+jobs:
+  deploy:
+    name: Build, migrate, deploy
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # The exact commit CI passed, not whatever main is by now.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - name: Build and push the image
+        run: |
+          gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          docker build -t "${IMAGE}:${GITHUB_SHA}" .
+          docker push "${IMAGE}:${GITHUB_SHA}"
+        env:
+          GITHUB_SHA: ${{ github.event.workflow_run.head_sha }}
+
+      # Before any traffic moves: a failed migration stops the pipeline here and
+      # the live revision is untouched. The job exits non-zero on failure.
+      - name: Migrate
+        run: |
+          gcloud run jobs update "${MIGRATE_JOB}" --region "${REGION}" \
+            --image "${IMAGE}:${SHA}"
+          gcloud run jobs execute "${MIGRATE_JOB}" --region "${REGION}" --wait
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Deploy the revision without traffic
+        run: |
+          gcloud run deploy "${SERVICE}" --region "${REGION}" \
+            --image "${IMAGE}:${SHA}" --no-traffic --tag candidate --quiet
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Smoke test the candidate
+        run: |
+          url=$(gcloud run services describe "${SERVICE}" --region "${REGION}" \
+            --format='value(status.traffic[].url)' | tr ';' '\n' | grep candidate | head -1)
+          [ -n "$url" ] || { echo "::error::no candidate url"; exit 1; }
+          # /healthz is reserved by Cloud Run's front end on *.run.app (it answers
+          # a Google 404 before the app sees it); /readyz also proves the database.
+          body=$(curl -fsS --retry 5 --retry-delay 3 "${url}/readyz")
+          echo "$body"
+          [ "$body" = '{"status":"ok","database":"ok"}' ] || { echo "::error::candidate not ready"; exit 1; }
+
+      - name: Send traffic to the new revision
+        run: |
+          gcloud run services update-traffic "${SERVICE}" --region "${REGION}" --to-latest
+          gcloud run services update-traffic "${SERVICE}" --region "${REGION}" --remove-tags candidate
