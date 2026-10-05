@@ -31,3 +31,12 @@ Authorization: Bearer not.a.token
 # 200 {"onboarded":true}. Idempotent; GET /v1/me then shows onboarded: true.
 POST {{baseUrl}}/v1/me/onboarding/complete
 Authorization: Bearer {{accessToken}}
+
+###
+# @name deleteMe
+# 204. Irreversible: the profile, sections, skills, projects, integrations and
+# notifications are gone; your name stays on other people's projects without a
+# photo. Sign out afterwards: a token that is still valid creates a new, empty
+# account on the next request.
+DELETE {{baseUrl}}/v1/me
+Authorization: Bearer {{accessToken}}

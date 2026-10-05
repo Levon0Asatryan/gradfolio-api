@@ -1,13 +1,17 @@
-import { Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, Post, Req } from '@nestjs/common';
 import type { AuthenticatedRequest } from '../auth/auth.constants.js';
 import { CurrentUser } from '../users/decorators/current-user.decorator.js';
 import type { UserRow } from '../users/repositories/user.repository.js';
 import type { MeResponse } from './dto/me.dto.js';
+import { AccountService } from './services/account.service.js';
 import { OnboardingService } from './services/onboarding.service.js';
 
 @Controller('me')
 export class MeController {
-  constructor(private readonly onboarding: OnboardingService) {}
+  constructor(
+    private readonly onboarding: OnboardingService,
+    private readonly account: AccountService,
+  ) {}
 
   /** The caller's own account; the first call after a login creates it. */
   @Get()
@@ -35,5 +39,12 @@ export class MeController {
   async completeOnboarding(@CurrentUser() user: UserRow): Promise<{ onboarded: true }> {
     await this.onboarding.complete(user.id);
     return { onboarded: true };
+  }
+
+  /** Deletes the caller's account and all its data. The frontend then signs out. */
+  @Delete()
+  @HttpCode(204)
+  async deleteAccount(@CurrentUser() user: UserRow): Promise<void> {
+    await this.account.delete(user.id);
   }
 }
