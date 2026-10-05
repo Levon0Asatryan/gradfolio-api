@@ -22,8 +22,8 @@ Pull requests:
 | #29     | follow-up: deletion takes the user row first | see the PR            | requested                                                                        |
 | this PR | verification (docs only)                     |                       | requested; merge does not wait                                                   |
 
-Copilot failed on quota on every head (tracker, 2026-09-29), so every push was reviewed by
-Codex alone.
+Copilot failed on quota on #25–#28 (tracker, 2026-09-29), so those pushes were reviewed by
+Codex alone; on #29 Copilot reviewed the head (no comments).
 
 | #   | Check                                          | Result                    |
 | --- | ---------------------------------------------- | ------------------------- |
@@ -55,6 +55,9 @@ DATABASE_URL=… npm run db:types:check && npm run migrate
 | `npm run test:coverage`     | statements 97.78%, branches 95.76%, functions 96.77%, lines 98.83% (floor 90%)                                   | PASS   |
 | `npm run test:int`          | 21 files, **193 passed**                                                                                         | PASS   |
 | `db:types:check`, `migrate` | types up to date; `nothing to apply`                                                                             | PASS   |
+
+Re-run on `main` at `7488c1d` (after #29–#36): verify **535 passed**, integration **195
+passed**, coverage 97.8 / 95.8 / 96.85 / 98.85, `openapi.yaml: up to date`.
 
 Migration 0005 up, down, up: `db:schema` before and after the cycle is byte-identical.
 
