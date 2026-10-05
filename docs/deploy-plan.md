@@ -214,7 +214,7 @@ the pipeline's own first run.
 ## 6. CI/CD: GitHub Actions, Workload Identity Federation
 
 **Trigger: push to `main` after the `CI` workflow succeeds** (`workflow_run`, so a red
-main never deploys), ignoring docs-only changes. Recommended over tags: this is a
+main never deploys), a docs-only push also redeploys (same behaviour, deferred follow-up), and a re-run of an older CI run is refused unless its sha is the tip of main. Recommended over tags: this is a
 coursework project with one environment; every merge is deployable, and a tag-per-deploy
 is ceremony. v1.0.0 is tagged in M9 separately. A `concurrency` group serializes deploys.
 
