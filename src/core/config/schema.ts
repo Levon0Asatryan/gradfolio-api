@@ -133,6 +133,10 @@ const rateLimit = {
 /** Profile page bounds (docs/m3-plan.md §1, Limits). */
 const profile = {
   // Projects listed on one profile (own and accepted-team together).
+  // Education, experience and certification entries one user may hold, each.
+  PROFILE_MAX_SECTION_ITEMS: z.coerce.number().int().min(1).max(500).default(50),
+  // Skills one user may hold.
+  PROFILE_MAX_SKILLS: z.coerce.number().int().min(1).max(1000).default(100),
   PROFILE_PROJECTS_LIMIT: z.coerce.number().int().min(1).max(500).default(50),
 };
 

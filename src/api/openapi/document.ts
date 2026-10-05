@@ -2,12 +2,28 @@ import { z, type ZodObject, type ZodType } from 'zod';
 import { LIVENESS_PATH, READINESS_PATH } from '../health/constants.js';
 import { meResponseSchema } from '../me/dto/me.dto.js';
 import {
+  certificationSchema,
+  educationSchema,
+  experienceSchema,
   onboardingResponseSchema,
   profileHeaderSchema,
   profileSchema,
   updateProfileSchema,
   userIdParamSchema,
 } from '../profiles/dto/profile.dto.js';
+import {
+  createCertificationSchema,
+  createEducationSchema,
+  createExperienceSchema,
+  itemIdParamSchema,
+  nonEmptyPatch,
+  patchCertificationSchema,
+  patchEducationSchema,
+  patchExperienceSchema,
+  reorderSchema,
+  replaceSkillsSchema,
+  skillsResponseSchema,
+} from '../profiles/dto/section.dto.js';
 
 /**
  * The OpenAPI document, built from the same zod schemas the request pipeline
@@ -106,6 +122,91 @@ const authenticatedFailures = {
 const validationFailed = error(
   'VALIDATION_FAILED: the body does not fit the schema (see `details`)',
 );
+
+const notYours = (what: string) =>
+  error(`NOT_FOUND: no such ${what} of the caller's (someone else's id answers the same)`);
+
+/** The five operations every ordered profile section has. */
+function sectionOperations(s: {
+  path: string;
+  name: string;
+  plural: string;
+  item: ZodType;
+  create: ZodType;
+  patch: ZodObject;
+}): Operation[] {
+  const list = z.array(s.item);
+  const base = { tag: 'profiles', bearer: true } as const;
+  return [
+    {
+      ...base,
+      method: 'post',
+      path: `/v1/me/${s.path}`,
+      operationId: `create${s.name}`,
+      summary: `Add a ${s.plural} entry`,
+      description:
+        'The new entry goes first. Required fields must be non-empty; `null` or a blank string ' +
+        'clears an optional text field. Over the per-user cap: 409 `LIMIT_REACHED`.',
+      body: s.create,
+      responses: {
+        '201': { description: 'The new entry', schema: s.item },
+        '400': validationFailed,
+        '409': error('LIMIT_REACHED: the section is full'),
+        ...authenticatedFailures,
+      },
+    },
+    {
+      ...base,
+      method: 'patch',
+      path: `/v1/me/${s.path}/{id}`,
+      operationId: `update${s.name}`,
+      summary: `Change a ${s.plural} entry`,
+      description:
+        'Any non-empty subset of the fields; the result is validated as a whole, so ' +
+        'cross-field rules hold. Unknown keys (`id`, `userId`, `sortOrder` …) are rejected.',
+      params: itemIdParamSchema,
+      body: nonEmptyPatch(s.patch as never),
+      responses: {
+        '200': { description: 'The entry after the change', schema: s.item },
+        '400': validationFailed,
+        '404': notYours(`${s.plural} entry`),
+        ...authenticatedFailures,
+      },
+    },
+    {
+      ...base,
+      method: 'delete',
+      path: `/v1/me/${s.path}/{id}`,
+      operationId: `delete${s.name}`,
+      summary: `Delete a ${s.plural} entry`,
+      params: itemIdParamSchema,
+      responses: {
+        '204': { description: 'Deleted' },
+        '404': notYours(`${s.plural} entry`),
+        ...authenticatedFailures,
+      },
+    },
+    {
+      ...base,
+      method: 'put',
+      path: `/v1/me/${s.path}/order`,
+      operationId: `reorder${s.name}`,
+      summary: `Set the order of the ${s.plural} section`,
+      description:
+        'Atomic. `ids` must be exactly the caller’s entries, each once. An id that is not ' +
+        'the caller’s is 404; the right ids but an incomplete list (an entry was added ' +
+        'elsewhere) is 409 `ORDER_STALE`.',
+      body: reorderSchema,
+      responses: {
+        '200': { description: 'The section in its new order', schema: list },
+        '400': validationFailed,
+        '404': notYours(`${s.plural} entry`),
+        '409': error('ORDER_STALE: the list changed; reload it and try again'),
+        ...authenticatedFailures,
+      },
+    },
+  ];
+}
 
 export const OPERATIONS: readonly Operation[] = [
   {
@@ -213,6 +314,48 @@ export const OPERATIONS: readonly Operation[] = [
       '503': error('AUTH_UNAVAILABLE or DATABASE_UNAVAILABLE'),
     },
   },
+  {
+    method: 'put',
+    path: '/v1/me/skills',
+    operationId: 'replaceSkills',
+    tag: 'profiles',
+    summary: 'Replace the whole skill list',
+    description:
+      'One transaction. The order given is the order kept; names are normalized and ' +
+      'case-insensitive duplicates collapse, with one spelling per name across the site. ' +
+      'Over the per-user cap: 400.',
+    bearer: true,
+    body: replaceSkillsSchema,
+    responses: {
+      '200': { description: 'The canonical list', schema: skillsResponseSchema },
+      '400': validationFailed,
+      ...authenticatedFailures,
+    },
+  },
+  ...sectionOperations({
+    path: 'education',
+    name: 'Education',
+    plural: 'education',
+    item: educationSchema,
+    create: createEducationSchema,
+    patch: patchEducationSchema,
+  }),
+  ...sectionOperations({
+    path: 'experience',
+    name: 'Experience',
+    plural: 'experience',
+    item: experienceSchema,
+    create: createExperienceSchema,
+    patch: patchExperienceSchema,
+  }),
+  ...sectionOperations({
+    path: 'certifications',
+    name: 'Certification',
+    plural: 'certification',
+    item: certificationSchema,
+    create: createCertificationSchema,
+    patch: patchCertificationSchema,
+  }),
 ];
 
 export function buildOpenApiDocument(

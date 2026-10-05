@@ -3,13 +3,14 @@
 Every endpoint the API serves, as runnable requests. One file per module, named
 after the module it exercises.
 
-| File                           | Module         | Covers                                                        |
-| ------------------------------ | -------------- | ------------------------------------------------------------- |
-| [health.http](health.http)     | `api/health`   | liveness, readiness                                           |
-| [common.http](common.http)     | `api/common`   | not-found fallback, error shape, body limit                   |
-| [openapi.http](openapi.http)   | `api/openapi`  | Swagger UI and the document it renders                        |
-| [me.http](me.http)             | `api/me`       | the caller's account; 401 without a token                     |
-| [profiles.http](profiles.http) | `api/profiles` | profiles by id (anonymous and signed in), the caller's header |
+| File                           | Module         | Covers                                                                            |
+| ------------------------------ | -------------- | --------------------------------------------------------------------------------- |
+| [health.http](health.http)     | `api/health`   | liveness, readiness                                                               |
+| [common.http](common.http)     | `api/common`   | not-found fallback, error shape, body limit                                       |
+| [openapi.http](openapi.http)   | `api/openapi`  | Swagger UI and the document it renders                                            |
+| [me.http](me.http)             | `api/me`       | the caller's account; 401 without a token                                         |
+| [sections.http](sections.http) | `api/profiles` | education, experience, certifications and skills: create, change, delete, reorder |
+| [profiles.http](profiles.http) | `api/profiles` | profiles by id (anonymous and signed in), the caller's header                     |
 
 **A module added later gets a file here in the same pull request.** A file that
 does not list every route its module serves is worse than none: the gap reads as
