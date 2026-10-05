@@ -3,7 +3,8 @@
 The final test record for M3 on the API side: tracker 3.1–3.6, the API half of 2.12 and
 2.14, [m3-plan.md](m3-plan.md). Unit, integration, clone, stack and guard runs on
 2026-10-05 against MySQL 8.4.11 on `origin/main` at `b0aa64d` (after #28), with the
-follow-up #29 (§11.1). Every stack run starts from an **empty volume**
+follow-up #29 (§11.1), re-run on `main` at `7488c1d` after #29 and the deployment PRs
+#30–#36 (§1). Every stack run starts from an **empty volume**
 (`docker-compose -p gradfolio-m3 down -v`), on this worktree's own project and ports
 (MySQL 3309, api 3003). Local runs use the standalone `docker-compose`; this
 machine's `docker` CLI has no `compose` plugin.
@@ -19,7 +20,7 @@ Pull requests:
 | #26     | (a) contract, reads, header, onboarding      | `5712abf` → `03f3c2a` | Codex: no findings                                                               |
 | #27     | (b) section writes, skills, reorder          | `ed292d0` → `d299f00` | Codex: 1 finding (rate-limit test could pass for the wrong reason); fixed in #28 |
 | #28     | (c) `DELETE /v1/me`                          | `66c4736` → `b0aa64d` | Codex on `66c4736`: 1 finding (lock order), fixed in #29                         |
-| #29     | follow-up: deletion takes the user row first | see the PR            | requested                                                                        |
+| #29     | follow-up: deletion takes the user row first | `e3790c1` → `d45aeea` | Copilot reviewed the head, no comments; CI 5/5                                   |
 | this PR | verification (docs only)                     |                       | requested; merge does not wait                                                   |
 
 Copilot failed on quota on #25–#28 (tracker, 2026-09-29), so those pushes were reviewed by
