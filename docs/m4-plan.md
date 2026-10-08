@@ -2,29 +2,31 @@
 
 Tracker tasks 4.1–4.5, and what FE tasks 4.6–4.10 need from the API. Decides **Q6**
 (file storage, Levon's call) and applies **Q3 = A** to projects. Product calls for
-Levon: **Q6** (§2.1), **read access to files** (§2.2).
+Levon: **Q6** (§2.1), **read access to files** (§2.2). **Both decided 2026-10-08:
+Q6 = GCS `us-east1`; read access = S (private bucket, signed GET URLs).** The bucket
+exists and the probe has run (§3).
 
 Claims marked **run** were executed on 2026-10-08 against MySQL **8.4.11** (compose
 project `gradfolio-m4`, port 3312), Node 24.20, Kysely 0.29, mysql2 3.24.5, zod 4.6.5,
 sanitize-html 2.18.0, dompurify 3.4.16, jsdom 30.1.2, @google-cloud/storage 8.3.0.
 Probe scripts ran outside the repo; their behaviour is re-proved by tests in the PRs
 (§7). Frontend facts were read from `gradfolio@cb48095` (`origin/main`), read-only.
-Prices and docs were fetched on the same day (links inline). **Not run:** anything that
-needs a bucket (no billed resource was created); §3.3 lists those.
+Prices and docs were fetched on the same day (links inline). The bucket probe ran on
+2026-10-08 after Levon's OK (§3.3).
 
 ## 1. Decisions
 
-| ID           | Decision                                                                                                                                                                                                                                             | Evidence |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| Q3 (project) | One predicate, `projectVisibleTo(viewer)`: `(is_public = 1 AND is_draft = 0) OR user_id = viewer`, in the SQL of every read. A private or draft project answers 404 to everyone but its owner and is excluded from every list.                       | §5.2     |
-| Q6           | **Levon decides.** Recommendation: Google Cloud Storage, `us-east1`, same project, private bucket.                                                                                                                                                   | §2, §3   |
-| Sanitizer    | **`sanitize-html`** (pinned 2.18.x) with a strict allow-list, on every write of `description_html`. The FE re-sanitizes with DOMPurify (4.8): two different parsers.                                                                                 | §4       |
-| Write lock   | Project writes first take the project row `SELECT … WHERE id = ? AND user_id = ? FOR UPDATE` (no row: 404). Creates take `lockUser` (the M3 helper) for the per-user cap. Order: user row, project row, child rows, `terms`.                         | §6.1     |
-| Migration    | **None.** Every column M4 needs exists (0001, 0004). No existing row can break a new rule: nothing writes projects today except the seed.                                                                                                            | §6.4     |
-| Media URLs   | Media URLs (hero, attachments of type image/video/pdf) are **https only**. Other project URLs (demo, repo, links, files) stay http(s), as in M1.                                                                                                     | §5.5     |
-| Pagination   | Keyset cursor `(sort value, id)`, not offset. `created_at` is `DATETIME` (whole seconds), so ties are common; the `id` tie-break keeps pages stable while rows are added.                                                                            | §6.3     |
-| Limits       | Config, not literals: `PROJECT_MAX_PER_USER` (100), `PROJECT_MAX_ATTACHMENTS` (20), `PROJECT_MAX_TAGS` (20), `PROJECT_MAX_TECHNOLOGIES` (30), `PROJECT_MAX_LINKS` (10), `PROJECT_DESCRIPTION_MAX_BYTES` (100000), `PROJECTS_PAGE_SIZE` (20, max 50). | §5.4     |
-| Orphans      | Delete the object after the row's transaction commits; a failed delete is logged with the key. A sweep script (`storage:sweep`) lists objects with no row and deletes those older than 24 h. No bucket lifecycle rule.                               | §3.5     |
+| ID           | Decision                                                                                                                                                                                                                                                                                                                | Evidence |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| Q3 (project) | One predicate, `projectVisibleTo(viewer)`: `(is_public = 1 AND is_draft = 0) OR user_id = viewer`, in the SQL of every read. A private or draft project answers 404 to everyone but its owner and is excluded from every list.                                                                                          | §5.2     |
+| Q6           | **Decided (Levon, 2026-10-08): Google Cloud Storage `us-east1`, same project, private bucket, signed read URLs (§2.2 = S).**                                                                                                                                                                                            | §2, §3   |
+| Sanitizer    | **`sanitize-html`** (pinned 2.18.x) with a strict allow-list, on every write of `description_html`. The FE re-sanitizes with DOMPurify (4.8): two different parsers.                                                                                                                                                    | §4       |
+| Write lock   | Project writes first take the project row `SELECT … WHERE id = ? AND user_id = ? FOR UPDATE` (no row: 404). Creates take `lockUser` (the M3 helper) for the per-user cap. Order: user row, project row, child rows, `terms`.                                                                                            | §6.1     |
+| Migration    | **None.** Every column M4 needs exists (0001, 0004). No existing row can break a new rule: nothing writes projects today except the seed.                                                                                                                                                                               | §6.4     |
+| Media URLs   | Media URLs (hero, attachments of type image/video/pdf) are **https only**. Other project URLs (demo, repo, links, files) stay http(s), as in M1.                                                                                                                                                                        | §5.5     |
+| Pagination   | Keyset cursor `(sort value, id)`, not offset. `created_at` is `DATETIME` (whole seconds), so ties are common; the `id` tie-break keeps pages stable while rows are added.                                                                                                                                               | §6.3     |
+| Limits       | Config, not literals: `PROJECT_MAX_PER_USER` (100), `PROJECT_MAX_ATTACHMENTS` (20), `PROJECT_MAX_TAGS` (20), `PROJECT_MAX_TECHNOLOGIES` (30), `PROJECT_MAX_LINKS` (10), `PROJECT_DESCRIPTION_MAX_BYTES` (100000), `PROJECTS_PAGE_SIZE` (20, max 50).                                                                    | §5.4     |
+| Orphans      | One storage key is referenced by at most one row (§3.5); the object is deleted after the row's transaction commits, only if no row still references it; a failed delete is logged with the key. A sweep script (`storage:sweep`) lists objects with no row and deletes those older than 24 h. No bucket lifecycle rule. | §3.5     |
 
 ## 2. Questions for Levon
 
@@ -52,21 +54,31 @@ $0.005/1000 = **$0.03** + Class B 100 000 × $0.004/1000 (the pessimistic price)
 **$0.40** + egress 20 GB (free) = **under $0.50**; **$0** in a normal month. Bucket
 creation itself is free. The existing budget alert ($10) is untouched.
 
-**I created nothing.** Before creating the bucket I need Levon's OK on A and on the
-IAM change in §3.1; both are commands for the sandboxed gcloud.
+**Decided: A (Levon, 2026-10-08).** The bucket and the two IAM bindings were created
+with the sandboxed gcloud only (§3.2); no key file, nothing else billed.
 
 ### 2.2 Who can read a private project's files?
 
 With Q3 = A a private project is 404 to everyone else. Files are bytes at a URL, so:
 
-| Option                                                | What happens                                                                                                                                                                                                                                                                                       | Against                                                                                                                                                                                                                                                     |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **S. Private bucket, signed read URLs** (recommended) | Public access prevention on. The DB stores the canonical object URL; every project response swaps it for a V4 `GET` URL valid 1 h (cached in memory 50 min per key, so a URL is stable while cached). A private project's files cannot be fetched without a response that only its owner receives. | One IAM `signBlob` call per uncached object; URLs change every 50 min (the FE already renders with `unoptimized`, so no image-cache loss). IAM Credentials `signBlob` has a per-project quota I did not look up; the cache keeps calls to new objects only. |
-| P. Public-read bucket, unguessable keys               | `allUsers: objectViewer`. Keys are `u/<userId>/<uuid>.<ext>` (122 random bits). No signing on read.                                                                                                                                                                                                | A URL that was ever visible keeps working after the project turns private, and after delete if the object delete fails. That is Q3's rejected "unlisted" model for files.                                                                                   |
+| Option                                                | What happens                                                                                                                                                                                                                                                                                                                                                                             | Against                                                                                                                                                                                                                                                    |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **S. Private bucket, signed read URLs** (recommended) | Public access prevention on. The DB stores the canonical object URL; every project response swaps it for a V4 `GET` URL valid `FILE_READ_URL_TTL_S` = **300 s** (cached in memory 240 s per key, so a URL is stable while cached). A private project's files cannot be fetched without a response that only its owner receives, and a URL already issued stops working within 5 minutes. | One IAM `signBlob` call per uncached object; URLs change every 4 min (the FE already renders with `unoptimized`, so no image-cache loss). IAM Credentials `signBlob` has a per-project quota I did not look up; the cache keeps calls to new objects only. |
+| P. Public-read bucket, unguessable keys               | `allUsers: objectViewer`. Keys are `u/<userId>/<uuid>.<ext>` (122 random bits). No signing on read.                                                                                                                                                                                                                                                                                      | A URL that was ever visible keeps working after the project turns private, and after delete if the object delete fails. That is Q3's rejected "unlisted" model for files.                                                                                  |
 
-**Recommendation: S**, because Q3 chose "private means private". The avatar of a private
-profile follows the same rule. If Levon picks P, only `FileUrlService.readUrl()` changes
-(one function, returns the stored URL).
+**Decided: S (Levon, 2026-10-08).** The avatar of a private profile follows the same rule.
+
+**What S does not give (stated plainly).** A signed URL is a bearer credential and
+cannot be revoked. If a public project turns private, a non-owner who loaded it in the
+last `FILE_READ_URL_TTL_S` keeps a working file URL until it expires: **a bounded leak of
+at most 5 minutes** (the TTL is the only knob; the cache window is shorter than it).
+Anyone who saved the bytes keeps them under any model. Nothing issues a new URL once the
+project is private (the predicate is in the SQL). Rotating the object on every
+visibility change, or proxying every read through the API, would close the window and was
+rejected: a proxy cannot serve `<img src>` without a token (Q11), and rotation rewrites
+rows and objects on a toggle. This needs Levon's acknowledgement; the cost of a 5-minute
+TTL is that a page left open longer than that shows broken images until it reloads
+(the FE refetches on navigation).
 
 ## 3. Storage design (applies to option A)
 
@@ -76,45 +88,70 @@ profile follows the same rule. If Levon picks P, only `FileUrlService.readUrl()`
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | G1  | Sandboxed gcloud (`CLOUDSDK_CONFIG` verified = `/Users/levon/Dev/university/.sandbox/gcloud`). `gcloud storage buckets list`.                                                                   | 0 buckets. `iamcredentials.googleapis.com` and `storage.googleapis.com` are already enabled.                                                                                                                                                                                                                                                                                                                                                        |
 | G2  | `gcloud iam service-accounts sign-blob … --iam-account=gradfolio-api-run@…` as Levon (project **Owner**).                                                                                       | **`IAM_PERMISSION_DENIED`, permission `iam.serviceAccounts.signBlob`.** Even Owner cannot sign. `roles/iam.serviceAccountTokenCreator` is the predefined role that holds it (`iam.serviceAccounts.signBlob`, `signJwt`, `getAccessToken`, …, listed by `gcloud iam roles describe`). `gradfolio-api-run` has only `roles/cloudsql.client` on the project and no binding on itself.                                                                  |
-| G3  | `@google-cloud/storage` 8.3.0 `getSignedUrl({version:'v4', action:'write', contentType:'image/png', extensionHeaders:{'x-goog-content-length-range':'1,5242880'}})` with a throwaway local key. | URL on `storage.googleapis.com/<bucket>/<key>`; `X-Goog-SignedHeaders=content-type;host;x-goog-content-length-range`, `X-Goog-Expires=300`. So the type and the size range are **inside the signature**; a PUT that omits or changes either header does not match it. Without a key the library signs through IAM `signBlob` as the runtime service account (library behaviour per its docs; **not run**, it needs G2's binding).                   |
+| G3  | `@google-cloud/storage` 8.3.0 `getSignedUrl({version:'v4', action:'write', contentType:'image/png', extensionHeaders:{'x-goog-content-length-range':'1,5242880'}})` with a throwaway local key. | URL on `<bucket>.storage.googleapis.com/<key>`; `X-Goog-SignedHeaders=content-type;host;x-goog-content-length-range`, `X-Goog-Expires=300`. So the type and the size range are **inside the signature**; a PUT that omits or changes either header does not match it. Without a key the library signs through IAM `signBlob` as the runtime service account (library behaviour per its docs; **not run**, it needs G2's binding).                   |
 | G4  | Docs ([signing](https://docs.cloud.google.com/storage/docs/access-control/signing-urls-manually), [headers](https://docs.cloud.google.com/storage/docs/xml-api/reference-headers)).             | V4 expiry ≤ 7 days. `x-goog-content-length-range: MIN,MAX` inclusive, body outside it gives **400**. The client must send the header as signed.                                                                                                                                                                                                                                                                                                     |
 | G5  | [CORS docs](https://docs.cloud.google.com/storage/docs/using-cors).                                                                                                                             | JSON `[{origin, method, responseHeader, maxAgeSeconds}]`, set with `gcloud storage buckets update gs://B --cors-file=…`. `origin` is exact (or `*`); **no `*.vercel.app` wildcard**, so a Vercel preview origin must be listed by hand or cannot upload. The fetched page was ambiguous on whether `responseHeader` must name the request headers (`Content-Type`, `x-goog-content-length-range`); I will list both, and the probe in §3.3 decides. |
 
-### 3.2 What Levon runs once (after saying yes)
+### 3.2 What was created (2026-10-08, sandboxed gcloud)
 
-Names are proposals. Nothing below has been run.
+`CLOUDSDK_CONFIG` checked: `gcloud info` printed
+`/Users/levon/Dev/university/.sandbox/gcloud`. Project
+`project-33e407b5-7fd5-485d-8dc`. No key file exists or was created.
 
 ```sh
-# sandboxed gcloud, as in deploy.md
 gcloud storage buckets create gs://gradfolio-files-1058577031182 \
   --location=us-east1 --uniform-bucket-level-access --public-access-prevention
 gcloud storage buckets update gs://gradfolio-files-1058577031182 --cors-file=cors.json
-# the runtime account may create/read/delete objects in this bucket only
 gcloud storage buckets add-iam-policy-binding gs://gradfolio-files-1058577031182 \
   --member=serviceAccount:gradfolio-api-run@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com \
   --role=roles/storage.objectUser
-# the runtime account may sign as itself (G2): the binding is on the account, not the project
 gcloud iam service-accounts add-iam-policy-binding \
   gradfolio-api-run@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com \
   --member=serviceAccount:gradfolio-api-run@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com \
   --role=roles/iam.serviceAccountTokenCreator
-# then: STORAGE_BUCKET on the service (plain env, not a secret), via deploy.yml
 ```
 
-`cors.json`: origins = the production FE origin and `http://localhost:3010`; method
-`PUT` (and `GET` for option P); `responseHeader` `Content-Type`,
-`x-goog-content-length-range`; `maxAgeSeconds` 3600. `serviceAccountTokenCreator` on the
-account itself is wider than a custom `signBlob`-only role; it also allows
-`getAccessToken` for that one account. A custom role would be tighter; with one runtime
-account and no key files the predefined role is accepted. No key file is created.
+`cors.json`: origins `https://gradfolio-navy.vercel.app` and `http://localhost:3010`;
+method `PUT`; `responseHeader` `Content-Type`, `x-goog-content-length-range`;
+`maxAgeSeconds` 3600. `describe` shows `US-EAST1`, uniform access, public access
+prevention enforced. Bucket IAM: the runtime account `objectUser` (plus the project's
+legacy owner/editor/viewer roles that GCS adds); no `allUsers`. The account's own policy:
+the runtime account `serviceAccountTokenCreator` (on itself, not the project) and the
+existing deployer `serviceAccountUser`. `serviceAccountTokenCreator` is wider than a
+custom `signBlob`-only role (it also allows `getAccessToken` for that one account);
+with one runtime account and no key files the predefined role is accepted.
 
-### 3.3 Not run, and how it will be
+To run the probe as the runtime account I added a **temporary**
+`serviceAccountTokenCreator` binding for Levon's user on that account, used
+`gcloud storage sign-url --impersonate-service-account` (the same IAM `signBlob` path
+Cloud Run uses), then **removed it** (verified: the policy above is what remains).
+Still to do: `STORAGE_BUCKET` on the Cloud Run service via `deploy.yml` (PR (c)).
 
-Needs the bucket: a real signed `PUT` from `curl` with and without each signed header
-(expect 400/403), the preflight, a read of a private object, the `signBlob` latency and
-quota. **Probe plan after Levon's OK:** create the bucket, run those, delete the probe
-objects; results go in `m4-verification.md`. Until then the signed-URL claims in §3.1
-rest on G3 (the library's output) and G4 (documentation).
+### 3.3 Probe results (run 2026-10-08, real bucket, signed as the runtime account)
+
+Signed with `sign-url --http-verb=PUT --headers content-type=image/png,x-goog-content-length-range=18,18`
+(an 18-byte PNG-headed body), 5 min expiry, then `curl`:
+
+| Request                                                                                                                              | Result                                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| PUT with both signed headers, 18-byte body                                                                                           | **200**                                                                                                                          |
+| PUT with `Content-Type: text/html` (signed `image/png`)                                                                              | **403** (signature mismatch)                                                                                                     |
+| PUT without `x-goog-content-length-range`                                                                                            | **400**                                                                                                                          |
+| PUT with `x-goog-content-length-range: 0,999999` (signed `18,18`)                                                                    | **403**                                                                                                                          |
+| PUT with a 19-byte body and the signed `18,18`                                                                                       | **400** (range enforced)                                                                                                         |
+| unauthenticated `GET` of the uploaded object                                                                                         | **403** (public access prevention)                                                                                               |
+| `GET` with a V4 signed URL (1 h)                                                                                                     | **200**, `content-type: image/png`                                                                                               |
+| the PUT-signed URL used for `GET`                                                                                                    | 400 (a URL is bound to its verb)                                                                                                 |
+| Preflight `OPTIONS` (`PUT`, `content-type, x-goog-content-length-range`) from the production origin and from `http://localhost:3010` | 200, `access-control-allow-origin` = the origin, `allow-methods: PUT`, `allow-headers: Content-Type,x-goog-content-length-range` |
+| Preflight from `https://evil.example`                                                                                                | 200 with **no** `access-control-allow-*` headers (the browser blocks it)                                                         |
+
+Both headers are listed in `responseHeader`; I did not test with them omitted, so keep
+both. `sign-url` needed `--region=us-east1` (it could not infer it from the name). The
+probe object was deleted (`gcloud storage rm -r gs://…/probe`); the bucket is empty. Not
+measured: `signBlob` latency under load and its quota (one call per uncached object,
+cached 240 s). A signed `PUT` URL can be replayed with the same headers until it
+expires (it overwrites the same key); the key is fixed per URL and under the caller's
+prefix, so it can only overwrite the caller's own object.
 
 ### 3.4 Q11: the token never reaches the browser (shown)
 
@@ -143,8 +180,18 @@ Q11 is not weakened: the FE calls the API only from the server.
 - Key `u/<userId>/<uuid>.<ext>`, extension chosen by the server from the type. The
   signature pins `Content-Type` and `x-goog-content-length-range: <size>,<size>` (exact
   declared size), expiry 5 min (`UPLOAD_URL_TTL_S`). Own budget `@RateBudget('upload')`
-  (`RATE_LIMIT_UPLOAD`, default 20/min) and `UPLOAD_MAX_FILES_PER_USER` (200, counted
-  over the caller's rows with an object URL) checked at sign time.
+  (`RATE_LIMIT_UPLOAD`, default 20/min).
+- **Upload cap counts objects, not rows** (a row count misses signed URLs never
+  registered). At sign time, inside `inTransaction` holding `lockUser` (so concurrent
+  signs of one user are serialized), the API lists the objects under `u/<userId>/`
+  (`maxResults = UPLOAD_MAX_FILES_PER_USER + 1`, default cap 200) and answers 409
+  `LIMIT_REACHED` at the cap, else signs. Abandoned uploads therefore count until the
+  sweep deletes them. Not counted: URLs signed but not yet used. They are bounded by the
+  rate limit and the 5-minute expiry: at most `RATE_LIMIT_UPLOAD` × `UPLOAD_URL_TTL_S` /
+  `RATE_LIMIT_WINDOW_S` = 100 outstanding, so the true bound is cap + 100 objects. This
+  needs no table and no migration; a reservation table (exact bound) was rejected as
+  more machinery than a coursework bucket needs. A concurrency test holds the lock with
+  a barrier while a second sign waits.
 - **Register on write.** A write that carries a URL inside our bucket (`avatarUrl`,
   `heroImageUrl`, attachment `url`) goes through `FileUrlService.accept()`: the key must
   start with `u/<callerId>/` (else 400 `INVALID_FILE`, not 404: it is a body field),
@@ -153,10 +200,19 @@ Q11 is not weakened: the FE calls the API only from the server.
   and PDFs the first bytes are read with a range request and checked against the magic
   number. Failure: 400, nothing written. Any other https URL passes as before (URL-only
   stays valid for links, videos and external images).
+- **One key, one row.** Inside the write transaction (after `lockUser`, which already
+  serializes all of one user's writes, and a key is always under that user's prefix),
+  `accept()` checks that no **other** row references the key (`avatar_url`,
+  `hero_image_url`, `project_attachments.url`/`thumbnail_url`); a second reference is 400
+  `FILE_IN_USE`. Re-saving the same value on the same row is fine; a row's `thumbnail_url`
+  equal to its own `url` counts as one reference. To reuse a file the user uploads it again.
 - **Delete.** Replacing or clearing a hero/avatar/attachment, deleting an attachment, a
   project (cascade) or the account (`DELETE /v1/me`, M3 deferred this to M4) collects the
   caller's object keys inside the transaction (`SELECT` before the `DELETE`), and
-  deletes the objects after commit. A failed delete is logged (`storage object delete
+  deletes each object after commit **only if no row still references its key** (re-checked
+  after commit, as a guard on top of the single-owner rule). The one gap left: the same
+  user re-referencing a key in the instant between this commit and the delete; it can
+  only hurt their own file. A failed delete is logged (`storage object delete
 failed`, key) and is not an error for the caller. Account deletion lists the prefix
   `u/<userId>/` instead, which also catches uploads never registered.
 - **Orphans** (signed but never registered; delete that failed): `npm run storage:sweep`
@@ -186,7 +242,7 @@ corpus in PR (b).
 
 How a result is judged (run): the output is **re-parsed by a second parser** (jsdom/parse5)
 and rejected if it holds any element or attribute outside the allow-list, any `href` not
-`http(s)`/`mailto`, or any class outside `language-*`; the HTML must be a **fixpoint of
+`http(s)`, or any class outside `language-*`; the HTML must be a **fixpoint of
 serialise-then-parse** (the mutation-XSS check); it is **executed** in a scripting jsdom
 (`runScripts: 'dangerously'`) and must not call `alert`; and `sanitize(sanitize(x)) ===
 sanitize(x)`.
@@ -202,7 +258,7 @@ sanitize(x)`.
 | Parser                               | htmlparser2 (not a browser parser)                                                                                                                                 | parse5 DOM (the spec parser)                                                            |
 
 The fixes were in my config, not the libraries: validate `href` with one strict regex
-(`^(?:https?://|mailto:)` and no whitespace, control or zero-width characters) inside the
+(`^https?://` and no whitespace, control or zero-width characters) inside the
 tag transform, and give `class` only to `<code>` with `^language-[a-z0-9+#-]{1,20}$`.
 
 **Advisories (GitHub Advisory API, fetched today).** `sanitize-html` has had a run of
@@ -235,8 +291,10 @@ DOMPurify only if the corpus found a bypass that DOMPurify stops.
   `name`, `class` elsewhere, `data-*`, `aria-*`, event handlers. Every link is rewritten
   to `rel="noopener noreferrer nofollow" target="_blank"`; a link whose `href` fails the
   regex is unwrapped to its text.
-- **Schemes:** `https`, `http`, `mailto`. No protocol-relative, relative, `data:`,
-  `javascript:`, `tel:`.
+- **Schemes:** `https`, `http` only, as AGENTS.md requires for any stored user URL. No
+  `mailto:`, protocol-relative, relative, `data:`, `javascript:`, `tel:`. (The measured
+  corpus run above also allowed `mailto:`; the implementation and the corpus drop it, and
+  a `mailto:` vector is added as a must-be-unwrapped case.)
 - **No images and no tables** in v1. Images belong to attachments. **The FE editor must
   not offer an image or table button**, must limit headings to H2–H4, and may emit
   `<pre><code class="language-x">`. Tiptap's StarterKit output (`p`, `h2`–`h4`, `strong`,
@@ -271,7 +329,7 @@ Read from `gradfolio@cb48095`: `src/data/project.mock.ts`, `src/components/proje
 | `team[]{id,name,role?,avatarUrl?,profileUrl?}`                                                          | `project_team_members` (M5; Q4)                                                                             | Read-only in M4: accepted members as `team[]{id,name,role,avatarUrl,userId}`; `userId` is null when their profile is not visible to the caller (Q3), so the FE shows no link. **No team writes before M5.** The owner is `owner{id,name,avatarUrl}` (avatar null when the owner's profile is private).               |
 | Projects list sorts by **start date** (`newest`/`oldest`), name A–Z/Z–A; search by title and technology | `created_at` etc.                                                                                           | API `sort`: `newest`, `oldest` (by `created_at`), `updated`, `name_asc`, `name_desc`. FE values already match except `newest`/`oldest` meaning (start date → creation date); say so in the FE plan. `q` (title or technology contains, `LIKE`-escaped, ≤ 100 chars) is supported on the own list; full search is M6. |
 | Profile card `Project.href`, `tags`                                                                     | `projects.href` (TEXT, unused); `project_tags`                                                              | `href` is not exposed; the route is `/projects/:id`. Follow-up: drop the column. Tags and technologies are two lists (both in M1's registry); the form edits both.                                                                                                                                                   |
-| `next.config.ts` image hosts: `i.pravatar.cc`, `images.unsplash.com` (mock)                             | storage host                                                                                                | 4.9: `storage.googleapis.com/<bucket>` (path-pinned); mock hosts removed.                                                                                                                                                                                                                                            |
+| `next.config.ts` image hosts: `i.pravatar.cc`, `images.unsplash.com` (mock)                             | storage host                                                                                                | 4.9: hostname `gradfolio-files-1058577031182.storage.googleapis.com` (the bucket's virtual host, which is what signed URLs use); mock hosts removed.                                                                                                                                                                 |
 | Dates shown with `formatDay` (UTC)                                                                      | `createdAt`, `updatedAt` as ISO 8601 UTC                                                                    | Matches.                                                                                                                                                                                                                                                                                                             |
 
 ### 5.2 Endpoints
@@ -417,6 +475,8 @@ Every proof is a test **seen failing** with the guard removed (recorded in
 | Pagination stable and cursor validated                                                                                                 | the walk in §6.3; cursor from another sort / forged key → 400                                                                                                                                        | drop the `id` tie-break                                       |
 | Every new route rate-limited, per route; `upload` budget separate                                                                      | parameterized e2e with `RATE_LIMIT_DEFAULT=2`: third call 429; exhausting one route leaves another at 200; upload exhausted leaves default at 200                                                    | mark a route `@SkipThrottle`; share a budget                  |
 | Contract is the code                                                                                                                   | `document.test.ts` (routes both ways), `$ref`s resolve, bodies/params present, `openapi:check`                                                                                                       | n/a                                                           |
+| One key, one row; delete only if unreferenced                                                                                          | e2e: a second row with the same `fileUrl` → 400 `FILE_IN_USE`; deleting one of two references (forced by writing the row directly) keeps the object                                                  | drop the reference check                                      |
+| Upload cap counts objects, serialized                                                                                                  | fake storage with 199 objects incl. unregistered → one sign ok, next 409; two concurrent signs at cap − 1 behind a barrier → one ok, one 409                                                         | count rows instead of objects; drop the lock                  |
 | Storage against real GCS                                                                                                               | the probe in §3.3 and the real-token run (§8)                                                                                                                                                        | n/a                                                           |
 
 Race tests use a barrier (`waitForLockWaiters`), never a sleep. Storage in tests is a fake
@@ -437,9 +497,7 @@ the real client is exercised by the probe and the real run.
 4. **(c) Attachments and storage.** Attachment routes (generalised reorder),
    `FileStorage` + `FileUrlService`, `POST /me/uploads`, `accept()`, deletes after
    commit, account deletion deleting objects, `storage:sweep`, `deploy.yml`/`deploy.md`
-   changes for `STORAGE_BUCKET` and the IAM, FE image host note. **Needs the bucket.** If
-   Levon picks D, (c) is attachments only (URL validation, types, reorder) and storage is
-   stretch.
+   changes for `STORAGE_BUCKET`, FE image host note. The bucket and IAM exist (§3.2).
 5. `docs/m4-verification.md` in the last PR: fresh clone; verify, coverage ≥ 90 %,
    integration; second-user matrix; Q3 for owner/other/anonymous on the project, every
    list and the profile; the grep that no private project leaks; the XSS corpus; barrier
@@ -465,7 +523,7 @@ change linting (oasdiff).
 
 - Editor: H2–H4, no image, no table; output fits §4.1. Disable the editor's own link
   `target`/`rel` options (the API sets them); keep DOMPurify with `ALLOWED_URI_REGEXP`
-  `^(?:https?|mailto):` as the second layer.
+  `^https?:` as the second layer (no `mailto:`).
 - Form fields and limits to mirror: §5.4; relabel "AI Summary" to Summary; do not send
   `thumbnailUrl` or ids; send `null` to clear.
 - Upload from a server action: `POST /me/uploads` → browser `PUT` with the returned
@@ -477,8 +535,9 @@ change linting (oasdiff).
 
 ## 11. Proposed tracker changes (for the orchestrator)
 
-- Q6: record Levon's choice and the cost estimate (about $0/month, under $0.50 worst
-  case) once decided. Q3: record "applies to projects: `projectVisibleTo`".
+- Q6: decided GCS `us-east1`, private bucket, signed reads (2026-10-08); cost about
+  $0/month, under $0.50 worst case. Bucket `gradfolio-files-1058577031182` and the two
+  IAM bindings exist; `STORAGE_BUCKET` still to be set on the service. Q3: record "applies to projects: `projectVisibleTo`".
 - 4.1–4.5: PR split (a)/(b)/(c); 4.2 = `sanitize-html` 2.18.x (decided in this plan).
 - New rows: **IAM `serviceAccountTokenCreator` on `gradfolio-api-run` is required for
   signed URLs (Owner is denied `signBlob`, run)**; bucket CORS has no `*.vercel.app`
