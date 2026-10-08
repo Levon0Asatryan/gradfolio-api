@@ -148,18 +148,19 @@ relevant checks, and Levon decides the product calls.
 
 ## Milestones
 
-| #   | Name                                   | Repos          | Status                                                                                     | Depends on                | Plan                  | Verification                          |
-| --- | -------------------------------------- | -------------- | ------------------------------------------------------------------------------------------ | ------------------------- | --------------------- | ------------------------------------- |
-| M0  | Foundations: setup + architecture plan | api, all       | done; 0.5, 0.7–0.9 open                                                                    | —                         | —                     | —                                     |
-| M1  | Data layer, schema ownership, DB fixes | api, sql       | done (sql#1 and the DML-atomicity follow-up open)                                          | M0                        | [m1-plan](m1-plan.md) | [m1-verification](m1-verification.md) |
-| M2  | Auth and identity, end to end          | auth0, api, fe | done: api (#15, #17, #20), fe (gradfolio#21); 2.12 and 2.14 moved to M3; auth0 2.17 partly | M0, M1                    | [m2-plan](m2-plan.md) | [m2-verification](m2-verification.md) |
-| M3  | Profiles                               | api, fe        | todo                                                                                       | M2                        | —                     | —                                     |
-| M4  | Projects and media                     | api, fe        | todo                                                                                       | M3                        | —                     | —                                     |
-| M5  | Teams and notifications                | api, fe        | todo                                                                                       | M4                        | —                     | —                                     |
-| M6  | Discovery and dashboard                | api, fe        | todo                                                                                       | M4 (M5 for team projects) | —                     | —                                     |
-| M7  | GitHub + LinkedIn (export) import      | api, fe, auth0 | todo                                                                                       | M4                        | —                     | —                                     |
-| M8  | Utilities: résumé PDF, AI summary      | api, fe        | todo                                                                                       | M3, M4                    | —                     | —                                     |
-| M9  | Hardening, deployment and v1.0 release | all            | todo                                                                                       | M1–M8                     | —                     | —                                     |
+| #   | Name                                   | Repos          | Status                                                                                     | Depends on                | Plan                                                 | Verification                          |
+| --- | -------------------------------------- | -------------- | ------------------------------------------------------------------------------------------ | ------------------------- | ---------------------------------------------------- | ------------------------------------- |
+| M0  | Foundations: setup + architecture plan | api, all       | done; 0.5, 0.7–0.9 open                                                                    | —                         | —                                                    | —                                     |
+| M1  | Data layer, schema ownership, DB fixes | api, sql       | done (sql#1 and the DML-atomicity follow-up open)                                          | M0                        | [m1-plan](m1-plan.md)                                | [m1-verification](m1-verification.md) |
+| M2  | Auth and identity, end to end          | auth0, api, fe | done: api (#15, #17, #20), fe (gradfolio#21); 2.12 and 2.14 moved to M3; auth0 2.17 partly | M0, M1                    | [m2-plan](m2-plan.md)                                | [m2-verification](m2-verification.md) |
+| M3  | Profiles                               | api, fe        | todo                                                                                       | M2                        | —                                                    | —                                     |
+| M4  | Projects and media                     | api, fe        | todo                                                                                       | M3                        | —                                                    | —                                     |
+| M5  | Teams and notifications                | api, fe        | todo                                                                                       | M4                        | —                                                    | —                                     |
+| M6  | Discovery and dashboard                | api, fe        | todo                                                                                       | M4 (M5 for team projects) | —                                                    | —                                     |
+| M7  | GitHub + LinkedIn (export) import      | api, fe, auth0 | todo                                                                                       | M4                        | —                                                    | —                                     |
+| M8  | Utilities: résumé PDF, AI summary      | api, fe        | todo                                                                                       | M3, M4                    | —                                                    | —                                     |
+| M9  | Hardening, deployment and v1.0 release | all            | todo                                                                                       | M1–M8                     | —                                                    | —                                     |
+| UI  | UI/UX redesign, then motion and polish | fe, auth0      | UI-1–UI-6 done; UI-7–UI-16 todo                                                            | M3 (UI-9+ after M8, UI-8) | see [UI track](#ui-track-redesign-motion-and-polish) | —                                     |
 
 **Working in parallel** once M2 lands:
 
@@ -403,6 +404,47 @@ and the user's edits survive. Disconnecting deletes the tokens. A real LinkedIn 
 
 **Exit:** every 9.7 row PASS, or recorded as an accepted GAP by Levon; production URLs
 live; v1.0 tagged.
+
+## UI track: redesign, motion and polish
+
+Decided by Levon on 2026-10-05: palette C, the approved prototype
+(https://claude.ai/artifact/XR1nnxZ2niPcyDBADdDgFU) as the acceptance spec, logo
+option A (Cap), Profile and Account stay separate. Every UI PR is checked in the
+browser in light/dark, en/ru/am, at phone and desktop widths.
+
+### Redesign (UI-1–UI-8)
+
+| ID   | Task                                                                                                                                                                                                                                         | Repo  | Status | Source            |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ----------------- |
+| UI-1 | Design system: palette C tokens (calm variant), type scale, component overrides, Noto Sans Armenian, `html lang`, `<main>` landmark                                                                                                          | fe    | done   | gradfolio#34, #40 |
+| UI-2 | Navigation and layout: labelled nav at every width (sidebar, rail, phone bar + More), collapse toggle, shared spacing                                                                                                                        | fe    | done   | #36, #38, #45     |
+| UI-3 | Logo, favicon, app icons, manifest, Open Graph image and metadata; brand archive                                                                                                                                                             | fe    | done   | #37, #41          |
+| UI-4 | Profile edit model: per-section edit/add dialogs, toasts, empty-state prompts, delete confirm, reorder, unsaved guard                                                                                                                        | fe    | done   | #42, #46          |
+| UI-5 | Account and Settings in the new design                                                                                                                                                                                                       | fe    | done   | #39, #43, #47     |
+| UI-6 | Dashboard, projects, project page, new project, Explore, Integrations                                                                                                                                                                        | fe    | done   | #44               |
+| UI-7 | Auth0 Universal Login branding: logo (`/brand/auth0-logo-512.png`) and primary color `#2D4E8A`                                                                                                                                               | auth0 | todo   | M3 report         |
+| UI-8 | Full recheck: every page in the browser (390/768/1024/1440), WCAG 2.1 AA, keyboard-only walkthrough, remaining pages (connections stepper, 404), console clean, no hardcoded English, Lighthouse; fixes as small PRs; FE verification record | fe    | todo   | M3 report         |
+
+### Motion and polish (UI-9–UI-16): the last UI step
+
+**When:** after M8 and UI-8, so it animates finished screens rather than ones that
+will change. It must finish **before 9.7**, so the full-system verification runs on
+the final UI. Animation must never delay content, hide a loading state, or break
+reduced motion.
+
+| ID    | Task                                                                                                                                                                                                                                                                                                             | Repo  | Status | Source           |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------ | ---------------- |
+| UI-9  | Motion system: duration and easing tokens in the theme (e.g. 120 / 200 / 320 ms), one shared set of variants; CSS transitions first, the `motion` library (already a dependency) only where CSS can't do it; `prefers-reduced-motion` turns every animation off globally; animate only `transform` and `opacity` | fe    | todo   | Levon 2026-10-08 |
+| UI-10 | Page and layout transitions: route changes (View Transitions, with a no-op fallback), sidebar collapse/expand, rail ↔ phone bar, "More" sheet                                                                                                                                                                    | fe    | todo   | Levon 2026-10-08 |
+| UI-11 | Micro-interactions: button and card hover/press, dialog and sheet enter/exit, toasts, skill chips add/remove, list add/remove/reorder (FLIP), save-success feedback, focus rings that animate without hiding focus                                                                                               | fe    | todo   | Levon 2026-10-08 |
+| UI-12 | Loading feel: skeletons shaped like the real content instead of spinners, staggered list reveal, image blur placeholders; no layout shift when data arrives                                                                                                                                                      | fe    | todo   | Levon 2026-10-08 |
+| UI-13 | Delight, kept subtle: profile-completeness meter and dashboard counts animate to their value, onboarding stepper progress, a small first-login and first-project moment                                                                                                                                          | fe    | todo   | Levon 2026-10-08 |
+| UI-14 | Visual refinement: illustrations for empty, error and 404 states; profile header cover and project hero images; dark-mode depth (elevation, borders); typography rhythm on long pages                                                                                                                            | fe    | todo   | Levon 2026-10-08 |
+| UI-15 | Auth0 login page matches the app: background, button style, fonts (Universal Login customization beyond UI-7)                                                                                                                                                                                                    | auth0 | todo   | Levon 2026-10-08 |
+| UI-16 | Motion verification, recorded in the FE verification record: reduced motion on → no motion; Lighthouse CLS < 0.1 and INP < 200 ms on key pages; a performance trace on a throttled phone profile shows no long frames; keyboard and screen reader unaffected; light/dark, en/ru/am                               | fe    | todo   | —                |
+
+**Exit:** every page moves consistently with one set of tokens; with reduced motion
+on, nothing moves; Core Web Vitals no worse than before UI-9.
 
 ---
 
