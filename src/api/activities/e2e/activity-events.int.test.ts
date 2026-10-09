@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { newId } from '../../../core/db/ids.js';
 import { buildApp, captureLogs } from '../../../testing/app.js';
 import { testConfig, testDatabase } from '../../../testing/database.js';
-import { createUser } from '../../../testing/factories.js';
+import { createProject, createUser } from '../../../testing/factories.js';
 import { startTestTenant, type TestTenant } from '../../../testing/jwks.js';
 
 /**
@@ -221,3 +221,141 @@ describe.each(['before', 'after'] as const)('a failure %s the activity is writte
     expect(await feed(a.user.id)).toEqual(before);
   });
 });
+
+async function teamScene() {
+  const http = await start();
+  const owner = await alice();
+  const sub = `auth0|bob-${newId()}`;
+  const bobUser = await createUser(db, { auth0Id: sub, name: 'bob' });
+  const bob = { user: bobUser, auth: { Authorization: `Bearer ${await tenant.sign({ sub })}` } };
+  const { project } = await createProject(db, owner.user, {
+    title: 'Gradfolio',
+    descriptionHtml: '<p>secret plan</p>',
+  });
+  return { http, owner, bob, project };
+}
+const memberRows = (projectId: string) =>
+  db
+    .selectFrom('projectTeamMembers')
+    .select(['userId', 'status'])
+    .where('projectId', '=', projectId)
+    .execute();
+const keysOf = async (userId: string) => (await feed(userId)).map((f) => f.translationKey);
+
+describe('team events', () => {
+  it('invite, accept, reject, leave and re-invite write the owner’s and the member’s feeds', async () => {
+    const { http, owner, bob, project } = await teamScene();
+    const about = { projectId: project.id, name: 'Gradfolio' };
+
+    await http
+      .post(`/v1/projects/${project.id}/team`)
+      .set(owner.auth)
+      .send({ userId: bob.user.id })
+      .expect(201);
+    expect(await keysOf(owner.user.id)).toEqual(['teamInvited']);
+    expect((await feed(owner.user.id))[0]!.translationParams).toEqual({ ...about, member: 'bob' });
+    expect(await feed(bob.user.id)).toEqual([]); // an invitation is a notification, not feed news
+
+    await http.post(`/v1/projects/${project.id}/team/me/accept`).set(bob.auth).expect(200);
+    expect(await keysOf(owner.user.id)).toEqual(['teamInvited', 'teamMemberJoined']);
+    expect(await feed(bob.user.id)).toEqual([
+      { type: 'project', translationKey: 'teamJoined', translationParams: about },
+    ]);
+
+    await http.delete(`/v1/projects/${project.id}/team/me`).set(bob.auth).expect(204);
+    expect(await keysOf(owner.user.id)).toEqual(['teamInvited', 'teamLeft', 'teamMemberJoined']);
+
+    await http
+      .post(`/v1/projects/${project.id}/team`)
+      .set(owner.auth)
+      .send({ userId: bob.user.id })
+      .expect(201);
+    await http.post(`/v1/projects/${project.id}/team/me/reject`).set(bob.auth).expect(200);
+    expect(await keysOf(owner.user.id)).toEqual([
+      'teamInvited',
+      'teamInvited',
+      'teamLeft',
+      'teamMemberDeclined',
+      'teamMemberJoined',
+    ]);
+  });
+
+  it('puts nothing private in either feed: ids and names only', async () => {
+    const { http, owner, bob, project } = await teamScene();
+    await http
+      .post(`/v1/projects/${project.id}/team`)
+      .set(owner.auth)
+      .send({ userId: bob.user.id, role: 'Secret role' })
+      .expect(201);
+    await http.post(`/v1/projects/${project.id}/team/me/accept`).set(bob.auth).expect(200);
+    const text = JSON.stringify([...(await feed(owner.user.id)), ...(await feed(bob.user.id))]);
+    expect(text).not.toContain('secret plan');
+    expect(text).not.toContain('Secret role');
+    expect(text).not.toContain('@');
+  });
+
+  it('writes nothing for a refused call, an external name or a removal', async () => {
+    const { http, owner, bob, project } = await teamScene();
+    await http
+      .post(`/v1/projects/${project.id}/team`)
+      .set(bob.auth)
+      .send({ userId: owner.user.id })
+      .expect(404);
+    await http.post(`/v1/projects/${project.id}/team/me/accept`).set(bob.auth).expect(404);
+    await http
+      .post(`/v1/projects/${project.id}/team/external`)
+      .set(owner.auth)
+      .send({ name: 'Aram' })
+      .expect(201);
+    const [m] = await memberRows(project.id);
+    expect(m).toBeDefined();
+    expect(await feed(owner.user.id)).toEqual([]);
+    expect(await feed(bob.user.id)).toEqual([]);
+  });
+});
+
+describe.each(['before', 'after'] as const)(
+  'team: a failure %s the activity is written',
+  (mode) => {
+    it.each(['invite', 'accept', 'reject', 'leave'] as const)(
+      '%s changes nothing',
+      async (action) => {
+        const { http, owner, bob, project } = await teamScene();
+        const link = (userId: string, status: 'pending' | 'accepted') =>
+          db
+            .insertInto('projectTeamMembers')
+            .values({ id: newId(), projectId: project.id, userId, name: 'bob', status })
+            .execute();
+        if (action === 'accept' || action === 'reject') await link(bob.user.id, 'pending');
+        if (action === 'leave') await link(bob.user.id, 'accepted');
+        const snapshot = async () => ({
+          members: await memberRows(project.id),
+          owner: await feed(owner.user.id),
+          bob: await feed(bob.user.id),
+          notifications: Number(
+            (
+              await db
+                .selectFrom('notifications')
+                .select((eb) => eb.fn.countAll<number>().as('n'))
+                .executeTakeFirstOrThrow()
+            ).n,
+          ),
+        });
+        const before = await snapshot();
+        control.mode = mode;
+        const call = {
+          invite: () =>
+            http
+              .post(`/v1/projects/${project.id}/team`)
+              .set(owner.auth)
+              .send({ userId: bob.user.id }),
+          accept: () => http.post(`/v1/projects/${project.id}/team/me/accept`).set(bob.auth),
+          reject: () => http.post(`/v1/projects/${project.id}/team/me/reject`).set(bob.auth),
+          leave: () => http.delete(`/v1/projects/${project.id}/team/me`).set(bob.auth),
+        }[action];
+        await call().expect(500);
+        expect(await snapshot()).toEqual(before);
+      },
+    );
+  },
+);
