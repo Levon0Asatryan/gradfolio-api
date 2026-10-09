@@ -38,9 +38,10 @@ import { UsersModule } from './users/users.module.js';
     FilesModule,
     HealthModule,
     MeModule,
+    // TeamModule before ProfilesModule: `GET /users/lookup` must be matched before `GET /users/:id`.
+    TeamModule,
     ProfilesModule,
     ProjectsModule,
-    TeamModule,
     NotificationsModule,
   ],
   providers: [
