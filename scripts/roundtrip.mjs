@@ -144,13 +144,15 @@ try {
     JSON.stringify(edit.body.tags) === JSON.stringify(['m4']),
     `PATCH replaced the tags with exactly ["m4"]: ${JSON.stringify(edit.body.tags)}`,
   );
+  // Every field the patch did not name must come back exactly as created. Fields that move for
+  // other reasons (the timestamp, the attachments added since) are checked elsewhere.
+  const moved = new Set(['status', 'tags', 'metadata', 'updatedAt', 'attachments']);
+  const changed = Object.keys(sent).filter(
+    (k) => !moved.has(k) && JSON.stringify(sent[k]) !== JSON.stringify(edit.body[k]),
+  );
   check(
-    edit.body.title === title &&
-      edit.body.category === 'research' &&
-      edit.body.technologies.length === 2 &&
-      edit.body.links.length === sent.links.length &&
-      edit.body.files.length === sent.files.length,
-    'PATCH left the fields it did not name alone',
+    changed.length === 0 && Object.keys(edit.body).length === Object.keys(sent).length,
+    `PATCH left every field it did not name alone (changed: ${changed.join(', ') || 'none'})`,
   );
   const order = [link.id, pdf.id, video.id, image.id];
   const reordered = await call('PUT', `/v1/projects/${projectId}/attachments/order`, {
