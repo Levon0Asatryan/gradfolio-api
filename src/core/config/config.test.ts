@@ -46,6 +46,8 @@ describe('loadConfig', () => {
       PROJECT_DESCRIPTION_MAX_BYTES: 100_000,
       PROJECT_MAX_TEAM: 20,
       RATE_LIMIT_LOOKUP: 30,
+      TEAMS_PAGE_MAX: 50,
+      TEAMS_PAGE_SIZE: 20,
       ACTIVITIES_PAGE_MAX: 50,
       ACTIVITIES_PAGE_SIZE: 20,
       NOTIFICATIONS_PAGE_MAX: 50,
@@ -133,6 +135,8 @@ describe('loadConfig', () => {
     ['UPLOAD_MAX_IMAGE_BYTES', '10'],
     ['PROJECT_MAX_TEAM', '0'],
     ['RATE_LIMIT_LOOKUP', '0'],
+    ['TEAMS_PAGE_SIZE', '0'],
+    ['TEAMS_PAGE_MAX', '101'],
     ['ACTIVITIES_PAGE_SIZE', '0'],
     ['ACTIVITIES_PAGE_MAX', '201'],
     ['NOTIFICATIONS_PAGE_SIZE', '0'],
@@ -168,6 +172,13 @@ describe('loadConfig', () => {
     expect(
       loadConfig({ ...REQUIRED, ACTIVITIES_PAGE_MAX: '5', ACTIVITIES_PAGE_SIZE: '5' })
         .ACTIVITIES_PAGE_SIZE,
+    ).toBe(5);
+  });
+
+  it('refuses a default teams page size above the maximum, and accepts one equal to it', () => {
+    expect(() => loadConfig({ ...REQUIRED, TEAMS_PAGE_MAX: '5' })).toThrow(/TEAMS_PAGE_SIZE/);
+    expect(
+      loadConfig({ ...REQUIRED, TEAMS_PAGE_MAX: '5', TEAMS_PAGE_SIZE: '5' }).TEAMS_PAGE_SIZE,
     ).toBe(5);
   });
 

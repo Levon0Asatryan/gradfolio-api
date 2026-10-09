@@ -70,3 +70,14 @@ Authorization: Bearer {{inviteeToken}}
 # Run as an ACCEPTED teammate. 204; the owner is notified. 404 for anyone else.
 DELETE {{baseUrl}}/v1/projects/{{projectId}}/team/me
 Authorization: Bearer {{inviteeToken}}
+
+###
+# @name getMyTeams
+# 200 { owned, member, incoming, outgoing }, each { items, nextCursor }. owned: your projects
+# with members and every member's status. member: projects you are an accepted member of.
+# incoming: invitations waiting for you (project title + inviter only; answer with
+# /team/me/accept or reject). outgoing: invitations you sent, still pending. Page one list
+# with its own cursor (ownedCursor, memberCursor, incomingCursor, outgoingCursor); a cursor
+# of another list, or limit over the maximum, is 400. Only your own teams exist.
+GET {{baseUrl}}/v1/me/teams?limit=20
+Authorization: Bearer {{accessToken}}

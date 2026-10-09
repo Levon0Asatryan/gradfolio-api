@@ -14,6 +14,7 @@ import {
   readAllResultSchema,
   unreadCountSchema,
 } from '../notifications/dto/notification.dto.js';
+import { myTeamsQuerySchema, myTeamsSchema } from '../team/dto/my-teams.dto.js';
 import {
   addExternalMemberSchema,
   inviteMemberSchema,
@@ -759,6 +760,28 @@ export const OPERATIONS: readonly Operation[] = [
     responses: {
       '204': { description: 'Left' },
       '404': error('NOT_FOUND: no such project, or the caller is not an accepted member'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'get',
+    path: '/v1/me/teams',
+    operationId: 'getMyTeams',
+    tag: 'team',
+    summary: 'The caller’s teams in one call',
+    description:
+      'Four lists, each on its own cursor: `owned` (projects the caller owns that have members, ' +
+      'with every member and status), `member` (projects the caller is an accepted member of, ' +
+      'never a draft), `incoming` (invitations waiting for the caller: the project’s title and ' +
+      'the inviter only) and `outgoing` (invitations the caller sent that are pending). ' +
+      'Everything is the caller’s own; another user’s teams cannot be asked for. Leaving a team ' +
+      'is `DELETE /v1/projects/{id}/team/me`. A fixed number of statements however many ' +
+      'projects and members there are.',
+    bearer: true,
+    query: myTeamsQuerySchema,
+    responses: {
+      '200': { description: 'The four lists', schema: myTeamsSchema },
+      '400': error('VALIDATION_FAILED: a query parameter is invalid (see `details`)'),
       ...authenticatedFailures,
     },
   },

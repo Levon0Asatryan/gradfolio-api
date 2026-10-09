@@ -12,6 +12,14 @@ describe('time cursor', () => {
     expect(decodeTimeCursor(encodeTimeCursor(c))).toEqual(c);
   });
 
+  it('a scoped cursor decodes only for its own scope, and an unscoped one only without a scope', () => {
+    const c = { t: 5, id: 'a' };
+    expect(decodeTimeCursor(encodeTimeCursor(c, 'owned'), 'owned')).toEqual(c);
+    expect(decodeTimeCursor(encodeTimeCursor(c, 'owned'), 'member')).toBeUndefined();
+    expect(decodeTimeCursor(encodeTimeCursor(c, 'owned'))).toBeUndefined();
+    expect(decodeTimeCursor(encodeTimeCursor(c), 'owned')).toBeUndefined();
+  });
+
   it.each([
     ['not base64 json', '!!!'],
     ['a string time', Buffer.from('{"t":"1","id":"a"}').toString('base64url')],
