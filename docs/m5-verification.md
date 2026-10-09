@@ -19,6 +19,9 @@ test JWKS server. Every database run below started from an **empty volume**
 | #53  | (b) invite, external, remove, accept, reject, leave, lookup | `4fe0930` | Codex: no findings; Copilot: quota failure                                                                                          |
 | #54  | (c) activities                                              |           | round 1: 3 P2 (params and a key differed from the plan, cursor time beyond the Date range), all fixed; confirmation round requested |
 | this | verification (docs, `scripts/team-roundtrip.mjs`)           |           | docs-only                                                                                                                           |
+| #58  | 5.8 `GET /me/teams`                                         | `3d69f70` | Codex: 1 P2 (a private owner's id was not null in the member list), fixed; confirmation clean before merge                          |
+| #60  | fix: remove the `node_modules` symlink I committed in #58   |           | one-line fix, see §11                                                                                                               |
+| #59  | `team-roundtrip.mjs` checks `/me/teams` after every step    |           | Codex: 1 P2 (the script needs #58), an ordering dependency; rebased after #58                                                       |
 
 Copilot failed on quota on every push; Codex reviewed alone.
 
@@ -39,6 +42,7 @@ Copilot failed on quota on every push; Codex reviewed alone.
 | 11  | Two-account journey with real Auth0 tokens, local and production                 | PASS: 44 checks each (§9)                                           |
 | 12  | Production `GET /readyz`                                                         | 200 (2026-10-10, after the Deploy of #54, `a435ac0`)                |
 | 13  | Guards proved by removal                                                         | PASS: 60+ guards (§10)                                              |
+| 14  | 5.8 `GET /me/teams`: matrix, no N+1, real two-account run, local and production  | PASS (§14)                                                          |
 
 ## 3. Fresh clone, migration
 
@@ -234,6 +238,9 @@ either alone changes nothing observable, removing both fails.
 - **M4 code, found in this milestone:** `ProjectService.signDetail` computed the signed team
   avatars and then discarded them; fixed in #52, and a linked member's photo is now the
   account's live avatar.
+- **#58, own:** I committed the worktree `node_modules` symlink by mistake (`.gitignore` had
+  `node_modules/`, which does not match a symlink); removed in #60 and the pattern widened.
+  It broke no build (`npm ci` replaces it) but blocked rebases with an untracked `node_modules`.
 - Behaviour changes that moved existing tests, by design: `team[]` shows a visible member's
   live name (the saved row name only for a private or deleted account); `ProjectSummary.role`
   is `owner | member`; the profile lists a member's private project to the member.
@@ -250,7 +257,51 @@ either alone changes nothing observable, removing both fails.
 - M5: 5.1–5.5 done after #54 merges; Q4 decided (plan §2: owner implicit, external named
   teammates accepted at once, accepted teammate reads a non-draft private project, a
   teammate may leave, pending/rejected invitations deleted with the account).
+- 5.8 done after #58 (merged): `GET /v1/me/teams`; leave stays `DELETE /projects/:id/team/me`.
 - Follow-ups: delete a notification; edit a member's role; a `projectUpdated` activity and
   the profile-view/connection activities (M6); `ProjectSummary.role` widening and the new
   activity keys need FE types and en/ru/am strings; the activity text placeholders are
   `projectName`, `memberName`, `skillName` (the dashboard mock's `{name}`/`{skill}` must follow).
+
+## 14. 5.8 `GET /me/teams` (2026-10-10)
+
+One call, four lists on their own cursors (`owned`, `member`, `incoming`, `outgoing`;
+[m5-plan.md](m5-plan.md) §4 and PR #58). On `main` at `3d69f70`, MySQL 8.4.11:
+
+- **Gate** (measured on the PR head before its last fix): verify green, 849 unit tests, 595
+  integration tests (one added by the last fix), coverage 98.03 / 95.84 / 96.66 / 98.89.
+- **Second user:** a user with no teams gets four empty lists and none of another user's titles;
+  a pending invitee has no `owned` or `outgoing` list; pending and rejected people have no
+  `member` entry; a draft never reaches a member; `incoming` carries the project's id and title
+  and the inviter's name, nothing else of the project (checked by key set and by a hidden
+  description).
+- **Privacy (Q3/Q4):** a linked person with a private profile shows the saved name, no account id
+  and no photo in `owned`, `outgoing`, `member.team` and `incoming.invitedBy`; for an owner with a
+  private profile `member[].owner` is `{id: null, avatarUrl: null}` (the Codex finding).
+- **No N+1:** a Kysely plugin counts statements per request. Owner, joined and invitee views of an
+  account with 1 project / 1 member and of one with 8 projects / about 60 members run the **same
+  number** of statements, at most 8 including the caller lookup. A per-project members query makes
+  that test fail.
+- **Paging:** each list pages on its own cursor without repeats; a cursor made for one list is
+  a 400 on another; a bad cursor, a limit over `TEAMS_PAGE_MAX`, a limit of 0 and an unknown key
+  are 400; 401 without a token, 429 once the budget is spent.
+- **Guards removed:** owner, caller and inviter scope on the three lists, `pending` on incoming,
+  `accepted` and the draft exclusion on member, the accepted-only member team, both
+  profile-visibility rules, the owner-id rule, cursor scope, the limit guard, and a per-project
+  members query: each fails a named test.
+- **Real two-account runs** with `scripts/team-roundtrip.mjs`, which now reads `/v1/me/teams`
+  for both accounts after every step (invite, accept, reject, invite again, accept, remove,
+  leave) and compares each side with the owner's own `GET /projects/:id/team` rows, and checks
+  that the owner is told of a leave and that B never owns, sends or joins A's project:
+
+| Run        | Target                                                                                  | Result                                         |
+| ---------- | --------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Local      | compiled server of #58 on `127.0.0.1:3007`, empty volume, real issuer, audience, tokens | exit 0, 53 PASS, 0 FAIL (8 `/me/teams` checks) |
+| Production | `https://gradfolio-api-1058577031182.us-east1.run.app` after the Deploy of #58          | exit 0, 53 PASS, 0 FAIL (8 `/me/teams` checks) |
+
+Changing one expectation in the script (accepted to pending) makes the run fail at the check
+after the accept. Hygiene as in §9: the script output of both runs and the local API log
+contain no token, `eyJ`, `sub` or stored email (0 hits; the script prints no names on
+success); the local API log has 0 error entries. Afterwards on production neither account
+has an `m5-roundtrip-*` project or an unread notification, and `/v1/me/teams` is empty
+(0/0/0/0) for both. Cloud Run logs were not read.
