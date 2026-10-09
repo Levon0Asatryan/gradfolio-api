@@ -561,8 +561,9 @@ export const OPERATIONS: readonly Operation[] = [
       '(exactly: type, size and a create-only precondition are signed; the URL writes its key once ' +
       'and a replay is refused), and the app sends `fileUrl` in the matching ' +
       'write. The URL lives `expiresAt`; the token never reaches the browser. Images: png, ' +
-      'jpeg, webp, gif; PDFs only as an attachment. `hero` and `attachment` need a ' +
-      '`projectId` of the caller’s. Rate-limited with its own budget. 409 at the per-user ' +
+      'jpeg, webp, gif; PDFs only as an attachment. `projectId` is optional for `hero` and ' +
+      '`attachment` (omit it while the project is being created); when given it must be ' +
+      'the caller’s (404 otherwise), and an `avatar` with one is 400. Rate-limited with its own budget. 409 at the per-user ' +
       'file cap; 503 `STORAGE_UNAVAILABLE` when the server has no bucket configured.',
     bearer: true,
     body: uploadRequestSchema,
