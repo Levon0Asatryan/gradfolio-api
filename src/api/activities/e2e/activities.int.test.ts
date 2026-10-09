@@ -82,9 +82,24 @@ describe('GET /v1/me/activities', () => {
     const http = await start();
     const alice = await member('alice');
     const bob = await member('bob');
-    const a1 = await add(alice.user.id, 'projectCreated', { projectId: 'p', name: 'One' }, at(1));
-    const a2 = await add(alice.user.id, 'projectPublished', { projectId: 'p', name: 'One' }, at(2));
-    await add(bob.user.id, 'projectCreated', { projectId: 'q', name: 'Bob’s secret' }, at(3));
+    const a1 = await add(
+      alice.user.id,
+      'projectCreated',
+      { projectId: 'p', projectName: 'One' },
+      at(1),
+    );
+    const a2 = await add(
+      alice.user.id,
+      'projectPublished',
+      { projectId: 'p', projectName: 'One' },
+      at(2),
+    );
+    await add(
+      bob.user.id,
+      'projectCreated',
+      { projectId: 'q', projectName: 'Bob’s secret' },
+      at(3),
+    );
 
     const res = await http.get('/v1/me/activities').set(alice.auth).expect(200);
     const page = res.body as Page;
@@ -93,14 +108,14 @@ describe('GET /v1/me/activities', () => {
       id: a2,
       type: 'project',
       translationKey: 'projectPublished',
-      translationParams: { projectId: 'p', name: 'One' },
+      translationParams: { projectId: 'p', projectName: 'One' },
       timestamp: at(2).toISOString(),
     });
     expect(JSON.stringify(res.body)).not.toContain('secret');
     // the other user's feed holds only theirs
     const theirs = await http.get('/v1/me/activities').set(bob.auth).expect(200);
     expect((theirs.body as Page).items.map((i) => i.translationParams)).toEqual([
-      { projectId: 'q', name: 'Bob’s secret' },
+      { projectId: 'q', projectName: 'Bob’s secret' },
     ]);
   });
 
@@ -116,7 +131,7 @@ describe('GET /v1/me/activities', () => {
     const alice = await member('alice');
     const ids: string[] = [];
     for (let i = 0; i < 5; i++) {
-      ids.push(await add(alice.user.id, 'newSkill', { skill: `s${i}` }, at(i < 3 ? 1 : i)));
+      ids.push(await add(alice.user.id, 'newSkill', { skillName: `s${i}` }, at(i < 3 ? 1 : i)));
     }
     const seen: string[] = [];
     let cursor: string | null = null;
@@ -157,6 +172,16 @@ describe('GET /v1/me/activities', () => {
     const http = await start();
     const alice = await member('alice');
     const res = await http.get('/v1/me/activities').query(query).set(alice.auth).expect(400);
+    expect(res.body.code).toBe('VALIDATION_FAILED');
+  });
+
+  it('answers 400, not a database error, for a cursor time beyond the Date range', async () => {
+    const http = await start();
+    const alice = await member('alice');
+    const cursor = Buffer.from(JSON.stringify({ t: 8_640_000_000_000_001, id: 'x' })).toString(
+      'base64url',
+    );
+    const res = await http.get('/v1/me/activities').query({ cursor }).set(alice.auth).expect(400);
     expect(res.body.code).toBe('VALIDATION_FAILED');
   });
 

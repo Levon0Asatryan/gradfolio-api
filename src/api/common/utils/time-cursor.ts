@@ -11,7 +11,8 @@ export interface TimeCursor {
 }
 
 const cursorSchema = z.strictObject({
-  t: z.number().int().nonnegative(),
+  // Within the range of a JavaScript Date: anything beyond it would build an invalid Date.
+  t: z.number().int().nonnegative().max(8_640_000_000_000_000),
   id: z.string().max(36),
 });
 

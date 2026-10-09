@@ -157,6 +157,14 @@ describe('GET /v1/me/notifications', () => {
     ['a limit over the maximum', { limit: '51' }],
     ['a limit of zero', { limit: '0' }],
     ['an unknown key', { sort: 'oldest' }],
+    [
+      'a cursor time beyond the Date range',
+      {
+        cursor: Buffer.from(JSON.stringify({ t: 8_640_000_000_000_001, id: 'x' })).toString(
+          'base64url',
+        ),
+      },
+    ],
   ])('answers 400 for %s', async (_n, query) => {
     const http = await start();
     const alice = await member('alice');
