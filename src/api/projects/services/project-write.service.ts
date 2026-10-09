@@ -16,11 +16,13 @@ import {
 import type { ProjectDetail } from '../dto/project.dto.js';
 import {
   countOwnedProjects,
-  deleteOwnedProject,
+  deleteOwnedProjectIn,
   insertProject,
   lockOwnedProject,
+  lockProjectFileUrls,
   updateOwnedProject,
 } from '../repositories/project-write.repository.js';
+import { FileUrlService } from '../../files/services/file-url.service.js';
 import { ProjectService } from './project.service.js';
 
 @Injectable()
@@ -30,6 +32,7 @@ export class ProjectWriteService {
   constructor(
     private readonly dbs: DbService,
     private readonly reads: ProjectService,
+    private readonly files: FileUrlService,
     @Inject(APP_CONFIG) private readonly cfg: AppConfig,
   ) {
     this.schemas = projectWriteSchemas({
@@ -48,6 +51,7 @@ export class ProjectWriteService {
   async create(userId: string, body: unknown): Promise<ProjectDetail> {
     const input = parse(this.schemas.create, body);
     const id = newId();
+    const register = this.registerOnce(userId);
     await inTransaction(this.dbs.db, async (trx) => {
       await lockUser(trx, userId);
       if ((await countOwnedProjects(trx, userId)) >= this.cfg.PROJECT_MAX_PER_USER) {
@@ -56,7 +60,11 @@ export class ProjectWriteService {
           `at most ${this.cfg.PROJECT_MAX_PER_USER} projects are allowed`,
         );
       }
-      await insertProject(trx, userId, id, input);
+      // Registering a file is network I/O, under the user lock for a moment: fine at
+      // this scale, and a failure here writes nothing.
+      const heroImageUrl =
+        input.heroImageUrl === null ? null : await register(input.heroImageUrl, 'hero');
+      await insertProject(trx, userId, id, { ...input, heroImageUrl });
       await setProjectTerms(trx, id, 'technologies', input.technologies);
       await setProjectTerms(trx, id, 'tags', input.tags);
     });
@@ -72,26 +80,74 @@ export class ProjectWriteService {
    */
   async update(userId: string, id: string, body: unknown): Promise<ProjectDetail> {
     const patch = parse(this.schemas.patch, body);
-    await inTransaction(this.dbs.db, async (trx) => {
+    const register = this.registerOnce(userId);
+    const released = await inTransaction(this.dbs.db, async (trx) => {
       const stored = await lockOwnedProject(trx, userId, id);
       if (stored === undefined) throw new NotFoundError('project');
       const merged = parse(this.schemas.create, merge(stored, patch));
+      const heroImageUrl = await this.resolveHero(
+        register,
+        stored.heroImageUrl,
+        merged.heroImageUrl,
+      );
       // The pool counts matched rows, so a patch that changes nothing is 1.
-      if ((await updateOwnedProject(trx, userId, id, merged)) === 0) {
+      if ((await updateOwnedProject(trx, userId, id, { ...merged, heroImageUrl })) === 0) {
         throw new NotFoundError('project');
       }
       if (patch.technologies !== undefined) {
         await setProjectTerms(trx, id, 'technologies', merged.technologies);
       }
       if (patch.tags !== undefined) await setProjectTerms(trx, id, 'tags', merged.tags);
+      return this.files
+        .keysOf([stored.heroImageUrl])
+        .filter((k) => !this.files.keysOf([heroImageUrl]).includes(k));
     });
+    await this.files.release(released);
     return this.reads.getProject(id, userId);
   }
 
+  /** Children cascade. The objects they pointed at are deleted after the commit. */
   async remove(userId: string, id: string): Promise<void> {
-    if ((await deleteOwnedProject(this.dbs.db, userId, id)) === 0) {
-      throw new NotFoundError('project');
-    }
+    const keys = await inTransaction(this.dbs.db, async (trx) => {
+      const urls = await lockProjectFileUrls(trx, userId, id);
+      if (urls === undefined) throw new NotFoundError('project');
+      if ((await deleteOwnedProjectIn(trx, userId, id)) === 0) throw new NotFoundError('project');
+      return this.files.keysOf(urls);
+    });
+    await this.files.release(keys);
+  }
+
+  /**
+   * `accept` for one request, remembered per URL: `inTransaction` reruns the
+   * whole body after a deadlock, and a file claimed by the first attempt must
+   * not be rejected as "already in use" by the second.
+   */
+  private registerOnce(userId: string) {
+    const done = new Map<string, Promise<string>>();
+    return (url: string, kind: Parameters<FileUrlService['accept']>[2]): Promise<string> => {
+      const hit = done.get(url);
+      if (hit !== undefined) return hit;
+      const pending = this.files.accept(userId, url, kind);
+      done.set(url, pending);
+      return pending;
+    };
+  }
+
+  /**
+   * The hero image to store: the stored value when the request names the same
+   * object (a client may send back the signed form), else the newly registered
+   * one, else as given.
+   */
+  private async resolveHero(
+    register: ReturnType<ProjectWriteService['registerOnce']>,
+    stored: string | null,
+    requested: string | null,
+  ): Promise<string | null> {
+    if (requested === null) return null;
+    const key = this.files.keyOf(requested);
+    if (key !== null && key === this.files.keyOf(stored)) return stored;
+    if (requested === stored) return stored;
+    return register(requested, 'hero');
   }
 }
 

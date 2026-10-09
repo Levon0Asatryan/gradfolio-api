@@ -1,5 +1,4 @@
 import type { Insertable, Transaction, Updateable } from 'kysely';
-import type { Database } from '../../../core/db/database.js';
 import { toJsonColumn } from '../../../core/db/json.js';
 import type { DB, Projects } from '../../../core/db/types.generated.js';
 import { linkList } from '../../../core/validation/json-shapes.js';
@@ -144,13 +143,59 @@ export async function updateOwnedProject(
   return Number(result.numUpdatedRows);
 }
 
-/** Rows deleted: 0 means no such project of the caller's. Children cascade. */
-export async function deleteOwnedProject(
-  db: Database,
+/**
+ * Locks the caller's project row (`FOR UPDATE`) without reading it: the mutex
+ * for everything that depends on the project's *set* of children (attachment
+ * add, reorder, delete). `false`: not the caller's, deleted, or unknown.
+ */
+export async function lockProjectRow(
+  trx: Transaction<DB>,
+  userId: string,
+  id: string,
+): Promise<boolean> {
+  const row = await trx
+    .selectFrom('projects')
+    .select('id')
+    .where('id', '=', id)
+    .where('userId', '=', userId)
+    .forUpdate()
+    .executeTakeFirst();
+  return row !== undefined;
+}
+
+/**
+ * The file URLs a project holds -- hero and every attachment's url and
+ * thumbnail -- read with the project row locked, so what is deleted is exactly
+ * what the delete took with it. `undefined`: not the caller's.
+ */
+export async function lockProjectFileUrls(
+  trx: Transaction<DB>,
+  userId: string,
+  id: string,
+): Promise<(string | null)[] | undefined> {
+  const project = await trx
+    .selectFrom('projects')
+    .select('heroImageUrl')
+    .where('id', '=', id)
+    .where('userId', '=', userId)
+    .forUpdate()
+    .executeTakeFirst();
+  if (project === undefined) return undefined;
+  const attachments = await trx
+    .selectFrom('projectAttachments')
+    .select(['url', 'thumbnailUrl'])
+    .where('projectId', '=', id)
+    .execute();
+  return [project.heroImageUrl, ...attachments.flatMap((a) => [a.url, a.thumbnailUrl])];
+}
+
+/** Rows deleted inside a transaction: 0 means no such project of the caller's. */
+export async function deleteOwnedProjectIn(
+  trx: Transaction<DB>,
   userId: string,
   id: string,
 ): Promise<number> {
-  const result = await db
+  const result = await trx
     .deleteFrom('projects')
     .where('id', '=', id)
     .where('userId', '=', userId)

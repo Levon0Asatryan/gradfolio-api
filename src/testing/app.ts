@@ -9,6 +9,7 @@ import { setupApiDocs } from '../api/openapi/docs.js';
 import { APP_CONFIG } from '../core/config/config.module.js';
 import type { AppConfig } from '../core/config/schema.js';
 import { DbService } from '../core/db/db.service.js';
+import { FILE_STORAGE, type FileStorage } from '../core/storage/file-storage.js';
 import { LOG_DESTINATION } from '../core/logging/index.js';
 import type { AccessTokenIdentity } from '../core/auth/access-token.js';
 import type { UserRow } from '../api/users/repositories/user.repository.js';
@@ -17,6 +18,8 @@ import { UsersService } from '../api/users/services/users.service.js';
 export interface BuildOptions {
   /** Extra controllers, for routes the application does not have yet. */
   controllers?: Type[];
+  /** Object storage to use instead of Google's (only consulted when STORAGE_BUCKET is set). */
+  storage?: FileStorage;
   /** Receives every log line the application writes. */
   logs?: LogCapture;
 }
@@ -29,7 +32,7 @@ export interface BuildOptions {
 export async function buildApp(
   cfg: AppConfig,
   db?: Pick<DbService, 'ping' | 'onModuleDestroy'>,
-  { controllers = [], logs }: BuildOptions = {},
+  { controllers = [], logs, storage }: BuildOptions = {},
 ): Promise<NestExpressApplication> {
   let builder = Test.createTestingModule({ imports: [AppModule], controllers })
     .overrideProvider(APP_CONFIG)
@@ -44,6 +47,7 @@ export async function buildApp(
       .overrideProvider(UsersService)
       .useValue(stubUsers);
   }
+  if (storage) builder = builder.overrideProvider(FILE_STORAGE).useValue(storage);
   if (logs) builder = builder.overrideProvider(LOG_DESTINATION).useValue(logs.stream);
 
   const moduleRef = await builder.compile();

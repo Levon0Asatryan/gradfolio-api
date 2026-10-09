@@ -3,6 +3,7 @@ import type { AuthenticatedRequest } from '../auth/auth.constants.js';
 import { CurrentUser } from '../users/decorators/current-user.decorator.js';
 import type { UserRow } from '../users/repositories/user.repository.js';
 import type { MeResponse } from './dto/me.dto.js';
+import { FileUrlService } from '../files/services/file-url.service.js';
 import { AccountService } from './services/account.service.js';
 import { OnboardingService } from './services/onboarding.service.js';
 
@@ -11,11 +12,12 @@ export class MeController {
   constructor(
     private readonly onboarding: OnboardingService,
     private readonly account: AccountService,
+    private readonly files: FileUrlService,
   ) {}
 
   /** The caller's own account; the first call after a login creates it. */
   @Get()
-  me(@CurrentUser() user: UserRow, @Req() req: AuthenticatedRequest): MeResponse {
+  async me(@CurrentUser() user: UserRow, @Req() req: AuthenticatedRequest): Promise<MeResponse> {
     const identities =
       req.auth && req.auth.identities.length > 0
         ? req.auth.identities
@@ -24,7 +26,7 @@ export class MeController {
       id: user.id,
       name: user.name,
       email: user.email,
-      avatarUrl: user.avatarUrl,
+      avatarUrl: await this.files.read(user.avatarUrl),
       headline: user.headline,
       verified: user.verified,
       isPublic: user.isPublic,

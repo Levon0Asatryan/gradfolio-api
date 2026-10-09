@@ -74,17 +74,7 @@ export function toDetail(
     },
     links: row.links ?? [],
     files: row.files ?? [],
-    attachments: children.attachments.map((a) => {
-      const video = a.type === 'video' ? parseVideo(a.url, videoHosts) : null;
-      return {
-        id: a.id,
-        type: a.type,
-        url: a.url,
-        title: a.title,
-        thumbnailUrl: a.thumbnailUrl ?? video?.thumbnailUrl ?? null,
-        embedUrl: video?.embedUrl ?? null,
-      };
-    }),
+    attachments: children.attachments.map((a) => toAttachment(a, videoHosts)),
     team: children.team.map((m) => ({
       id: m.id,
       name: m.name,
@@ -99,5 +89,27 @@ export function toDetail(
       avatarUrl: row.ownerIsPublic || isOwner ? row.ownerAvatarUrl : null,
     },
     source: row.source,
+  };
+}
+
+/** An attachment as the API shows it: a video gets its embed URL, and a thumbnail if none is stored. */
+export function toAttachment(
+  a: {
+    id: string;
+    type: 'image' | 'video' | 'pdf' | 'link';
+    url: string;
+    title: string | null;
+    thumbnailUrl: string | null;
+  },
+  videoHosts: readonly string[],
+) {
+  const video = a.type === 'video' ? parseVideo(a.url, videoHosts) : null;
+  return {
+    id: a.id,
+    type: a.type,
+    url: a.url,
+    title: a.title,
+    thumbnailUrl: a.thumbnailUrl ?? video?.thumbnailUrl ?? null,
+    embedUrl: video?.embedUrl ?? null,
   };
 }

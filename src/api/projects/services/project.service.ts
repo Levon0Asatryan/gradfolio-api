@@ -3,6 +3,7 @@ import { APP_CONFIG } from '../../../core/config/config.module.js';
 import type { AppConfig } from '../../../core/config/schema.js';
 import { DbService } from '../../../core/db/db.service.js';
 import { NotFoundError, ValidationError } from '../../../core/errors/app-error.js';
+import { FileUrlService } from '../../files/services/file-url.service.js';
 import { findVisibleUser } from '../../profiles/repositories/profile.repository.js';
 import type { ProjectDetail, ProjectListQuery, ProjectPage } from '../dto/project.dto.js';
 import {
@@ -21,6 +22,7 @@ export class ProjectService {
   constructor(
     private readonly dbs: DbService,
     @Inject(APP_CONFIG) private readonly cfg: AppConfig,
+    private readonly files: FileUrlService,
   ) {}
 
   /**
@@ -38,7 +40,7 @@ export class ProjectService {
       termsOf(db, 'projectTags', [row.id]),
       termsOf(db, 'projectTechnologies', [row.id]),
     ]);
-    return toDetail(
+    const detail = toDetail(
       row,
       {
         attachments,
@@ -49,6 +51,27 @@ export class ProjectService {
       viewerId,
       this.cfg.ATTACHMENT_VIDEO_HOSTS,
     );
+    return this.signDetail(detail);
+  }
+
+  /** Stored file URLs become short-lived signed read URLs (plan §2.2); external ones pass through. */
+  private async signDetail(d: ProjectDetail): Promise<ProjectDetail> {
+    // Team rows are not signed: no write path registers a file for them yet (M5 must).
+    const [heroImageUrl, ownerAvatar, attachments] = await Promise.all([
+      this.files.read(d.heroImageUrl),
+      this.files.read(d.owner.avatarUrl),
+      Promise.all(
+        d.attachments.map(async (a) => ({
+          ...a,
+          url: await this.files.read(a.url),
+          thumbnailUrl: await this.files.read(a.thumbnailUrl),
+        })),
+      ),
+      Promise.all(
+        d.team.map(async (m) => ({ ...m, avatarUrl: await this.files.read(m.avatarUrl) })),
+      ),
+    ]);
+    return { ...d, heroImageUrl, owner: { ...d.owner, avatarUrl: ownerAvatar }, attachments };
   }
 
   /** The caller's own projects, every state. */
@@ -98,14 +121,18 @@ export class ProjectService {
 
     const last = shown.at(-1);
     const spec = SORTS[query.sort];
-    return {
-      items: shown.map((r) =>
-        toSummary(
+    const items = await Promise.all(
+      shown.map(async (r) => {
+        const summary = toSummary(
           r,
           { tags: tags.get(r.id) ?? [], technologies: technologies.get(r.id) ?? [] },
           viewerId,
-        ),
-      ),
+        );
+        return { ...summary, heroImageUrl: await this.files.read(summary.heroImageUrl) };
+      }),
+    );
+    return {
+      items,
       nextCursor:
         rows.length > limit && last !== undefined
           ? encodeCursor(query.sort, {

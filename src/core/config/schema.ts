@@ -128,6 +128,7 @@ const rateLimit = {
   RATE_LIMIT_SEARCH: z.coerce.number().int().min(1).max(100_000).default(30),
   RATE_LIMIT_IMPORT: z.coerce.number().int().min(1).max(100_000).default(5),
   RATE_LIMIT_AI: z.coerce.number().int().min(1).max(100_000).default(10),
+  RATE_LIMIT_UPLOAD: z.coerce.number().int().min(1).max(100_000).default(20),
 };
 
 /** Profile page bounds (docs/m3-plan.md §1, Limits). */
@@ -163,6 +164,25 @@ const projects = {
         .map((h) => h.trim().toLowerCase())
         .filter((h) => h.length > 0),
     ),
+};
+
+/** File storage (docs/m4-plan.md §3). Unset STORAGE_BUCKET: URL-only, uploads answer 503. */
+const storage = {
+  STORAGE_BUCKET: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$/, { message: 'must be a bucket name' })
+    .optional(),
+  // Sizes are checked against the *declared* size, which the signature then pins.
+  UPLOAD_MAX_IMAGE_BYTES: z.coerce.number().int().min(1024).max(50_000_000).default(5_000_000),
+  UPLOAD_MAX_PDF_BYTES: z.coerce.number().int().min(1024).max(100_000_000).default(20_000_000),
+  // A signed upload URL's lifetime, and a signed read URL's (the window in which an
+  // already-issued read URL outlives a project turning private; plan §2.2).
+  UPLOAD_URL_TTL_S: z.coerce.number().int().min(30).max(3600).default(300),
+  FILE_READ_URL_TTL_S: z.coerce.number().int().min(30).max(3600).default(300),
+  // Objects one user may hold under their prefix (registered or not).
+  UPLOAD_MAX_FILES_PER_USER: z.coerce.number().int().min(1).max(5000).default(200),
+  PROJECT_MAX_ATTACHMENTS: z.coerce.number().int().min(1).max(200).default(20),
 };
 
 /** MySQL 8.4. */
@@ -235,7 +255,16 @@ export const databaseConfigSchema = z
 
 /** Everything the api process needs. */
 export const configSchema = z
-  .object({ ...runtime, ...api, ...database, ...auth, ...rateLimit, ...profile, ...projects })
+  .object({
+    ...runtime,
+    ...api,
+    ...database,
+    ...auth,
+    ...rateLimit,
+    ...profile,
+    ...projects,
+    ...storage,
+  })
   .refine(tlsInProduction, TLS_IN_PRODUCTION)
   .refine(noTlsOnSocket, NO_TLS_ON_SOCKET)
   .refine((c) => c.NODE_ENV !== 'production' || c.AUTH0_ISSUER_BASE_URL.startsWith('https:'), {

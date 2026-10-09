@@ -18,6 +18,7 @@
     "db:types": "kysely-codegen --config-file .kysely-codegenrc.json",
     "db:types:check": "kysely-codegen --config-file .kysely-codegenrc.json --verify",
     "projects:resanitize": "tsx --env-file-if-exists=.env src/core/db/resanitize-cli.ts",
+    "storage:sweep": "tsx --env-file-if-exists=.env src/core/storage/sweep-cli.ts",
     "db:seed": "tsx --env-file-if-exists=.env src/core/db/seed/cli.ts",
     "openapi": "tsx src/api/openapi/cli.ts",
     "openapi:check": "tsx src/api/openapi/cli.ts --check",
@@ -43,6 +44,7 @@
     ]
   },
   "dependencies": {
+    "@google-cloud/storage": "~8.3.0",
     "@nestjs/common": "^12.1.2",
     "@nestjs/core": "^12.1.2",
     "@nestjs/platform-express": "^12.1.2",

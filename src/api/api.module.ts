@@ -10,6 +10,7 @@ import type { DestinationStream } from 'pino';
 import { AuthModule } from './auth/auth.module.js';
 import { AccessTokenGuard } from './auth/guards/access-token.guard.js';
 import { ErrorFilter } from './common/filters/error.filter.js';
+import { FilesModule } from './files/files.module.js';
 import { HealthModule } from './health/health.module.js';
 import { MeModule } from './me/me.module.js';
 import { ProfilesModule } from './profiles/profiles.module.js';
@@ -32,6 +33,7 @@ import { UsersModule } from './users/users.module.js';
     AuthModule,
     RateLimitModule,
     UsersModule,
+    FilesModule,
     HealthModule,
     MeModule,
     ProfilesModule,

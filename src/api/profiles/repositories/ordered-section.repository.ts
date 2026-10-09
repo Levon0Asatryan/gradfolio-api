@@ -10,11 +10,15 @@ import type { DB } from '../../../core/db/types.generated.js';
  * so they see each table through this minimal shape instead of triplicating
  * the code. (M4 reuses `applyOrder` for attachments with a project owner.)
  */
-export type SectionTable = 'education' | 'experience' | 'certifications';
+export type SectionTable = 'education' | 'experience' | 'certifications' | 'projectAttachments';
+
+/** The column that names a row's owner: a user for sections, a project for attachments. */
+export type OwnerColumn = 'userId' | 'projectId';
 
 interface Common {
   id: string;
   userId: string;
+  projectId: string;
   sortOrder: number;
 }
 type Loose = Kysely<Record<SectionTable, Common>>;
@@ -25,11 +29,12 @@ export async function countOwned(
   trx: Transaction<DB>,
   table: SectionTable,
   userId: string,
+  owner: OwnerColumn = 'userId',
 ): Promise<number> {
   const row = await loose(trx)
     .selectFrom(table)
     .select((eb) => eb.fn.countAll<number>().as('n'))
-    .where('userId', '=', userId)
+    .where(owner, '=', userId)
     .executeTakeFirstOrThrow();
   return Number(row.n);
 }
@@ -39,11 +44,12 @@ export async function topSortOrder(
   trx: Transaction<DB>,
   table: SectionTable,
   userId: string,
+  owner: OwnerColumn = 'userId',
 ): Promise<number> {
   const row = await loose(trx)
     .selectFrom(table)
     .select((eb) => eb.fn.min<number | null>('sortOrder').as('lowest'))
-    .where('userId', '=', userId)
+    .where(owner, '=', userId)
     .executeTakeFirstOrThrow();
   return row.lowest === null ? 0 : Number(row.lowest) - 1;
 }
@@ -53,11 +59,12 @@ export async function lockOwnedIds(
   trx: Transaction<DB>,
   table: SectionTable,
   userId: string,
+  owner: OwnerColumn = 'userId',
 ): Promise<string[]> {
   const rows = await loose(trx)
     .selectFrom(table)
     .select('id')
-    .where('userId', '=', userId)
+    .where(owner, '=', userId)
     .forUpdate()
     .execute();
   return rows.map((r) => r.id);
@@ -69,11 +76,12 @@ export async function deleteOwned(
   table: SectionTable,
   userId: string,
   id: string,
+  owner: OwnerColumn = 'userId',
 ): Promise<number> {
   const result = await loose(db)
     .deleteFrom(table)
     .where('id', '=', id)
-    .where('userId', '=', userId)
+    .where(owner, '=', userId)
     .executeTakeFirst();
   return Number(result.numDeletedRows);
 }
@@ -88,6 +96,7 @@ export async function applyOrder(
   table: SectionTable,
   userId: string,
   ids: readonly string[],
+  owner: OwnerColumn = 'userId',
 ): Promise<number> {
   if (ids.length === 0) return 0;
   const position = sql<number>`CASE id ${sql.join(
@@ -97,7 +106,7 @@ export async function applyOrder(
   const result = await loose(trx)
     .updateTable(table)
     .set({ sortOrder: position })
-    .where('userId', '=', userId)
+    .where(owner, '=', userId)
     .where('id', 'in', ids as string[])
     .executeTakeFirst();
   return Number(result.numUpdatedRows);
