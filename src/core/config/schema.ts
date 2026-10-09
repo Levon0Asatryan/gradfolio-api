@@ -128,6 +128,7 @@ const rateLimit = {
   RATE_LIMIT_SEARCH: z.coerce.number().int().min(1).max(100_000).default(30),
   RATE_LIMIT_IMPORT: z.coerce.number().int().min(1).max(100_000).default(5),
   RATE_LIMIT_AI: z.coerce.number().int().min(1).max(100_000).default(10),
+  RATE_LIMIT_LOOKUP: z.coerce.number().int().min(1).max(100_000).default(30),
   RATE_LIMIT_UPLOAD: z.coerce.number().int().min(1).max(100_000).default(20),
 };
 
@@ -185,8 +186,11 @@ const storage = {
   PROJECT_MAX_ATTACHMENTS: z.coerce.number().int().min(1).max(200).default(20),
 };
 
-/** Notifications (docs/m5-plan.md §5.3). */
+/** Teams and notifications (docs/m5-plan.md §1, §5.3). */
 const notifications = {
+  // Rows a project's team may hold, in any status: bounds what an owner (or a
+  // pile of rejected invitations) can grow, checked under the project lock.
+  PROJECT_MAX_TEAM: z.coerce.number().int().min(1).max(200).default(20),
   // Items per page when `limit` is not given, and the most a caller may ask for.
   NOTIFICATIONS_PAGE_SIZE: z.coerce.number().int().min(1).max(200).default(20),
   NOTIFICATIONS_PAGE_MAX: z.coerce.number().int().min(1).max(200).default(50),

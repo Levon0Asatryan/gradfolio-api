@@ -6,6 +6,8 @@
 export const MysqlErrno = {
   /** Unique key violated. */
   DUPLICATE_KEY: 1062,
+  /** A foreign key points at a row that is not (or no longer) there. */
+  FOREIGN_KEY_MISSING: 1452,
   /** Chosen as the deadlock victim; InnoDB rolled the whole transaction back. */
   DEADLOCK: 1213,
   /** A CHECK constraint rejected the row. */
