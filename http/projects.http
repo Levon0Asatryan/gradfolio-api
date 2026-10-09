@@ -153,7 +153,7 @@ Content-Type: application/json
 # @name createUpload
 # 201 a signed PUT for one file. Then (browser) PUT the bytes to uploadUrl with the returned
 # headers exactly, and send fileUrl as avatarUrl / heroImageUrl / an attachment url.
-# purpose avatar|hero|attachment; hero and attachment need projectId; images png|jpeg|webp|gif,
+# purpose avatar|hero|attachment; projectId is optional for hero and attachment (omit it while creating the project; a foreign one is 404), not allowed for avatar; images png|jpeg|webp|gif,
 # PDFs only as an attachment. 503 STORAGE_UNAVAILABLE without a bucket. Own rate budget.
 POST {{baseUrl}}/v1/me/uploads
 Authorization: Bearer {{accessToken}}

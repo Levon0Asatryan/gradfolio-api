@@ -174,7 +174,10 @@ Q11 is not weakened: the FE calls the API only from the server.
 ### 3.5 Flow and rules (4.5)
 
 - **`POST /v1/me/uploads`** `{purpose: 'avatar'|'hero'|'attachment', contentType, size, projectId?}`.
-  `hero` and `attachment` need `projectId`, owned by the caller (else 404). Allowed types:
+  `projectId` is optional for `hero` and `attachment` (so a file can be uploaded while the
+  project is being created); when given it must be the caller's (else 404), and an `avatar`
+  with one is 400. The key never carries a project: the row that registers the file binds
+  it, once (`FILE_IN_USE` otherwise). Allowed types:
   images `image/png|jpeg|webp|gif` (≤ `UPLOAD_MAX_IMAGE_BYTES`, 5 MB), `application/pdf`
   (≤ `UPLOAD_MAX_PDF_BYTES`, 20 MB). Anything else, or a size over the limit: 400. No
   SVG, no HTML.

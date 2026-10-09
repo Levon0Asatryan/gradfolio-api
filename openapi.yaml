@@ -1296,7 +1296,7 @@ paths:
                   maximum: 9007199254740991
                   description: Exact size in bytes; signed into the URL.
                 projectId:
-                  description: "Required for `hero` and `attachment`: a project of the caller’s."
+                  description: Optional for `hero` and `attachment` (omit it while the project is being created); when given, a project of the caller’s. Not allowed for `avatar`.
                   type: string
                   maxLength: 36
               required:
