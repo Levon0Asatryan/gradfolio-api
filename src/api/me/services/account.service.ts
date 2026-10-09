@@ -49,6 +49,13 @@ export class AccountService {
         .set({ avatarUrl: null })
         .where('userId', '=', userId)
         .execute();
+      // An invitation nobody answered (or that was declined) has nothing to keep:
+      // the foreign key would turn it into a nameless pending row (m5-plan §2.4).
+      await trx
+        .deleteFrom('projectTeamMembers')
+        .where('userId', '=', userId)
+        .where('status', '<>', 'accepted')
+        .execute();
       const result = await trx.deleteFrom('users').where('id', '=', userId).executeTakeFirst();
       if (Number(result.numDeletedRows) === 0) throw new NotFoundError('account');
     });

@@ -87,9 +87,9 @@ const summaryShape = {
   status: z.enum(PROJECT_STATUSES),
   heroImageUrl: z.string().nullable(),
   tags: z.array(z.string()),
-  role: z.literal('owner').meta({
+  role: z.enum(['owner', 'member']).meta({
     description:
-      'Same field as on ProfileProject. Always owner here: these lists hold the user’s own projects (team projects appear on profiles only).',
+      'Same field as on ProfileProject: the listed user’s role. `member`: an accepted team member of someone else’s project (Q4). On a detail it is always owner.',
   }),
   technologies: z.array(z.string()),
   isPublic: z.boolean(),
@@ -117,7 +117,7 @@ export const projectDetailSchema = z
     files: z.array(z.object({ label: z.string(), url: z.string() })),
     attachments: z.array(projectAttachmentSchema),
     team: z.array(projectTeamMemberSchema).meta({
-      description: 'Accepted team members, read-only until M5. The owner is `owner`, not a member.',
+      description: 'Accepted team members. The owner is `owner`, not a member.',
     }),
     owner: projectOwnerSchema,
     source: z.enum(['manual', 'github']),

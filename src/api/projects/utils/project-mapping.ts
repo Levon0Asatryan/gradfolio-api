@@ -6,6 +6,8 @@ export function toSummary(
   row: ProjectSummaryRow,
   terms: { tags: string[]; technologies: string[] },
   viewerId: string | undefined,
+  /** Whose list this is: `member` for a project they are on but do not own. Default: the owner. */
+  subjectId: string = row.userId,
 ): ProjectSummary {
   return {
     id: row.id,
@@ -15,7 +17,7 @@ export function toSummary(
     status: row.status,
     heroImageUrl: row.heroImageUrl,
     tags: terms.tags,
-    role: 'owner',
+    role: row.userId === subjectId ? 'owner' : 'member',
     technologies: terms.technologies,
     isPublic: row.isPublic,
     isDraft: row.isDraft,

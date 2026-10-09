@@ -3,7 +3,7 @@ import type { Database } from '../../../core/db/database.js';
 import type { DB } from '../../../core/db/types.generated.js';
 import type { ProjectListQuery } from '../dto/project.dto.js';
 import { type Cursor, type ProjectSort, SORTS } from '../utils/cursor.js';
-import { isPublished, projectVisibleTo } from '../utils/visibility.js';
+import { isAcceptedMember, isPublished, projectReadableBy } from '../utils/visibility.js';
 
 /**
  * Columns a project read may select, listed one by one and never `selectAll()`:
@@ -44,7 +44,7 @@ const DETAIL_COLUMNS = [
   'projects.repoLanguage',
 ] as const;
 
-/** One project if `viewerId` may read it (see `projectVisibleTo`), with its owner's public facts. */
+/** One project if `viewerId` may read it (see `projectReadableBy`), with its owner's public facts. */
 export function findVisibleProject(db: Database, id: string, viewerId: string | undefined) {
   return db
     .selectFrom('projects')
@@ -56,7 +56,7 @@ export function findVisibleProject(db: Database, id: string, viewerId: string | 
       'owner.isPublic as ownerIsPublic',
     ])
     .where('projects.id', '=', id)
-    .where((eb) => projectVisibleTo(eb, viewerId))
+    .where((eb) => projectReadableBy(eb, viewerId))
     .executeTakeFirst();
 }
 
@@ -73,29 +73,53 @@ export function listAttachments(db: Database, projectId: string) {
 }
 
 /**
- * Accepted team members of a project the caller can already read. `memberVisible`
- * says whether the member's own profile is readable by the caller (Q3), which
- * decides whether the response may link to it.
+ * Team rows of a project the caller can already read. A linked member shows
+ * their live name and photo while their profile is visible to the caller (Q3;
+ * the owner sees their own), otherwise the name saved on the row and no photo.
+ * `memberVisible` tells whether the response may link to the member's profile.
+ * `acceptedOnly: false` is the owner's management view (every status).
  */
-export async function listAcceptedTeam(
+export async function listTeam(
   db: Database,
   projectId: string,
   viewerId: string | undefined,
+  { acceptedOnly }: { acceptedOnly: boolean },
 ) {
   const rows = await db
     .selectFrom('projectTeamMembers as m')
     .leftJoin('users as u', 'u.id', 'm.userId')
-    .select(['m.id', 'm.name', 'm.role', 'm.avatarUrl', 'm.userId', 'u.isPublic as memberIsPublic'])
+    .select([
+      'm.id',
+      'm.name',
+      'm.role',
+      'm.avatarUrl',
+      'm.userId',
+      'm.status',
+      'm.createdAt',
+      'u.name as liveName',
+      'u.avatarUrl as liveAvatarUrl',
+      'u.isPublic as memberIsPublic',
+    ])
     .where('m.projectId', '=', projectId)
-    .where('m.status', '=', 'accepted')
+    .$if(acceptedOnly, (qb) => qb.where('m.status', '=', 'accepted'))
     .orderBy('m.sortOrder')
     .orderBy('m.createdAt')
     .orderBy('m.id')
     .execute();
-  return rows.map(({ memberIsPublic, ...m }) => ({
-    ...m,
-    memberVisible: m.userId !== null && (memberIsPublic === true || m.userId === viewerId),
-  }));
+  return rows.map(({ memberIsPublic, liveName, liveAvatarUrl, ...m }) => {
+    const memberVisible = m.userId !== null && (memberIsPublic === true || m.userId === viewerId);
+    return {
+      ...m,
+      name: memberVisible && liveName !== null ? liveName : m.name,
+      avatarUrl: memberVisible ? liveAvatarUrl : m.userId === null ? m.avatarUrl : null,
+      memberVisible,
+    };
+  });
+}
+
+/** Accepted team members of a project the caller can already read. */
+export function listAcceptedTeam(db: Database, projectId: string, viewerId: string | undefined) {
+  return listTeam(db, projectId, viewerId, { acceptedOnly: true });
 }
 
 export interface ListScope {
@@ -108,7 +132,14 @@ export interface ListScope {
 export const escapeLike = (text: string) => text.replace(/[\\%_]/g, (c) => `\\${c}`);
 
 function filters(eb: ExpressionBuilder<DB, 'projects'>, scope: ListScope, q: ProjectListQuery) {
-  const conditions = [eb('projects.userId', '=', scope.ownerId)];
+  // The user's own projects, and those they are an accepted member of (never a
+  // draft: a draft is owner-only). `publishedOnly` then narrows both alike.
+  const conditions = [
+    eb.or([
+      eb('projects.userId', '=', scope.ownerId),
+      eb.and([eb('projects.isDraft', '=', false), isAcceptedMember(eb, scope.ownerId)]),
+    ]),
+  ];
   if (scope.publishedOnly) conditions.push(isPublished(eb));
   if (q.state === 'published') conditions.push(isPublished(eb));
   if (q.state === 'draft') conditions.push(eb('projects.isDraft', '=', true));
