@@ -145,6 +145,13 @@ const projects = {
   // Items per page when `limit` is not given, and the most a caller may ask for.
   PROJECTS_PAGE_SIZE: z.coerce.number().int().min(1).max(200).default(20),
   PROJECTS_PAGE_MAX: z.coerce.number().int().min(1).max(200).default(50),
+  // What one user may hold or send: projects, tags/technologies/links per project,
+  // and the description's size *after* sanitizing.
+  PROJECT_MAX_PER_USER: z.coerce.number().int().min(1).max(1000).default(100),
+  PROJECT_MAX_TAGS: z.coerce.number().int().min(1).max(100).default(20),
+  PROJECT_MAX_TECHNOLOGIES: z.coerce.number().int().min(1).max(100).default(30),
+  PROJECT_MAX_LINKS: z.coerce.number().int().min(1).max(100).default(10),
+  PROJECT_DESCRIPTION_MAX_BYTES: z.coerce.number().int().min(1000).max(1_000_000).default(100_000),
   // Hosts a video attachment may point to (the parsed hostname, never a
   // substring). A host listed here is also one the code knows how to embed.
   ATTACHMENT_VIDEO_HOSTS: z

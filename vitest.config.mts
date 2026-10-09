@@ -12,6 +12,7 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: [
         'src/**/*.test.ts',
+        'src/**/*.corpus.ts',
         // The entrypoint is wiring: CI's container-stack job boots it for real,
         // and mocking Nest's bootstrap to reach it would test the mock.
         'src/api/main.ts',
@@ -44,6 +45,9 @@ export default defineConfig({
         'src/core/db/user-lock.ts',
         'src/core/db/seed/seed.ts',
         'src/core/db/seed/cli.ts',
+        'src/core/db/resanitize-cli.ts',
+        // Rows in, rows out against MySQL: proved by resanitize.int.test.ts.
+        'src/core/db/resanitize.ts',
         // First-login provisioning: ON DUPLICATE KEY, FOR SHARE re-reads and the
         // deadlock retry are MySQL behaviour, proved with barriers against MySQL
         // 8.4 by user.repository.int.test.ts and me/e2e/me.int.test.ts.

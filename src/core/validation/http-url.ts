@@ -22,3 +22,20 @@ export function isHttpUrl(value: string): boolean {
     return false;
   }
 }
+
+/**
+ * An absolute `https:` URL without credentials, at most `limit` long: for media
+ * the page renders itself (hero images, attachments). `http:` would be mixed
+ * content, and `https://user:pw@host` hides where the link goes.
+ */
+export function httpsUrl(limit: ColumnLimit = TEXT) {
+  return z
+    .string()
+    .refine((v) => fits(v, limit), { message: `must fit its column (${limit.max} ${limit.kind})` })
+    .refine(isHttpsUrl, { message: 'must be an absolute https URL without credentials' });
+}
+
+export function isHttpsUrl(value: string): boolean {
+  const u = URL.parse(value);
+  return u?.protocol === 'https:' && u.username === '' && u.password === '';
+}

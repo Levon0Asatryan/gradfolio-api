@@ -1,6 +1,7 @@
 import { z, type ZodObject, type ZodType } from 'zod';
 import { LIVENESS_PATH, READINESS_PATH } from '../health/constants.js';
 import { meResponseSchema } from '../me/dto/me.dto.js';
+import { documentedProjectSchemas } from '../projects/dto/project-write.dto.js';
 import {
   myProjectsQuerySchema,
   projectDetailSchema,
@@ -384,6 +385,64 @@ export const OPERATIONS: readonly Operation[] = [
     },
   },
   {
+    method: 'post',
+    path: '/v1/projects',
+    operationId: 'createProject',
+    tag: 'projects',
+    summary: 'Create a project',
+    description:
+      'Only `title` is required. A new project is public and published unless `isPublic: false` ' +
+      'or `isDraft: true`. `descriptionHtml` is sanitized with an allow-list on the way in ' +
+      '(the response shows what was kept; the limit is measured after sanitizing). ' +
+      '`technologies` and `tags` are normalized, de-duplicated case-insensitively and take ' +
+      'the site-wide spelling. Unknown keys (`id`, `userId`, `source`, `repo…`, `aiSummary`) ' +
+      'are rejected. Over the per-user cap: 409 `LIMIT_REACHED`.',
+    bearer: true,
+    body: documentedProjectSchemas.create,
+    responses: {
+      '201': { description: 'The new project', schema: projectDetailSchema },
+      '400': validationFailed,
+      '409': error('LIMIT_REACHED: the user holds the maximum number of projects'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'patch',
+    path: '/v1/projects/{id}',
+    operationId: 'updateProject',
+    tag: 'projects',
+    summary: 'Change project fields',
+    description:
+      'Any non-empty subset of the create fields; `metadata` changes only the keys it names; ' +
+      '`technologies`, `tags`, `links` and `files` are replaced as whole lists. The result is ' +
+      'validated as a whole, so cross-field rules hold. Someone else’s project, a deleted one ' +
+      'and an unknown id all answer 404. A change that alters nothing is a 200.',
+    bearer: true,
+    params: projectIdParamSchema,
+    body: documentedProjectSchemas.patch,
+    responses: {
+      '200': { description: 'The project after the change', schema: projectDetailSchema },
+      '400': validationFailed,
+      '404': notYours('project'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'delete',
+    path: '/v1/projects/{id}',
+    operationId: 'deleteProject',
+    tag: 'projects',
+    summary: 'Delete a project',
+    description: 'Removes the project with its attachments, tags, technologies and team rows.',
+    bearer: true,
+    params: projectIdParamSchema,
+    responses: {
+      '204': { description: 'Deleted' },
+      '404': notYours('project'),
+      ...authenticatedFailures,
+    },
+  },
+  {
     method: 'get',
     path: '/v1/me/projects',
     operationId: 'listMyProjects',
@@ -519,7 +578,10 @@ export function buildOpenApiDocument(
       { name: 'health', description: 'Liveness and readiness, outside `/v1`' },
       { name: 'me', description: 'The caller’s own account' },
       { name: 'profiles', description: 'Profiles: reading anyone’s, editing your own' },
-      { name: 'projects', description: 'Projects: reading (writes arrive with M4 PRs b and c)' },
+      {
+        name: 'projects',
+        description: 'Projects: reading anyone’s public ones, managing your own',
+      },
     ],
     paths,
     components: {

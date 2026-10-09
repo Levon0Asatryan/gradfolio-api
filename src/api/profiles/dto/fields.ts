@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { columnString } from '../../../core/validation/columns.js';
-import { httpUrl } from '../../../core/validation/http-url.js';
+import { httpsUrl, httpUrl } from '../../../core/validation/http-url.js';
 import { chars, fits } from '../../../core/validation/text.js';
 
 /** Field building blocks shared by the profile header and the section items. */
@@ -31,6 +31,17 @@ export const nullableUrl = (limit: Parameters<typeof httpUrl>[0]) =>
       .trim()
       .transform(emptyToNull)
       .pipe(z.union([z.null(), httpUrl(limit)])),
+  ]);
+
+/** A nullable `https` URL (no credentials): `null` or a blank string clears the field. */
+export const nullableHttpsUrl = (limit: Parameters<typeof httpsUrl>[0]) =>
+  z.union([
+    z.null(),
+    z
+      .string()
+      .trim()
+      .transform(emptyToNull)
+      .pipe(z.union([z.null(), httpsUrl(limit)])),
   ]);
 
 const CONTACT_EMAIL_LIMIT = chars(255);

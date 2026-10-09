@@ -295,7 +295,8 @@ DOMPurify only if the corpus found a bypass that DOMPurify stops.
 - **Attributes:** `a[href rel target]` and `code[class]`. Nothing else: no `style`, `id`,
   `name`, `class` elsewhere, `data-*`, `aria-*`, event handlers. Every link is rewritten
   to `rel="noopener noreferrer nofollow" target="_blank"`; a link whose `href` fails the
-  regex is unwrapped to its text.
+  regex keeps its text as a bare `<a>` with no attributes (PR (b) deviation: renaming it to
+  drop the tag made sanitize-html close the next link with `</span>`, found by a real run).
 - **Schemes:** `https`, `http` only, as AGENTS.md requires for any stored user URL. No
   `mailto:`, protocol-relative, relative, `data:`, `javascript:`, `tel:`. (The measured
   corpus run above also allowed `mailto:`; the implementation and the corpus drop it, and

@@ -32,6 +32,11 @@ describe('loadConfig', () => {
       PROFILE_PROJECTS_LIMIT: 50,
       PROFILE_MAX_SECTION_ITEMS: 50,
       PROFILE_MAX_SKILLS: 100,
+      PROJECT_MAX_PER_USER: 100,
+      PROJECT_MAX_TAGS: 20,
+      PROJECT_MAX_TECHNOLOGIES: 30,
+      PROJECT_MAX_LINKS: 10,
+      PROJECT_DESCRIPTION_MAX_BYTES: 100_000,
       PROJECTS_PAGE_SIZE: 20,
       PROJECTS_PAGE_MAX: 50,
       ATTACHMENT_VIDEO_HOSTS: [
@@ -105,6 +110,9 @@ describe('loadConfig', () => {
     ['PROFILE_MAX_SKILLS', '1001'],
     ['PROFILE_PROJECTS_LIMIT', '0'],
     ['PROFILE_PROJECTS_LIMIT', '501'],
+    ['PROJECT_MAX_PER_USER', '0'],
+    ['PROJECT_MAX_TAGS', '101'],
+    ['PROJECT_DESCRIPTION_MAX_BYTES', '10'],
     ['PROJECTS_PAGE_SIZE', '0'],
     ['PROJECTS_PAGE_MAX', '201'],
   ])('refuses %s=%j', (key, value) => {
