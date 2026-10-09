@@ -3109,7 +3109,7 @@ components:
           description: What happened, e.g. `projectCreated`, `newSkill`, `teamJoined`. Render the text from your own strings for this key; an unknown key gets a generic line.
         translationParams:
           nullable: true
-          description: "Placeholders for the text: `name` (project), `skill`, `member`, `count`, and `projectId` for a link. Only what the feed’s owner may see."
+          description: "Placeholders for the text: `projectName`, `skillName`, `memberName`, and `projectId` for a link. Only what the feed’s owner may see."
           type: object
           additionalProperties:
             anyOf:

@@ -13,7 +13,7 @@ export const activitySchema = z
       .nullable()
       .meta({
         description:
-          'Placeholders for the text: `name` (project), `skill`, `member`, `count`, and `projectId` for a link. Only what the feed’s owner may see.',
+          'Placeholders for the text: `projectName`, `skillName`, `memberName`, and `projectId` for a link. Only what the feed’s owner may see.',
       }),
     timestamp: z.string().meta({ description: 'ISO 8601, UTC.' }),
   })

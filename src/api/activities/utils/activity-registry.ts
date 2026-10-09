@@ -5,8 +5,8 @@ import { z } from 'zod';
  * `profile` event, and the exact shape of its parameters (docs/m5-plan.md §8).
  *
  * The frontend renders the text from the key and the parameters (its
- * `dashboard.activity.<key>` strings, placeholders `{name}`, `{skill}`,
- * `{member}`, `{count}`), so the API stores no prose and no language. Strict
+ * `dashboard.activity.<key>` strings, placeholders `{projectName}`, `{skillName}`,
+ * `{memberName}`), so the API stores no prose and no language. Strict
  * schemas keep the parameters to what the feed needs -- an id, a display name,
  * a count -- and nothing a reader of the feed could not already see: never a
  * description, an email, a link or another user's private field.
@@ -20,16 +20,15 @@ const projectId = z.string().min(1).max(36);
 /** A project title or a person's display name: as long as the columns they came from. */
 const label = z.string().min(1).max(255);
 
-const project = z.strictObject({ projectId, name: label });
-const projectWithMember = z.strictObject({ projectId, name: label, member: label });
+const project = z.strictObject({ projectId, projectName: label });
+const projectWithMember = z.strictObject({ projectId, projectName: label, memberName: label });
 
 export const ACTIVITY_REGISTRY = {
   projectCreated: { type: 'project', params: project },
   projectPublished: { type: 'project', params: project },
   // The project is gone, so no id: only the name it had.
-  projectDeleted: { type: 'project', params: z.strictObject({ name: label }) },
-  newSkill: { type: 'profile', params: z.strictObject({ skill: label }) },
-  skillsAdded: { type: 'profile', params: z.strictObject({ count: z.number().int().min(2) }) },
+  projectDeleted: { type: 'project', params: z.strictObject({ projectName: label }) },
+  newSkill: { type: 'profile', params: z.strictObject({ skillName: label }) },
   // The owner's feed:
   teamInvited: { type: 'project', params: projectWithMember },
   teamMemberJoined: { type: 'project', params: projectWithMember },

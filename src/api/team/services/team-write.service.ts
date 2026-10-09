@@ -91,8 +91,8 @@ export class TeamWriteService {
         });
         await recordActivity(trx, owner.id, 'teamInvited', {
           projectId,
-          name: project.title,
-          member: invitee.name,
+          projectName: project.title,
+          memberName: invitee.name,
         });
         return { row: await readMember(trx, memberId), avatarUrl: invitee.avatarUrl };
       }),
@@ -172,18 +172,18 @@ export class TeamWriteService {
         project,
         role: mine.role,
       });
-      const about = { projectId, name: project.title };
+      const about = { projectId, projectName: project.title };
       if (status === 'accepted') {
         // The owner's feed names the member; the member's own feed says they joined.
         await recordActivity(trx, project.userId, 'teamMemberJoined', {
           ...about,
-          member: user.name,
+          memberName: user.name,
         });
         await recordActivity(trx, user.id, 'teamJoined', about);
       } else {
         await recordActivity(trx, project.userId, 'teamMemberDeclined', {
           ...about,
-          member: user.name,
+          memberName: user.name,
         });
       }
       return readMember(trx, mine.id);
@@ -211,8 +211,8 @@ export class TeamWriteService {
       });
       await recordActivity(trx, project.userId, 'teamLeft', {
         projectId,
-        name: project.title,
-        member: user.name,
+        projectName: project.title,
+        memberName: user.name,
       });
     });
   }

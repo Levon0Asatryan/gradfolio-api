@@ -8,29 +8,32 @@ import {
 
 describe('the activity registry', () => {
   it('accepts exactly the declared parameters and reports the declared type', () => {
-    expect(checkActivity('projectCreated', { projectId: 'p', name: 'Gradfolio' })).toEqual({
+    expect(checkActivity('projectCreated', { projectId: 'p', projectName: 'Gradfolio' })).toEqual({
       type: 'project',
-      params: { projectId: 'p', name: 'Gradfolio' },
+      params: { projectId: 'p', projectName: 'Gradfolio' },
     });
-    expect(checkActivity('newSkill', { skill: 'Docker' })).toEqual({
+    expect(checkActivity('newSkill', { skillName: 'Docker' })).toEqual({
       type: 'profile',
-      params: { skill: 'Docker' },
+      params: { skillName: 'Docker' },
     });
-    expect(checkActivity('skillsAdded', { count: 3 }).params).toEqual({ count: 3 });
   });
 
   it.each([
     [
       'an extra key (nothing private rides along)',
       'projectCreated',
-      { projectId: 'p', name: 'n', descriptionHtml: '<p>x</p>' },
+      { projectId: 'p', projectName: 'n', descriptionHtml: '<p>x</p>' },
     ],
-    ['a missing key', 'teamLeft', { projectId: 'p', name: 'n' }],
-    ['an empty name', 'projectCreated', { projectId: 'p', name: '' }],
-    ['a name over the column length', 'newSkill', { skill: 'x'.repeat(256) }],
-    ['a count of one (that is newSkill)', 'skillsAdded', { count: 1 }],
-    ['a fractional count', 'skillsAdded', { count: 2.5 }],
-    ['a number where a name belongs', 'newSkill', { skill: 7 }],
+    ['a missing key', 'teamLeft', { projectId: 'p', projectName: 'n' }],
+    ['an empty name', 'projectCreated', { projectId: 'p', projectName: '' }],
+    ['a name over the column length', 'newSkill', { skillName: 'x'.repeat(256) }],
+    [
+      'the old placeholder names (plan §8 says projectName)',
+      'projectCreated',
+      { projectId: 'p', name: 'n' },
+    ],
+    ['a key the plan does not list', 'skillsAdded', { count: 2 }],
+    ['a number where a name belongs', 'newSkill', { skillName: 7 }],
   ])('refuses %s', (_label, key, params) => {
     expect(() => checkActivity(key as ActivityKey, params as never)).toThrow(InvalidActivityError);
   });
@@ -53,12 +56,11 @@ describe('the activity registry', () => {
 });
 
 function sample(key: string): unknown {
-  const base = { projectId: 'p', name: 'n', member: 'm' };
-  if (key === 'newSkill') return { skill: 's' };
-  if (key === 'skillsAdded') return { count: 2 };
-  if (key === 'projectDeleted') return { name: 'n' };
+  const base = { projectId: 'p', projectName: 'n', memberName: 'm' };
+  if (key === 'newSkill') return { skillName: 's' };
+  if (key === 'projectDeleted') return { projectName: 'n' };
   if (key === 'projectCreated' || key === 'projectPublished' || key === 'teamJoined') {
-    return { projectId: 'p', name: 'n' };
+    return { projectId: 'p', projectName: 'n' };
   }
   return base;
 }

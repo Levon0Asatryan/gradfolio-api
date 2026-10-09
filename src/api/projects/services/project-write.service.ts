@@ -68,7 +68,10 @@ export class ProjectWriteService {
       await insertProject(trx, userId, id, { ...input, heroImageUrl });
       await setProjectTerms(trx, id, 'technologies', input.technologies);
       await setProjectTerms(trx, id, 'tags', input.tags);
-      await recordActivity(trx, userId, 'projectCreated', { projectId: id, name: input.title });
+      await recordActivity(trx, userId, 'projectCreated', {
+        projectId: id,
+        projectName: input.title,
+      });
     });
     return this.reads.getProject(id, userId);
   }
@@ -104,7 +107,7 @@ export class ProjectWriteService {
       if (stored.isDraft && !merged.isDraft) {
         await recordActivity(trx, userId, 'projectPublished', {
           projectId: id,
-          name: merged.title,
+          projectName: merged.title,
         });
       }
       return this.files
@@ -121,7 +124,7 @@ export class ProjectWriteService {
       const locked = await lockProjectFileUrls(trx, userId, id);
       if (locked === undefined) throw new NotFoundError('project');
       if ((await deleteOwnedProjectIn(trx, userId, id)) === 0) throw new NotFoundError('project');
-      await recordActivity(trx, userId, 'projectDeleted', { name: locked.title });
+      await recordActivity(trx, userId, 'projectDeleted', { projectName: locked.title });
       return this.files.keysOf(locked.urls);
     });
     await this.files.release(keys);

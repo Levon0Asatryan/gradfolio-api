@@ -107,7 +107,7 @@ describe('the events that write an activity', () => {
       {
         type: 'project',
         translationKey: 'projectCreated',
-        translationParams: { projectId: res.body.id, name: 'Gradfolio' },
+        translationParams: { projectId: res.body.id, projectName: 'Gradfolio' },
       },
     ]);
   });
@@ -125,7 +125,7 @@ describe('the events that write an activity', () => {
     await http.patch(`/v1/projects/${id}`).set(a.auth).send({ title: 'P3' }).expect(200);
     const keys = await feed(a.user.id);
     expect(keys.map((f) => f.translationKey)).toEqual(['projectCreated', 'projectPublished']);
-    expect(keys[1]!.translationParams).toEqual({ projectId: id, name: 'P2' });
+    expect(keys[1]!.translationParams).toEqual({ projectId: id, projectName: 'P2' });
   });
 
   it('delete: projectDeleted with the name it had, no id', async () => {
@@ -138,11 +138,11 @@ describe('the events that write an activity', () => {
     expect(rows.at(-1)).toEqual({
       type: 'project',
       translationKey: 'projectDeleted',
-      translationParams: { name: 'Gone' },
+      translationParams: { projectName: 'Gone' },
     });
   });
 
-  it('skills: one new skill is named, several are counted, a re-save or a removal is silent', async () => {
+  it('skills: each added skill is named (up to three a save), a bulk save, a re-save and a removal are silent', async () => {
     const http = await start();
     const a = await alice();
     const put = (skills: string[]) =>
@@ -150,15 +150,18 @@ describe('the events that write an activity', () => {
     await put(['Docker']);
     await put(['docker', 'Docker ']); // the same skill, any case
     await put([]); // removal
-    await put(['Go', 'Rust', 'SQL']);
+    await put(['Go', 'Rust', 'SQL']); // three added: each named
     await put(['Go', 'Rust', 'SQL', 'C']);
+    await put(['Go', 'Rust', 'SQL', 'C', 'A1', 'A2', 'A3', 'A4']); // four at once: setting up, not news
     expect(
       (await feed(a.user.id)).map((f) => [f.type, f.translationKey, f.translationParams]),
-    ).toEqual([
-      ['profile', 'newSkill', { skill: 'C' }],
-      ['profile', 'newSkill', { skill: 'Docker' }],
-      ['profile', 'skillsAdded', { count: 3 }],
-    ]);
+    ).toEqual(
+      ['C', 'Docker', 'Go', 'Rust', 'SQL'].map((skillName) => [
+        'profile',
+        'newSkill',
+        { skillName },
+      ]),
+    );
   });
 });
 
@@ -245,7 +248,7 @@ const keysOf = async (userId: string) => (await feed(userId)).map((f) => f.trans
 describe('team events', () => {
   it('invite, accept, reject, leave and re-invite write the owner’s and the member’s feeds', async () => {
     const { http, owner, bob, project } = await teamScene();
-    const about = { projectId: project.id, name: 'Gradfolio' };
+    const about = { projectId: project.id, projectName: 'Gradfolio' };
 
     await http
       .post(`/v1/projects/${project.id}/team`)
@@ -253,7 +256,10 @@ describe('team events', () => {
       .send({ userId: bob.user.id })
       .expect(201);
     expect(await keysOf(owner.user.id)).toEqual(['teamInvited']);
-    expect((await feed(owner.user.id))[0]!.translationParams).toEqual({ ...about, member: 'bob' });
+    expect((await feed(owner.user.id))[0]!.translationParams).toEqual({
+      ...about,
+      memberName: 'bob',
+    });
     expect(await feed(bob.user.id)).toEqual([]); // an invitation is a notification, not feed news
 
     await http.post(`/v1/projects/${project.id}/team/me/accept`).set(bob.auth).expect(200);

@@ -8,6 +8,9 @@ import { ValidationError } from '../../../core/errors/app-error.js';
 import { recordActivity } from '../../activities/repositories/activity-write.repository.js';
 import { lockUser } from '../../../core/db/user-lock.js';
 
+/** The most skills one save may announce; beyond it the save is a bulk edit and says nothing. */
+const MAX_SKILL_ACTIVITIES = 3;
+
 @Injectable()
 export class SkillsService {
   constructor(
@@ -38,12 +41,12 @@ export class SkillsService {
         ]);
       }
       // News is what was added (names compare case-insensitively, like the registry).
-      // One new skill is named; several are counted, so first-time setup is one line.
+      // A save that adds a few skills names each; one that adds more is setting a
+      // profile up, not news, and writes none.
       const had = new Set(before.map((r) => r.skillName.toLowerCase()));
       const added = skills.filter((s) => !had.has(s.toLowerCase()));
-      if (added.length === 1) await recordActivity(trx, userId, 'newSkill', { skill: added[0]! });
-      else if (added.length > 1) {
-        await recordActivity(trx, userId, 'skillsAdded', { count: added.length });
+      if (added.length <= MAX_SKILL_ACTIVITIES) {
+        for (const skillName of added) await recordActivity(trx, userId, 'newSkill', { skillName });
       }
       return skills;
     });
