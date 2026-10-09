@@ -11,6 +11,10 @@
 // never printed. Both accounts must have a public profile. Exits 1 on the first failed check,
 // after trying to delete what it created.
 //
+// After every team change it also reads GET /v1/me/teams for both accounts and compares the
+// project's state on each side with the stored rows (the owner's own team list). Needs an API with
+// that route (M5 5.8).
+//
 // Left behind, because the API has no way to delete a notification: a few read notifications
 // on both accounts (about projects that no longer exist; they render from their saved names).
 const API = (process.env.API_URL ?? '').replace(/\/$/, '');
