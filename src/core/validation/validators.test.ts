@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { COLUMN_LIMITS, columnString } from './columns.js';
-import { httpUrl, isHttpUrl } from './http-url.js';
+import { httpsUrl, httpUrl, isHttpsUrl, isHttpUrl } from './http-url.js';
 import { linkList, stringList, translationParams } from './json-shapes.js';
 import { chars } from './text.js';
 import { yearMonth } from './year-month.js';
@@ -38,6 +38,28 @@ describe('httpUrl', () => {
   });
   it('rejects a URL longer than its column', () => {
     expect(httpUrl(chars(20)).safeParse('https://example.com/abc').success).toBe(false);
+  });
+});
+
+describe('httpsUrl', () => {
+  it.each(['https://example.com/a.png', 'HTTPS://EXAMPLE.COM/x'])('accepts %j', (v) => {
+    expect(httpsUrl().safeParse(v).success).toBe(true);
+  });
+  it.each([
+    'http://example.com/a.png',
+    'javascript:alert(1)',
+    'data:image/png;base64,AAAA',
+    'https://user:pw@example.com/a',
+    'https://user@example.com/a',
+    '//example.com/a',
+    '/a.png',
+    '',
+  ])('rejects %j', (v) => {
+    expect(isHttpsUrl(v)).toBe(false);
+    expect(httpsUrl().safeParse(v).success).toBe(false);
+  });
+  it('rejects a URL longer than its column', () => {
+    expect(httpsUrl(chars(20)).safeParse('https://example.com/abc').success).toBe(false);
   });
 });
 
