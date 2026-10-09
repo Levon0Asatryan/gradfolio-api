@@ -51,6 +51,7 @@ describe('toSummary', () => {
       metadata: { startDate: '2025-01-02', endDate: null },
       tags: ['a'],
       technologies: ['b'],
+      role: 'owner',
     });
     expect(toSummary(base, terms, 'someone').isOwner).toBe(false);
     expect(toSummary(base, terms, undefined).isOwner).toBe(false);

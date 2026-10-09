@@ -87,6 +87,10 @@ const summaryShape = {
   status: z.enum(PROJECT_STATUSES),
   heroImageUrl: z.string().nullable(),
   tags: z.array(z.string()),
+  role: z.literal('owner').meta({
+    description:
+      'Same field as on ProfileProject. Always owner here: these lists hold the user’s own projects (team projects appear on profiles only).',
+  }),
   technologies: z.array(z.string()),
   isPublic: z.boolean(),
   isDraft: z.boolean().meta({ description: 'A draft is readable by its owner only.' }),

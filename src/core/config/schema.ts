@@ -234,6 +234,11 @@ export const configSchema = z
   .refine((c) => c.NODE_ENV !== 'production' || c.AUTH0_ISSUER_BASE_URL.startsWith('https:'), {
     message: 'must be https in production',
     path: ['AUTH0_ISSUER_BASE_URL'],
+  })
+  // A default page larger than the maximum would 400 every list that omits `limit`.
+  .refine((c) => c.PROJECTS_PAGE_SIZE <= c.PROJECTS_PAGE_MAX, {
+    message: 'must not exceed PROJECTS_PAGE_MAX',
+    path: ['PROJECTS_PAGE_SIZE'],
   });
 
 export type DatabaseConfig = z.infer<typeof databaseConfigSchema>;

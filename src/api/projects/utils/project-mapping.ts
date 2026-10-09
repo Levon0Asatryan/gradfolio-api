@@ -15,6 +15,7 @@ export function toSummary(
     status: row.status,
     heroImageUrl: row.heroImageUrl,
     tags: terms.tags,
+    role: 'owner',
     technologies: terms.technologies,
     isPublic: row.isPublic,
     isDraft: row.isDraft,

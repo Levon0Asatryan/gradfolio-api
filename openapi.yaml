@@ -1987,6 +1987,11 @@ components:
           type: array
           items:
             type: string
+        role:
+          type: string
+          enum:
+            - owner
+          description: "Same field as on ProfileProject. Always owner here: these lists hold the user’s own projects (team projects appear on profiles only)."
         technologies:
           type: array
           items:
@@ -2072,6 +2077,7 @@ components:
         - status
         - heroImageUrl
         - tags
+        - role
         - technologies
         - isPublic
         - isDraft
@@ -2216,6 +2222,11 @@ components:
           type: array
           items:
             type: string
+        role:
+          type: string
+          enum:
+            - owner
+          description: "Same field as on ProfileProject. Always owner here: these lists hold the user’s own projects (team projects appear on profiles only)."
         technologies:
           type: array
           items:
@@ -2246,6 +2257,7 @@ components:
         - status
         - heroImageUrl
         - tags
+        - role
         - technologies
         - isPublic
         - isDraft

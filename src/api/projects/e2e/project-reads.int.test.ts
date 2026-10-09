@@ -55,7 +55,7 @@ async function member(label: string, over: Parameters<typeof createUser>[1] = {}
 }
 
 interface Page {
-  items: { id: string; title: string; isOwner: boolean }[];
+  items: { id: string; title: string; isOwner: boolean; role: string }[];
   nextCursor: string | null;
 }
 const titlesOf = (body: unknown) => (body as Page).items.map((p) => p.title);
@@ -280,7 +280,7 @@ describe('GET /v1/me/projects', () => {
 
     const res = await http.get('/v1/me/projects?sort=name_asc').set(me.auth).expect(200);
     expect(titlesOf(res.body)).toEqual(['A public', 'B private', 'C draft', 'D private draft']);
-    expect((res.body as Page).items.every((p) => p.isOwner)).toBe(true);
+    expect((res.body as Page).items.every((p) => p.isOwner && p.role === 'owner')).toBe(true);
     expect(res.body.nextCursor).toBeNull();
 
     const byState = async (state: string) =>
@@ -494,7 +494,7 @@ describe('pagination', () => {
   });
 
   it('refuses a cursor for another sort, a forged one, an over-large page and unknown keys', async () => {
-    const http = await start({ PROJECTS_PAGE_MAX: '5' });
+    const http = await start({ PROJECTS_PAGE_MAX: '5', PROJECTS_PAGE_SIZE: '5' });
     const me = await member('me');
     for (let i = 0; i < 3; i++) await createProject(db, me.user);
     const page = await http.get('/v1/me/projects?limit=2').set(me.auth).expect(200);
