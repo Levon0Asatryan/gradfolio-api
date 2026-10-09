@@ -174,7 +174,10 @@ Q11 is not weakened: the FE calls the API only from the server.
 ### 3.5 Flow and rules (4.5)
 
 - **`POST /v1/me/uploads`** `{purpose: 'avatar'|'hero'|'attachment', contentType, size, projectId?}`.
-  `hero` and `attachment` need `projectId`, owned by the caller (else 404). Allowed types:
+  `projectId` is optional for `hero` and `attachment` (so a file can be uploaded while the
+  project is being created); when given it must be the caller's (else 404), and an `avatar`
+  with one is 400. The key never carries a project: the row that registers the file binds
+  it, once (`FILE_IN_USE` otherwise). Allowed types:
   images `image/png|jpeg|webp|gif` (≤ `UPLOAD_MAX_IMAGE_BYTES`, 5 MB), `application/pdf`
   (≤ `UPLOAD_MAX_PDF_BYTES`, 20 MB). Anything else, or a size over the limit: 400. No
   SVG, no HTML.
@@ -187,7 +190,7 @@ Q11 is not weakened: the FE calls the API only from the server.
   (`maxResults = UPLOAD_MAX_FILES_PER_USER + 1`, default cap 200) and answers 409
   `LIMIT_REACHED` at the cap, else signs. **Signing reserves nothing**: it changes neither
   the bucket nor the database, so no lock or transaction would make the cap exact, and
-  none is used (the sign route only checks the project's owner). Abandoned uploads count
+  none is used (the sign route only checks the project's owner, when a `projectId` is sent). Abandoned uploads count
   until the sweep deletes them. The bound is therefore cap + the URLs signed but not yet
   used: at most `RATE_LIMIT_UPLOAD` × `UPLOAD_URL_TTL_S` / `RATE_LIMIT_WINDOW_S` = 100
   (default 20/min × 300 s / 60 s), so **at most 300 objects per user** with the defaults.

@@ -135,6 +135,7 @@ describe('POST /v1/me/uploads', () => {
 
   it.each([
     ['an unknown key', { purpose: 'avatar', contentType: 'image/png', size: 10, extra: 1 }],
+    ['no purpose', { contentType: 'image/png', size: 10 }],
     ['an unknown purpose', { purpose: 'banner', contentType: 'image/png', size: 10 }],
     ['svg', { purpose: 'avatar', contentType: 'image/svg+xml', size: 10 }],
     ['html', { purpose: 'attachment', contentType: 'text/html', size: 10, projectId: 'x' }],
@@ -146,11 +147,6 @@ describe('POST /v1/me/uploads', () => {
     [
       'an avatar with a project',
       { purpose: 'avatar', contentType: 'image/png', size: 10, projectId: 'x' },
-    ],
-    ['a hero without a project', { purpose: 'hero', contentType: 'image/png', size: 10 }],
-    [
-      'an attachment without a project',
-      { purpose: 'attachment', contentType: 'image/png', size: 10 },
     ],
   ])('refuses %s with 400', async (_name, body) => {
     const http = await start();
@@ -171,6 +167,48 @@ describe('POST /v1/me/uploads', () => {
       });
     await send(20_000_000).expect(201);
     await send(20_000_001).expect(400);
+  });
+
+  it.each(['hero', 'attachment'] as const)(
+    'signs a %s without a project, for use while a project is being created',
+    async (purpose) => {
+      const http = await start();
+      const me = await member('me');
+      const res = await http
+        .post('/v1/me/uploads')
+        .set(me.auth)
+        .send({ purpose, contentType: 'image/png', size: 10 })
+        .expect(201);
+      expect(objectKeyOf(res.body.fileUrl as string, BUCKET)).toMatch(
+        new RegExp(`^u/${me.user.id}/[0-9a-f-]{36}\\.png$`),
+      );
+    },
+  );
+
+  it('files uploaded without a project are registered by the rows that claim them, once', async () => {
+    const http = await start();
+    const me = await member('me');
+    const hero = await upload(http, me, 'hero');
+    const img = await upload(http, me, 'attachment');
+    const created = await http
+      .post('/v1/projects')
+      .set(me.auth)
+      .send({ title: 'T', heroImageUrl: hero.fileUrl })
+      .expect(201);
+    const id = created.body.id as string;
+    expect((await storage.stat(hero.key))?.claimed).toBe(true);
+    await http
+      .post(`/v1/projects/${id}/attachments`)
+      .set(me.auth)
+      .send({ type: 'image', url: img.fileUrl })
+      .expect(201);
+    expect((await storage.stat(img.key))?.claimed).toBe(true);
+    // the same file cannot back a second row
+    await http
+      .post('/v1/projects')
+      .set(me.auth)
+      .send({ title: 'Second', heroImageUrl: hero.fileUrl })
+      .expect(400);
   });
 
   it('answers 404 for a project that is not the caller’s, and signs nothing', async () => {

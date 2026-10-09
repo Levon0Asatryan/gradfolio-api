@@ -30,6 +30,11 @@ export class UploadsService {
    * A signed `PUT` for one file. Nothing is reserved: the cap counts the
    * objects already under the user's prefix, so the true bound is the cap plus
    * the URLs signed but not yet used (rate limit × URL lifetime; plan §3.5).
+   *
+   * `projectId` is optional for `hero` and `attachment`, so a file can be uploaded
+   * while the project is still being created. The key carries no project, so
+   * nothing here binds the file to one: registration does that (the one row that
+   * claims it). When given, the project must be the caller's (404 otherwise).
    */
   async sign(userId: string, body: unknown): Promise<UploadResponse> {
     const { storage } = this;
@@ -59,9 +64,6 @@ export class UploadsService {
     if (req.size > max) problems.push({ path: 'size', message: `must be at most ${max} bytes` });
     if (req.purpose === 'avatar' && req.projectId !== undefined) {
       problems.push({ path: 'projectId', message: 'an avatar belongs to no project' });
-    }
-    if (req.purpose !== 'avatar' && req.projectId === undefined) {
-      problems.push({ path: 'projectId', message: `required for ${req.purpose}` });
     }
     if (problems.length > 0) throw new ValidationError(problems);
 

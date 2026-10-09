@@ -12,11 +12,10 @@ export const uploadRequestSchema = z.strictObject({
   purpose: z.enum(UPLOAD_PURPOSES),
   contentType: z.enum([...IMAGE_TYPES, PDF_TYPE]),
   size: z.number().int().min(1).meta({ description: 'Exact size in bytes; signed into the URL.' }),
-  projectId: z
-    .string()
-    .max(36)
-    .optional()
-    .meta({ description: 'Required for `hero` and `attachment`: a project of the caller’s.' }),
+  projectId: z.string().max(36).optional().meta({
+    description:
+      'Optional for `hero` and `attachment` (omit it while the project is being created); when given, a project of the caller’s. Not allowed for `avatar`.',
+  }),
 });
 export type UploadRequest = z.output<typeof uploadRequestSchema>;
 
