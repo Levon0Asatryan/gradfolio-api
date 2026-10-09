@@ -4,12 +4,17 @@ import { DbService } from '../../../core/db/db.service.js';
 import { inTransaction } from '../../../core/db/transaction.js';
 import { NotFoundError } from '../../../core/errors/app-error.js';
 import { lockUser } from '../../../core/db/user-lock.js';
+import { FileUrlService } from '../../files/services/file-url.service.js';
+
+/** More than the per-user cap can ever hold (config max 5000). */
+const ACCOUNT_FILE_LIMIT = 10_000;
 
 @Injectable()
 export class AccountService {
   constructor(
     private readonly dbs: DbService,
     @InjectPinoLogger(AccountService.name) private readonly logger: PinoLogger,
+    private readonly files: FileUrlService,
   ) {}
 
   /**
@@ -47,6 +52,9 @@ export class AccountService {
       const result = await trx.deleteFrom('users').where('id', '=', userId).executeTakeFirst();
       if (Number(result.numDeletedRows) === 0) throw new NotFoundError('account');
     });
+    // Every object under the user's prefix, including uploads never registered.
+    // After the commit: a failed delete is logged by `release` and swept later.
+    await this.files.releaseAllOf(userId, ACCOUNT_FILE_LIMIT);
     this.logger.info({ userId }, 'account deletion completed');
   }
 }

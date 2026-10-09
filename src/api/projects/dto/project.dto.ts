@@ -134,6 +134,7 @@ export const projectPageSchema = z
   })
   .meta({ id: 'ProjectPage' });
 
+export type ProjectAttachment = z.infer<typeof projectAttachmentSchema>;
 export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 export type ProjectDetail = z.infer<typeof projectDetailSchema>;
 export type ProjectPage = z.infer<typeof projectPageSchema>;
