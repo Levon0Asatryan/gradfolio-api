@@ -111,8 +111,9 @@ gcloud iam service-accounts add-iam-policy-binding \
   --role=roles/iam.serviceAccountTokenCreator
 ```
 
-`cors.json`: origins `https://gradfolio-navy.vercel.app` and `http://localhost:3010`;
-method `PUT`; `responseHeader` `Content-Type`, `x-goog-content-length-range`;
+`cors.json` (now `docker/gcs-cors.json`, applied with `--cors-file`): origins
+`https://gradfolio-navy.vercel.app` and `http://localhost:3010`; method `PUT`;
+`responseHeader` `Content-Type`, `x-goog-content-length-range`, `x-goog-if-generation-match`;
 `maxAgeSeconds` 3600. `describe` shows `US-EAST1`, uniform access, public access
 prevention enforced. Bucket IAM: the runtime account `objectUser` (plus the project's
 legacy owner/editor/viewer roles that GCS adds); no `allUsers`. The account's own policy:
@@ -253,6 +254,30 @@ becomes "any https URL".
   the runtime account; a full upload to delete flow) are recorded in the PR description and in
   `m4-verification.md`. The IAM `signBlob` call the library makes on Cloud Run is checked at the
   production round trip, because it needs the runtime identity.
+
+### 3.7 Follow-up to PR (c), three review findings (all confirmed)
+
+- **Replay of a signed PUT.** The URL is now also signed with `x-goog-if-generation-match: 0`
+  (create-only), so it writes its key once; a replay is a 412. Run against the real bucket:
+  first PUT 200, replay with other bytes 412, object and generation unchanged. The claim now
+  carries _both_ preconditions, generation and metageneration (metageneration restarts at 1
+  for every generation, so it cannot tell replaced bytes from validated ones).
+- **Sweep.** It lists first, reads the references second, and deletes only the listed
+  generation and metageneration: an object claimed after the listing is kept (a claim bumps
+  the metageneration); one claimed before it has a refreshed `updated`, so the age floor
+  holds it until its row has long committed.
+- **Signing a read URL never fails a request.** A write that committed (and claimed a file)
+  is not reported as failed because the response could not be signed: the stored URL is
+  returned, the failure logged, and the next read signs again.
+
+- **CORS had to follow the signed headers (found in review of the follow-up).** A signed
+  header the browser must send must be listed in the bucket's CORS `responseHeader`, or the
+  preflight is refused. Run against the real bucket: with the old list a preflight asking for
+  `x-goog-if-generation-match` got **no** `access-control-allow-*` headers; the list was
+  updated (`docker/gcs-cors.json`) and the preflight then echoes the origin and all three
+  headers, a foreign origin and an unlisted header get nothing. `uploadHeaders()` is the one
+  place the signed extension headers are defined, and `cors-config.test.ts` fails when the
+  file and that function drift.
 
 ## 4. Sanitizer (4.2): measured
 

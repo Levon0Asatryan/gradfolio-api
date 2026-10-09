@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["https://gradfolio-navy.vercel.app", "http://localhost:3010"],
+    "method": ["PUT"],
+    "responseHeader": ["Content-Type", "x-goog-content-length-range", "x-goog-if-generation-match"],
+    "maxAgeSeconds": 3600
+  }
+]

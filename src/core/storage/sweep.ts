@@ -9,6 +9,8 @@ export interface SweepResult {
   orphans: string[];
   /** Orphans actually deleted (always 0 on a dry run). */
   deleted: number;
+  /** Orphans kept because they changed after they were listed (registered or replaced meanwhile). */
+  kept: number;
 }
 
 /** More objects than this bucket can plausibly hold; the sweep reads at most this many. */
@@ -20,6 +22,7 @@ const SWEEP_LIMIT = 100_000;
  * and deletes those older than `minAgeMs`. The age floor is what keeps a file
  * that was just claimed, with its row not yet committed, from being taken.
  * Only the `u/` prefix is looked at. `apply: false` reports and deletes nothing.
+ * An orphan that changed after it was listed is kept and counted, not deleted.
  */
 export async function sweepOrphans(
   db: Database,
@@ -27,6 +30,13 @@ export async function sweepOrphans(
   bucket: string,
   { apply, minAgeMs, now = Date.now() }: { apply: boolean; minAgeMs: number; now?: number },
 ): Promise<SweepResult> {
+  // List first, read the references second, delete third, and delete only the exact
+  // version that was listed. An object registered after the listing has a new
+  // metageneration (the claim), so its delete is refused; one registered before it
+  // has had its `updatedAt` refreshed by the claim, so the age floor holds it back
+  // until its row has long been committed.
+  const objects = await storage.list('u/', SWEEP_LIMIT);
+
   const referenced = new Set<string>();
   const add = (url: string | null) => {
     const key = url === null ? null : objectKeyOf(url, bucket);
@@ -44,16 +54,16 @@ export async function sweepOrphans(
     add(r.thumbnailUrl);
   }
 
-  const objects = await storage.list('u/', SWEEP_LIMIT);
-  const orphans = objects
-    .filter((o) => !referenced.has(o.key) && now - o.updatedAt.getTime() >= minAgeMs)
-    .map((o) => o.key);
+  const orphans = objects.filter(
+    (o) => !referenced.has(o.key) && now - o.updatedAt.getTime() >= minAgeMs,
+  );
   let deleted = 0;
+  let kept = 0;
   if (apply) {
-    for (const key of orphans) {
-      await storage.delete(key);
-      deleted++;
+    for (const o of orphans) {
+      if (await storage.delete(o.key, o)) deleted++;
+      else kept++;
     }
   }
-  return { scanned: objects.length, orphans, deleted };
+  return { scanned: objects.length, orphans: orphans.map((o) => o.key), deleted, kept };
 }
