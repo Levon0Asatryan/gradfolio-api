@@ -3,7 +3,12 @@ import { newId } from '../ids.js';
 import { toJsonColumn } from '../json.js';
 import { setProjectTerms, setUserSkills } from '../terms.js';
 import { inTransaction } from '../transaction.js';
-import { linkList, stringList, translationParams } from '../../validation/json-shapes.js';
+import {
+  linkList,
+  notificationParams,
+  stringList,
+  translationParams,
+} from '../../validation/json-shapes.js';
 import { termList } from '../../validation/terms.js';
 import { activities, integrations, notifications, projects, SEED_USERS, users } from './data.js';
 
@@ -131,6 +136,7 @@ export async function seed(db: Database): Promise<void> {
           type: n.type,
           title: n.title,
           message: n.message,
+          params: toJsonColumn(notificationParams, { ...n.params, projectId: n.project }),
           isRead: n.isRead,
           referenceId: n.project,
           referenceType: 'project',

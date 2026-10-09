@@ -505,6 +505,8 @@ export interface SeedNotification {
   message: string;
   isRead: boolean;
   project: ProjectId;
+  /** What the frontend renders the text from (m5-plan §5.1); `title`/`message` are the fallback. */
+  params: { actorName: string; projectTitle: string; role?: string };
 }
 
 /** Each one is about a team row above; its link is built from the project id. */
@@ -516,6 +518,7 @@ export const notifications: SeedNotification[] = [
     message: 'Անահիտ Սարգսյան пригласила вас в «Gradfolio» как Backend Developer',
     isRead: false,
     project: SEED_PROJECTS.gradfolio,
+    params: { actorName: 'Անահիտ Սարգսյան', projectTitle: 'Gradfolio', role: 'Backend Developer' },
   },
   {
     user: SEED_USERS.anahit,
@@ -524,6 +527,7 @@ export const notifications: SeedNotification[] = [
     message: 'Мария Петросян-ը միացավ «Gradfolio» նախագծին',
     isRead: true,
     project: SEED_PROJECTS.gradfolio,
+    params: { actorName: 'Мария Петросян', projectTitle: 'Gradfolio' },
   },
   {
     user: SEED_USERS.dmitri,
@@ -532,6 +536,7 @@ export const notifications: SeedNotification[] = [
     message: 'Tigran Hakobyan declined the invitation to «Маршруты ереванского метро»',
     isRead: false,
     project: SEED_PROJECTS.metroRoute,
+    params: { actorName: 'Tigran Hakobyan', projectTitle: 'Маршруты ереванского метро' },
   },
   {
     user: SEED_USERS.tigran,
@@ -540,6 +545,7 @@ export const notifications: SeedNotification[] = [
     message: 'Emily Carter joined “Armenian Wine Quality Predictor”',
     isRead: true,
     project: SEED_PROJECTS.wineQuality,
+    params: { actorName: 'Emily Carter', projectTitle: 'Armenian Wine Quality Predictor' },
   },
 ];
 

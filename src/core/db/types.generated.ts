@@ -3,7 +3,7 @@
  * Please do not edit it manually.
  */
 
-import type { Bool, DateText, JsonColumn, LinkList, StringList, TranslationParams } from "./column-types.js";
+import type { Bool, DateText, JsonColumn, LinkList, NotificationParams, StringList, TranslationParams } from "./column-types.js";
 import type { ColumnType } from "kysely";
 
 export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
@@ -76,10 +76,11 @@ export interface Notifications {
   isRead: Bool;
   link: string | null;
   message: string | null;
+  params: JsonColumn<NotificationParams>;
   referenceId: string | null;
   referenceType: string | null;
   title: string;
-  type: "comment" | "contact_request" | "general" | "project_verified" | "team_accepted" | "team_invite" | "team_rejected";
+  type: "comment" | "contact_request" | "general" | "project_verified" | "team_accepted" | "team_invite" | "team_left" | "team_rejected";
   userId: string;
 }
 

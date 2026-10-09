@@ -9,6 +9,7 @@
     "DateText": "./column-types.js",
     "JsonColumn": "./column-types.js",
     "LinkList": "./column-types.js",
+    "NotificationParams": "./column-types.js",
     "StringList": "./column-types.js",
     "TranslationParams": "./column-types.js"
   },
@@ -39,7 +40,8 @@
       "experience.skills": "JsonColumn<StringList>",
       "projects.links": "JsonColumn<LinkList>",
       "projects.files": "JsonColumn<LinkList>",
-      "activities.translation_params": "JsonColumn<TranslationParams>"
+      "activities.translation_params": "JsonColumn<TranslationParams>",
+      "notifications.params": "JsonColumn<NotificationParams>"
     }
   }
 }
