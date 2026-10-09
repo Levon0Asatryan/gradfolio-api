@@ -1,4 +1,5 @@
 import { Storage } from '@google-cloud/storage';
+import { uploadHeaders } from './upload-headers.js';
 import type { FileStorage, ListedObject, ObjectInfo, SignedUpload } from './file-storage.js';
 
 const NOT_FOUND = 404;
@@ -29,10 +30,7 @@ export class GcsFileStorage implements FileStorage {
     // a PUT that changes any of them does not match the signature (run,
     // docs/m4-plan.md §3.3), and once the object exists a replay of the same URL
     // is refused (412), so the bytes that were validated are the bytes that stay.
-    const headers = {
-      'x-goog-content-length-range': `${size},${size}`,
-      'x-goog-if-generation-match': '0',
-    };
+    const headers = uploadHeaders(size);
     const [url] = await this.bucket.file(key).getSignedUrl({
       version: 'v4',
       action: 'write',

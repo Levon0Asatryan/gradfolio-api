@@ -1,3 +1,4 @@
+import { uploadHeaders } from '../core/storage/upload-headers.js';
 import type { FileStorage, ObjectInfo, SignedUpload } from '../core/storage/file-storage.js';
 
 interface FakeObject {
@@ -57,11 +58,7 @@ export class FakeFileStorage implements FileStorage {
 
   signUpload({ key, contentType, size, ttlS }: Parameters<FileStorage['signUpload']>[0]) {
     const url = `https://${this.bucket}.storage.googleapis.com/${key}?X-Goog-Expires=${ttlS}&X-Goog-Signature=fake`;
-    const headers = {
-      'Content-Type': contentType,
-      'x-goog-content-length-range': `${size},${size}`,
-      'x-goog-if-generation-match': '0',
-    };
+    const headers = { 'Content-Type': contentType, ...uploadHeaders(size) };
     return Promise.resolve<SignedUpload>({ url, headers });
   }
 

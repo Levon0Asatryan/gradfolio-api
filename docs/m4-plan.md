@@ -111,8 +111,9 @@ gcloud iam service-accounts add-iam-policy-binding \
   --role=roles/iam.serviceAccountTokenCreator
 ```
 
-`cors.json`: origins `https://gradfolio-navy.vercel.app` and `http://localhost:3010`;
-method `PUT`; `responseHeader` `Content-Type`, `x-goog-content-length-range`;
+`cors.json` (now `docker/gcs-cors.json`, applied with `--cors-file`): origins
+`https://gradfolio-navy.vercel.app` and `http://localhost:3010`; method `PUT`;
+`responseHeader` `Content-Type`, `x-goog-content-length-range`, `x-goog-if-generation-match`;
 `maxAgeSeconds` 3600. `describe` shows `US-EAST1`, uniform access, public access
 prevention enforced. Bucket IAM: the runtime account `objectUser` (plus the project's
 legacy owner/editor/viewer roles that GCS adds); no `allUsers`. The account's own policy:
@@ -268,6 +269,15 @@ becomes "any https URL".
 - **Signing a read URL never fails a request.** A write that committed (and claimed a file)
   is not reported as failed because the response could not be signed: the stored URL is
   returned, the failure logged, and the next read signs again.
+
+- **CORS had to follow the signed headers (found in review of the follow-up).** A signed
+  header the browser must send must be listed in the bucket's CORS `responseHeader`, or the
+  preflight is refused. Run against the real bucket: with the old list a preflight asking for
+  `x-goog-if-generation-match` got **no** `access-control-allow-*` headers; the list was
+  updated (`docker/gcs-cors.json`) and the preflight then echoes the origin and all three
+  headers, a foreign origin and an unlisted header get nothing. `uploadHeaders()` is the one
+  place the signed extension headers are defined, and `cors-config.test.ts` fails when the
+  file and that function drift.
 
 ## 4. Sanitizer (4.2): measured
 

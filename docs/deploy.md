@@ -108,7 +108,7 @@ print to the job log (JSON lines appear under `jsonPayload`).
 ## File storage (M4)
 
 Bucket `gradfolio-files-1058577031182` (plan: [m4-plan.md](m4-plan.md) §3). Private; the API signs every upload and every read.
-CORS (`PUT` from the production frontend and `http://localhost:3010`) is on the bucket; Vercel preview origins are not listed
+CORS (`PUT` from the production frontend and `http://localhost:3010`) is on the bucket and lives in `docker/gcs-cors.json`; the rule must name every header a signed upload carries (`cors-config.test.ts` fails when `uploadHeaders()` and the file drift). Apply a change with `gcloud storage buckets update gs://gradfolio-files-1058577031182 --cors-file=docker/gcs-cors.json` and re-check with a preflight (`curl -X OPTIONS -H 'Origin: …' -H 'Access-Control-Request-Method: PUT' -H 'Access-Control-Request-Headers: content-type,x-goog-content-length-range,x-goog-if-generation-match' https://<bucket>.storage.googleapis.com/x`: the origin must be echoed, a foreign one must get no `access-control-allow-*`); Vercel preview origins are not listed
 (no wildcard exists), so previews cannot upload. IAM, all on `gradfolio-api-run`: `roles/storage.objectUser` on the bucket, and
 `roles/iam.serviceAccountTokenCreator` on **itself** (it signs through IAM `signBlob`; project Owner is not enough). No key file.
 
