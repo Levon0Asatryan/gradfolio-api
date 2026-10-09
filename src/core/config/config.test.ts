@@ -32,6 +32,16 @@ describe('loadConfig', () => {
       PROFILE_PROJECTS_LIMIT: 50,
       PROFILE_MAX_SECTION_ITEMS: 50,
       PROFILE_MAX_SKILLS: 100,
+      PROJECTS_PAGE_SIZE: 20,
+      PROJECTS_PAGE_MAX: 50,
+      ATTACHMENT_VIDEO_HOSTS: [
+        'youtube.com',
+        'www.youtube.com',
+        'm.youtube.com',
+        'youtu.be',
+        'vimeo.com',
+        'player.vimeo.com',
+      ],
     });
   });
 
@@ -95,8 +105,18 @@ describe('loadConfig', () => {
     ['PROFILE_MAX_SKILLS', '1001'],
     ['PROFILE_PROJECTS_LIMIT', '0'],
     ['PROFILE_PROJECTS_LIMIT', '501'],
+    ['PROJECTS_PAGE_SIZE', '0'],
+    ['PROJECTS_PAGE_MAX', '201'],
   ])('refuses %s=%j', (key, value) => {
     expect(() => loadConfig({ ...REQUIRED, [key]: value })).toThrow(new RegExp(key));
+  });
+
+  it('refuses a default page size above the maximum, and accepts one equal to it', () => {
+    expect(() => loadConfig({ ...REQUIRED, PROJECTS_PAGE_MAX: '5' })).toThrow(/PROJECTS_PAGE_SIZE/);
+    expect(
+      loadConfig({ ...REQUIRED, PROJECTS_PAGE_MAX: '5', PROJECTS_PAGE_SIZE: '5' })
+        .PROJECTS_PAGE_SIZE,
+    ).toBe(5);
   });
 
   it('refuses a non-mysql database URL', () => {

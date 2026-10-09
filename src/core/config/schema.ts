@@ -140,6 +140,24 @@ const profile = {
   PROFILE_PROJECTS_LIMIT: z.coerce.number().int().min(1).max(500).default(50),
 };
 
+/** Project reads (docs/m4-plan.md §1, §5.2). */
+const projects = {
+  // Items per page when `limit` is not given, and the most a caller may ask for.
+  PROJECTS_PAGE_SIZE: z.coerce.number().int().min(1).max(200).default(20),
+  PROJECTS_PAGE_MAX: z.coerce.number().int().min(1).max(200).default(50),
+  // Hosts a video attachment may point to (the parsed hostname, never a
+  // substring). A host listed here is also one the code knows how to embed.
+  ATTACHMENT_VIDEO_HOSTS: z
+    .string()
+    .default('youtube.com,www.youtube.com,m.youtube.com,youtu.be,vimeo.com,player.vimeo.com')
+    .transform((v) =>
+      v
+        .split(',')
+        .map((h) => h.trim().toLowerCase())
+        .filter((h) => h.length > 0),
+    ),
+};
+
 /** MySQL 8.4. */
 const database = {
   DATABASE_URL: z
@@ -210,12 +228,17 @@ export const databaseConfigSchema = z
 
 /** Everything the api process needs. */
 export const configSchema = z
-  .object({ ...runtime, ...api, ...database, ...auth, ...rateLimit, ...profile })
+  .object({ ...runtime, ...api, ...database, ...auth, ...rateLimit, ...profile, ...projects })
   .refine(tlsInProduction, TLS_IN_PRODUCTION)
   .refine(noTlsOnSocket, NO_TLS_ON_SOCKET)
   .refine((c) => c.NODE_ENV !== 'production' || c.AUTH0_ISSUER_BASE_URL.startsWith('https:'), {
     message: 'must be https in production',
     path: ['AUTH0_ISSUER_BASE_URL'],
+  })
+  // A default page larger than the maximum would 400 every list that omits `limit`.
+  .refine((c) => c.PROJECTS_PAGE_SIZE <= c.PROJECTS_PAGE_MAX, {
+    message: 'must not exceed PROJECTS_PAGE_MAX',
+    path: ['PROJECTS_PAGE_SIZE'],
   });
 
 export type DatabaseConfig = z.infer<typeof databaseConfigSchema>;

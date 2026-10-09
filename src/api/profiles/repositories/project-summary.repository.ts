@@ -1,5 +1,6 @@
 import type { Database } from '../../../core/db/database.js';
 import type { ProfileProject } from '../dto/profile.dto.js';
+import { termsOf } from '../../projects/repositories/project-terms.repository.js';
 
 const SUMMARY_COLUMNS = [
   'projects.id',
@@ -64,27 +65,10 @@ export async function listProfileProjects(
     )
     .slice(0, limit);
 
-  const tags = await tagsOf(
+  const tags = await termsOf(
     db,
+    'projectTags',
     merged.map((p) => p.id),
   );
   return merged.map(({ createdAt: _createdAt, ...p }) => ({ ...p, tags: tags.get(p.id) ?? [] }));
-}
-
-async function tagsOf(db: Database, projectIds: string[]): Promise<Map<string, string[]>> {
-  const byProject = new Map<string, string[]>();
-  if (projectIds.length === 0) return byProject;
-  const rows = await db
-    .selectFrom('projectTags')
-    .select(['projectId', 'name'])
-    .where('projectId', 'in', projectIds)
-    .orderBy('sortOrder')
-    .orderBy('name')
-    .execute();
-  for (const { projectId, name } of rows) {
-    const list = byProject.get(projectId) ?? [];
-    list.push(name);
-    byProject.set(projectId, list);
-  }
-  return byProject;
 }
