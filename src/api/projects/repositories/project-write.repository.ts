@@ -166,16 +166,17 @@ export async function lockProjectRow(
 /**
  * The file URLs a project holds -- hero and every attachment's url and
  * thumbnail -- read with the project row locked, so what is deleted is exactly
- * what the delete took with it. `undefined`: not the caller's.
+ * what the delete took with it, and the title the project had (for the activity
+ * about its deletion). `undefined`: not the caller's.
  */
 export async function lockProjectFileUrls(
   trx: Transaction<DB>,
   userId: string,
   id: string,
-): Promise<(string | null)[] | undefined> {
+): Promise<{ title: string; urls: (string | null)[] } | undefined> {
   const project = await trx
     .selectFrom('projects')
-    .select('heroImageUrl')
+    .select(['title', 'heroImageUrl'])
     .where('id', '=', id)
     .where('userId', '=', userId)
     .forUpdate()
@@ -186,7 +187,10 @@ export async function lockProjectFileUrls(
     .select(['url', 'thumbnailUrl'])
     .where('projectId', '=', id)
     .execute();
-  return [project.heroImageUrl, ...attachments.flatMap((a) => [a.url, a.thumbnailUrl])];
+  return {
+    title: project.title,
+    urls: [project.heroImageUrl, ...attachments.flatMap((a) => [a.url, a.thumbnailUrl])],
+  };
 }
 
 /** Rows deleted inside a transaction: 0 means no such project of the caller's. */

@@ -22,6 +22,7 @@ import {
   lockProjectFileUrls,
   updateOwnedProject,
 } from '../repositories/project-write.repository.js';
+import { recordActivity } from '../../activities/repositories/activity-write.repository.js';
 import { FileUrlService } from '../../files/services/file-url.service.js';
 import { ProjectService } from './project.service.js';
 
@@ -67,6 +68,7 @@ export class ProjectWriteService {
       await insertProject(trx, userId, id, { ...input, heroImageUrl });
       await setProjectTerms(trx, id, 'technologies', input.technologies);
       await setProjectTerms(trx, id, 'tags', input.tags);
+      await recordActivity(trx, userId, 'projectCreated', { projectId: id, name: input.title });
     });
     return this.reads.getProject(id, userId);
   }
@@ -98,6 +100,13 @@ export class ProjectWriteService {
         await setProjectTerms(trx, id, 'technologies', merged.technologies);
       }
       if (patch.tags !== undefined) await setProjectTerms(trx, id, 'tags', merged.tags);
+      // Only the change from draft to published; later edits are not news.
+      if (stored.isDraft && !merged.isDraft) {
+        await recordActivity(trx, userId, 'projectPublished', {
+          projectId: id,
+          name: merged.title,
+        });
+      }
       return this.files
         .keysOf([stored.heroImageUrl])
         .filter((k) => !this.files.keysOf([heroImageUrl]).includes(k));
@@ -109,10 +118,11 @@ export class ProjectWriteService {
   /** Children cascade. The objects they pointed at are deleted after the commit. */
   async remove(userId: string, id: string): Promise<void> {
     const keys = await inTransaction(this.dbs.db, async (trx) => {
-      const urls = await lockProjectFileUrls(trx, userId, id);
-      if (urls === undefined) throw new NotFoundError('project');
+      const locked = await lockProjectFileUrls(trx, userId, id);
+      if (locked === undefined) throw new NotFoundError('project');
       if ((await deleteOwnedProjectIn(trx, userId, id)) === 0) throw new NotFoundError('project');
-      return this.files.keysOf(urls);
+      await recordActivity(trx, userId, 'projectDeleted', { name: locked.title });
+      return this.files.keysOf(locked.urls);
     });
     await this.files.release(keys);
   }

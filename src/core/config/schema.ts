@@ -194,6 +194,9 @@ const notifications = {
   // Items per page when `limit` is not given, and the most a caller may ask for.
   NOTIFICATIONS_PAGE_SIZE: z.coerce.number().int().min(1).max(200).default(20),
   NOTIFICATIONS_PAGE_MAX: z.coerce.number().int().min(1).max(200).default(50),
+  // The same for the activity feed.
+  ACTIVITIES_PAGE_SIZE: z.coerce.number().int().min(1).max(200).default(20),
+  ACTIVITIES_PAGE_MAX: z.coerce.number().int().min(1).max(200).default(50),
 };
 
 /** MySQL 8.4. */
@@ -287,6 +290,10 @@ export const configSchema = z
   .refine((c) => c.NOTIFICATIONS_PAGE_SIZE <= c.NOTIFICATIONS_PAGE_MAX, {
     message: 'must not exceed NOTIFICATIONS_PAGE_MAX',
     path: ['NOTIFICATIONS_PAGE_SIZE'],
+  })
+  .refine((c) => c.ACTIVITIES_PAGE_SIZE <= c.ACTIVITIES_PAGE_MAX, {
+    message: 'must not exceed ACTIVITIES_PAGE_MAX',
+    path: ['ACTIVITIES_PAGE_SIZE'],
   })
   .refine((c) => c.PROJECTS_PAGE_SIZE <= c.PROJECTS_PAGE_MAX, {
     message: 'must not exceed PROJECTS_PAGE_MAX',
