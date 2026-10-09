@@ -166,7 +166,9 @@ Two disposable test accounts in the project's Auth0 tenant, each signed in throu
 frontend; one access token per account (issuer `https://dev-wkthnyn8b8mjn5ae.us.auth0.com/`,
 audience `https://api.gradfolio.app`, RS256, different `sub`s, checked without printing).
 Tokens lived in a gitignored, mode-600 `.env`, were passed to the script through the
-environment, and appear in no file, log or message.
+environment. Outside that `.env`, they appear in no tracked file, no PR text and no message, and
+not in the script output or the local API log (searched below); the production request logs
+were not read.
 
 `scripts/team-roundtrip.mjs` (§8), unchanged, with the two real tokens:
 
