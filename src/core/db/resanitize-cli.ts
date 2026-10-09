@@ -17,9 +17,11 @@ async function main(): Promise<void> {
   const cfg = loadDatabaseConfig();
   const pool = createPool({ ...cfg, DATABASE_POOL_MAX: 2 });
   try {
-    const { scanned, changed } = await resanitizeDescriptions(createDatabase(pool), { apply });
+    const { scanned, changed, skipped } = await resanitizeDescriptions(createDatabase(pool), {
+      apply,
+    });
     process.stdout.write(
-      `resanitize: ${scanned} scanned, ${changed} ${apply ? 'rewritten' : 'would change (dry run; pass --apply)'}\n`,
+      `resanitize: ${scanned} scanned, ${changed} ${apply ? 'rewritten' : 'would change (dry run; pass --apply)'}${skipped > 0 ? `, ${skipped} skipped (changed meanwhile; run again)` : ''}\n`,
     );
   } finally {
     await pool.end();

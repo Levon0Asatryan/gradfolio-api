@@ -192,6 +192,11 @@ describe('POST /v1/projects', () => {
     ['a month 13', { title: 'x', metadata: { startDate: '2025-13-45' } }],
     ['year 0000', { title: 'x', metadata: { startDate: '0000-00-00' } }],
     [
+      'a date before MySQL’s supported DATE range',
+      { title: 'x', metadata: { startDate: '0999-12-31' } },
+    ],
+    ['year 0000-01-01', { title: 'x', metadata: { startDate: '0000-01-01' } }],
+    [
       'end before start',
       { title: 'x', metadata: { startDate: '2025-05-01', endDate: '2025-04-30' } },
     ],
@@ -359,7 +364,6 @@ describe('PATCH /v1/projects/:id', () => {
 
   it.each([
     ['an empty patch', {}],
-    ['an empty metadata only is allowed to be a no-op, but an empty patch is not', {}],
     ['id', { id: newId() }],
     ['userId', { userId: newId() }],
     ['source', { source: 'github' }],
@@ -375,6 +379,20 @@ describe('PATCH /v1/projects/:id', () => {
     const { id } = await created(http, me.auth);
     const before = await rowOf(id);
     await http.patch(`/v1/projects/${id}`).set(me.auth).send(body).expect(400);
+    expect(await rowOf(id)).toEqual(before);
+  });
+
+  it('treats an empty metadata object as naming no key: a 200 that changes nothing', async () => {
+    const http = await start();
+    const me = await member('me');
+    const { id } = await created(http, me.auth);
+    const before = await rowOf(id);
+    const res = await http
+      .patch(`/v1/projects/${id}`)
+      .set(me.auth)
+      .send({ metadata: {} })
+      .expect(200);
+    expect(res.body.metadata).toMatchObject({ startDate: '2025-01-15', course: 'IoT 101' });
     expect(await rowOf(id)).toEqual(before);
   });
 

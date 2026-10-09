@@ -39,7 +39,12 @@ export const DEFAULT_PROJECT_LIMITS: ProjectLimits = {
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-/** A real calendar day: `2025-02-30` matches the pattern and is not one. */
+/**
+ * MySQL documents DATE's supported range as 1000-01-01 to 9999-12-31 (earlier
+ * values are stored today, run, but "may work" is not a contract).
+ */
+const MIN_DATE = '1000-01-01';
+/** A real calendar day in that range: `2025-02-30` matches the pattern and is not one. */
 const isoDate = z
   .string()
   .regex(ISO_DATE, { message: 'must be YYYY-MM-DD' })
@@ -50,7 +55,8 @@ const isoDate = z
       return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(v);
     },
     { message: 'must be a real date' },
-  );
+  )
+  .refine((v) => v >= MIN_DATE, { message: `must be ${MIN_DATE} or later` });
 const dateOrNull = z.union([z.null(), isoDate]);
 
 export interface ProjectInput {

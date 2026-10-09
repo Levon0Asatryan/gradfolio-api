@@ -50,11 +50,19 @@ describe('create', () => {
     ['2025-02-30'],
     ['2025-13-45'],
     ['0000-00-00'],
+    ['0000-01-01'],
+    ['0999-12-31'],
     ['2025-1-5'],
     ['2025-01-15T10:00:00Z'],
     [''],
   ])('refuses the date %j without throwing', (date) => {
     expect(create.safeParse({ title: 't', metadata: { startDate: date } }).success).toBe(false);
+  });
+
+  it('accepts the first supported day', () => {
+    expect(create.safeParse({ title: 't', metadata: { startDate: '1000-01-01' } }).success).toBe(
+      true,
+    );
   });
 
   it('accepts a leap day and refuses a non-leap one', () => {
