@@ -7,6 +7,7 @@ import { isMysqlError, MysqlErrno } from '../../../core/db/mysql-errors.js';
 import { inTransaction } from '../../../core/db/transaction.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../core/errors/app-error.js';
 import { FileUrlService } from '../../files/services/file-url.service.js';
+import { recordActivity } from '../../activities/repositories/activity-write.repository.js';
 import { insertTeamNotification } from '../../notifications/repositories/notification-write.repository.js';
 import type { UserRow } from '../../users/repositories/user.repository.js';
 import { type AddExternalMember, type InviteMember, type TeamMember } from '../dto/team.dto.js';
@@ -88,6 +89,11 @@ export class TeamWriteService {
           project,
           role: input.role,
         });
+        await recordActivity(trx, owner.id, 'teamInvited', {
+          projectId,
+          projectName: project.title,
+          memberName: invitee.name,
+        });
         return { row: await readMember(trx, memberId), avatarUrl: invitee.avatarUrl };
       }),
     );
@@ -166,6 +172,20 @@ export class TeamWriteService {
         project,
         role: mine.role,
       });
+      const about = { projectId, projectName: project.title };
+      if (status === 'accepted') {
+        // The owner's feed names the member; the member's own feed says they joined.
+        await recordActivity(trx, project.userId, 'teamMemberJoined', {
+          ...about,
+          memberName: user.name,
+        });
+        await recordActivity(trx, user.id, 'teamJoined', about);
+      } else {
+        await recordActivity(trx, project.userId, 'teamMemberDeclined', {
+          ...about,
+          memberName: user.name,
+        });
+      }
       return readMember(trx, mine.id);
     });
     return this.present(row, user.id, user.avatarUrl);
@@ -188,6 +208,11 @@ export class TeamWriteService {
         actor: user,
         project,
         role: mine.role,
+      });
+      await recordActivity(trx, project.userId, 'teamLeft', {
+        projectId,
+        projectName: project.title,
+        memberName: user.name,
       });
     });
   }

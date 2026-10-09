@@ -6,6 +6,7 @@ import {
   createAttachmentSchema,
   patchAttachmentSchema,
 } from '../projects/dto/attachment.dto.js';
+import { activityPageSchema, activityQuerySchema } from '../activities/dto/activity.dto.js';
 import {
   notificationIdParamSchema,
   notificationPageSchema,
@@ -762,6 +763,25 @@ export const OPERATIONS: readonly Operation[] = [
   },
   {
     method: 'get',
+    path: '/v1/me/activities',
+    operationId: 'listMyActivities',
+    tag: 'activities',
+    summary: 'The caller’s activity feed, newest first',
+    description:
+      'The dashboard feed: project and profile events written in the same transaction as ' +
+      'the event. Each item is a `translationKey` and `translationParams`; the frontend ' +
+      'renders the text. Only the caller’s own feed exists, so there is no id to ask for. ' +
+      'Keyset pagination: pass `nextCursor` back as `cursor`.',
+    bearer: true,
+    query: activityQuerySchema,
+    responses: {
+      '200': { description: 'One page', schema: activityPageSchema },
+      '400': error('VALIDATION_FAILED: a query parameter is invalid (see `details`)'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'get',
     path: '/v1/me/notifications',
     operationId: 'listMyNotifications',
     tag: 'notifications',
@@ -918,6 +938,7 @@ export function buildOpenApiDocument(
       },
       { name: 'team', description: 'Project teams: invitations, answers, the owner’s view' },
       { name: 'notifications', description: 'The caller’s own notifications' },
+      { name: 'activities', description: 'The caller’s own activity feed' },
     ],
     paths,
     components: {

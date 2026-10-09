@@ -46,6 +46,8 @@ describe('loadConfig', () => {
       PROJECT_DESCRIPTION_MAX_BYTES: 100_000,
       PROJECT_MAX_TEAM: 20,
       RATE_LIMIT_LOOKUP: 30,
+      ACTIVITIES_PAGE_MAX: 50,
+      ACTIVITIES_PAGE_SIZE: 20,
       NOTIFICATIONS_PAGE_MAX: 50,
       NOTIFICATIONS_PAGE_SIZE: 20,
       PROJECTS_PAGE_SIZE: 20,
@@ -131,6 +133,8 @@ describe('loadConfig', () => {
     ['UPLOAD_MAX_IMAGE_BYTES', '10'],
     ['PROJECT_MAX_TEAM', '0'],
     ['RATE_LIMIT_LOOKUP', '0'],
+    ['ACTIVITIES_PAGE_SIZE', '0'],
+    ['ACTIVITIES_PAGE_MAX', '201'],
     ['NOTIFICATIONS_PAGE_SIZE', '0'],
     ['NOTIFICATIONS_PAGE_MAX', '201'],
     ['PROJECTS_PAGE_SIZE', '0'],
@@ -154,6 +158,16 @@ describe('loadConfig', () => {
     expect(
       loadConfig({ ...REQUIRED, NOTIFICATIONS_PAGE_MAX: '5', NOTIFICATIONS_PAGE_SIZE: '5' })
         .NOTIFICATIONS_PAGE_SIZE,
+    ).toBe(5);
+  });
+
+  it('refuses a default activity page size above the maximum, and accepts one equal to it', () => {
+    expect(() => loadConfig({ ...REQUIRED, ACTIVITIES_PAGE_MAX: '5' })).toThrow(
+      /ACTIVITIES_PAGE_SIZE/,
+    );
+    expect(
+      loadConfig({ ...REQUIRED, ACTIVITIES_PAGE_MAX: '5', ACTIVITIES_PAGE_SIZE: '5' })
+        .ACTIVITIES_PAGE_SIZE,
     ).toBe(5);
   });
 
