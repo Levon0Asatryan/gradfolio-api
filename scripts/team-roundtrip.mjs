@@ -144,17 +144,18 @@ try {
     (await call(who, 'GET', `/v1/users/${userId}`)).body.projects.find((p) => p.id === pub);
   check((await onProfile('A', a.id))?.role === 'owner', 'the project is on A’s profile as owner');
   check((await onProfile('A', b.id))?.role === 'member', 'and on B’s profile as member');
-  const feedA = (await call('A', 'GET', '/v1/me/activities?limit=50')).body.items.map(
-    (i) => i.translationKey,
-  );
-  const feedB = (await call('B', 'GET', '/v1/me/activities?limit=50')).body.items.map(
-    (i) => i.translationKey,
-  );
+  // Only this round trip's rows count: an account may already have older activities.
+  const feedKeys = async (who) =>
+    (await call(who, 'GET', '/v1/me/activities?limit=50')).body.items
+      .filter((i) => i.translationParams?.projectId === pub)
+      .map((i) => i.translationKey);
+  const feedA = await feedKeys('A');
+  const feedB = await feedKeys('B');
   check(
     feedA.includes('teamInvited') && feedA.includes('teamMemberJoined'),
-    'A’s feed has the invitation and the join',
+    'A’s feed has the invitation and the join for this project',
   );
-  check(feedB.includes('teamJoined'), 'B’s feed has the join');
+  check(feedB.includes('teamJoined'), 'B’s feed has the join for this project');
 
   // --- the private project: reject, invite again, accept, remove
   check(
@@ -215,6 +216,11 @@ try {
     );
     if (r.status !== 204) process.exitCode = 1;
   }
-  for (const who of ['A', 'B'])
-    await call(who, 'POST', '/v1/me/notifications/read-all').catch(() => undefined);
+  for (const who of ['A', 'B']) {
+    const r = await call(who, 'POST', '/v1/me/notifications/read-all').catch(() => ({ status: 0 }));
+    console.log(
+      `${r.status === 200 ? 'PASS' : 'FAIL'}  cleanup: ${who} marks notifications read: ${r.status}`,
+    );
+    if (r.status !== 200) process.exitCode = 1;
+  }
 }

@@ -36,7 +36,7 @@ Copilot failed on quota on every push; Codex reviewed alone.
 | 7   | Q4 visibility matrix (accepted / pending / rejected / removed × private / draft) | PASS (§5)                                                           |
 | 8   | Transaction proofs, both directions                                              | PASS (§6)                                                           |
 | 9   | Races forced with a barrier                                                      | PASS (§7)                                                           |
-| 10  | Two-account journey over HTTP against the compiled server, local test tenant     | PASS: 42 checks (§8)                                                |
+| 10  | Two-account journey over HTTP against the compiled server, local test tenant     | PASS: 44 checks (§8)                                                |
 | 11  | Two-account journey with real Auth0 tokens                                       | **PENDING** (§9)                                                    |
 | 12  | Production `GET /readyz`                                                         | 200 (2026-10-09; the lead confirms again after the Deploy of #54)   |
 | 13  | Guards proved by removal                                                         | PASS: 60+ guards (§10)                                              |
@@ -144,8 +144,8 @@ take the project `FOR SHARE`, owner writes `FOR UPDATE` (plan §4.3; the interpl
 
 `scripts/team-roundtrip.mjs` against the **compiled server** (`node dist/api/main.js`,
 `NODE_ENV=development`) on `127.0.0.1:3007`, an empty database, two accounts whose tokens
-come from the test JWKS server (RS256, real signature, issuer and audience checks). 42
-checks, 0 failures, in this order: both accounts differ; A creates a public and a private
+come from the test JWKS server (RS256, real signature, issuer and audience checks); both accounts start with stale `teamInvited`, `teamMemberJoined` and `teamJoined` activities of another project, so the feed checks must match this run's `projectId` to pass (pointed at a project that wrote nothing, they fail). 44
+checks (the journey plus the cleanup of both accounts), 0 failures, in this order: both accounts differ; A creates a public and a private
 project; the lookup finds B and not A; A cannot invite A (400); A invites B (pending); a second
 invite is `ALREADY_MEMBER`; B has one more unread; B's notification is pending and renders from
 saved names; B cannot list A's team, invite, remove (404 each); A cannot accept B's invitation
