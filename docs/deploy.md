@@ -17,16 +17,17 @@ Every command needs the sandboxed gcloud: `eval "$(direnv export bash)"` and che
 
 ## Resources and monthly cost (us-east1, USD, 2026-10-05; plan §1.2 has the unit prices)
 
-| Resource                                        | Setting                                                                              | Monthly                      |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------ | ---------------------------- |
-| Cloud SQL `gradfolio-db`                        | MySQL 8.4.11, Enterprise, `db-f1-micro`, zonal, private IP only, deletion protection | about $7.67                  |
-| Cloud SQL storage                               | 10 GiB SSD, auto-grow capped at 20 GiB                                               | $1.70                        |
-| Cloud SQL backups                               | daily 03:00 UTC, 7 kept, no point-in-time recovery                                   | about $0.10                  |
-| Cloud Run service `gradfolio-api`               | 1 vCPU, 512 MiB, concurrency 40, **min 1**, max 3                                    | about $9.86 idle + requests  |
-| Cloud Run job `gradfolio-migrate`               | same image, seconds per run                                                          | about $0                     |
-| Artifact Registry `gradfolio`                   | keeps the 5 newest images                                                            | about $0                     |
-| Secret Manager (3 secrets), Logging, VPC egress |                                                                                      | about $0                     |
-| **Total (min 1)** / with min 0                  |                                                                                      | **about $19.3** / about $9.5 |
+| Resource                                             | Setting                                                                                                                               | Monthly                                      |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Cloud SQL `gradfolio-db`                             | MySQL 8.4.11, Enterprise, `db-f1-micro`, zonal, private IP only, deletion protection                                                  | about $7.67                                  |
+| Cloud SQL storage                                    | 10 GiB SSD, auto-grow capped at 20 GiB                                                                                                | $1.70                                        |
+| Cloud SQL backups                                    | daily 03:00 UTC, 7 kept, no point-in-time recovery                                                                                    | about $0.10                                  |
+| Cloud Run service `gradfolio-api`                    | 1 vCPU, 512 MiB, concurrency 40, **min 1**, max 3                                                                                     | about $9.86 idle + requests                  |
+| Cloud Run job `gradfolio-migrate`                    | same image, seconds per run                                                                                                           | about $0                                     |
+| Artifact Registry `gradfolio`                        | keeps the 5 newest images                                                                                                             | about $0                                     |
+| Cloud Storage bucket `gradfolio-files-1058577031182` | `us-east1`, uniform access, public access prevention, no lifecycle rule; user uploads (avatars, hero images, project images and PDFs) | about $0 (5 GB free; under $0.50 worst case) |
+| Secret Manager (3 secrets), Logging, VPC egress      |                                                                                                                                       | about $0                                     |
+| **Total (min 1)** / with min 0                       |                                                                                                                                       | **about $19.3** / about $9.5                 |
 
 Switch min instances: `gcloud run services update gradfolio-api --region us-east1 --min-instances 0|1`.
 The trial credit expires after 90 days; after that the card is billed.
@@ -44,6 +45,7 @@ The trial credit expires after 90 days; after that the card is billed.
 | `DATABASE_URL`            | service: **secret** `gradfolio-database-url`; job: **secret** `gradfolio-migrate-database-url` | `mysql://<user>@localhost/gradfolio`, user `gradfolio_app` (DML only) / `gradfolio_migrator` (DDL) |
 | `AUTH0_ISSUER_BASE_URL`   | service                                                                                        | the `dev-…us.auth0.com` tenant, trailing slash (production tenant: M9 9.4)                         |
 | `AUTH0_AUDIENCE`          | service                                                                                        | `https://api.gradfolio.app`                                                                        |
+| `STORAGE_BUCKET`          | service                                                                                        | `gradfolio-files-1058577031182`. Unset: URL-only, `POST /v1/me/uploads` answers 503                |
 | `API_BASE_URL`            | Vercel (Production, Preview)                                                                   | the API URL above                                                                                  |
 
 `gradfolio-db-root-password` (secret) is for bootstrap and grants only; nothing at runtime reads it.
@@ -102,3 +104,20 @@ total (about $19.3) exceeds it: raise it or set min 0. `gcloud billing budgets l
 There is no public IP. Run a one-off Cloud Run job from the same image on the same network and socket
 (`--network default --subnet default --vpc-egress private-ranges-only --set-cloudsql-instances ...`), delete it afterwards. Results
 print to the job log (JSON lines appear under `jsonPayload`).
+
+## File storage (M4)
+
+Bucket `gradfolio-files-1058577031182` (plan: [m4-plan.md](m4-plan.md) §3). Private; the API signs every upload and every read.
+CORS (`PUT` from the production frontend and `http://localhost:3010`) is on the bucket; Vercel preview origins are not listed
+(no wildcard exists), so previews cannot upload. IAM, all on `gradfolio-api-run`: `roles/storage.objectUser` on the bucket, and
+`roles/iam.serviceAccountTokenCreator` on **itself** (it signs through IAM `signBlob`; project Owner is not enough). No key file.
+
+Turn it on (once; a plain env var, not a secret; the deploy workflow keeps it, because `gcloud run deploy` leaves env alone):
+
+```sh
+gcloud run services update gradfolio-api --region us-east1 \
+  --update-env-vars STORAGE_BUCKET=gradfolio-files-1058577031182
+```
+
+Orphans (uploads never registered, a failed delete): `npm run storage:sweep` lists them (dry run); `-- --apply` deletes those older
+than 24 h (`--hours N`). It needs `STORAGE_BUCKET`, the database and credentials that may list and delete in the bucket.

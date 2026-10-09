@@ -1,10 +1,17 @@
 import { z, type ZodObject, type ZodType } from 'zod';
 import { LIVENESS_PATH, READINESS_PATH } from '../health/constants.js';
 import { meResponseSchema } from '../me/dto/me.dto.js';
+import {
+  attachmentParamsSchema,
+  createAttachmentSchema,
+  patchAttachmentSchema,
+} from '../projects/dto/attachment.dto.js';
+import { uploadRequestSchema, uploadResponseSchema } from '../files/dto/upload.dto.js';
 import { documentedProjectSchemas } from '../projects/dto/project-write.dto.js';
 import {
   myProjectsQuerySchema,
   projectDetailSchema,
+  projectAttachmentSchema,
   projectIdParamSchema,
   projectPageSchema,
   userProjectsQuerySchema,
@@ -439,6 +446,111 @@ export const OPERATIONS: readonly Operation[] = [
     responses: {
       '204': { description: 'Deleted' },
       '404': notYours('project'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'post',
+    path: '/v1/projects/{id}/attachments',
+    operationId: 'addAttachment',
+    tag: 'projects',
+    summary: 'Add an attachment to a project',
+    description:
+      'Placed last. Every URL is https without credentials. `image` and `pdf` may be an ' +
+      'uploaded file (the `fileUrl` of `POST /v1/me/uploads`, registered here once) or an ' +
+      'external URL. `video` must be a YouTube or Vimeo link; the server computes ' +
+      '`embedUrl` and the thumbnail. `link` cannot point at an uploaded file. At the ' +
+      'per-project cap: 409 `LIMIT_REACHED`. A file that is not the caller’s, missing, of ' +
+      'the wrong type or size, or already registered: 400 `INVALID_FILE` / `FILE_IN_USE`.',
+    bearer: true,
+    params: projectIdParamSchema,
+    body: createAttachmentSchema,
+    responses: {
+      '201': { description: 'The new attachment', schema: projectAttachmentSchema },
+      '400': validationFailed,
+      '404': notYours('project'),
+      '409': error('LIMIT_REACHED: the project holds the maximum number of attachments'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'patch',
+    path: '/v1/projects/{id}/attachments/{attachmentId}',
+    operationId: 'updateAttachment',
+    tag: 'projects',
+    summary: 'Change an attachment’s title or URL',
+    description:
+      'The type is fixed. A new `url` is validated for that type; replacing an uploaded ' +
+      'file deletes the old object. Sending back the same file (even its signed read URL) ' +
+      'keeps it.',
+    bearer: true,
+    params: attachmentParamsSchema,
+    body: patchAttachmentSchema,
+    responses: {
+      '200': { description: 'The attachment after the change', schema: projectAttachmentSchema },
+      '400': validationFailed,
+      '404': notYours('attachment'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'delete',
+    path: '/v1/projects/{id}/attachments/{attachmentId}',
+    operationId: 'deleteAttachment',
+    tag: 'projects',
+    summary: 'Delete an attachment',
+    description: 'An uploaded file is deleted from storage after the row is gone.',
+    bearer: true,
+    params: attachmentParamsSchema,
+    responses: {
+      '204': { description: 'Deleted' },
+      '404': notYours('attachment'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'put',
+    path: '/v1/projects/{id}/attachments/order',
+    operationId: 'reorderAttachments',
+    tag: 'projects',
+    summary: 'Set the order of a project’s attachments',
+    description:
+      'Atomic. `ids` must be exactly the project’s attachments, each once. An id that is ' +
+      'not this project’s is 404; the right ids but an incomplete list is 409 `ORDER_STALE`.',
+    bearer: true,
+    params: projectIdParamSchema,
+    body: reorderSchema,
+    responses: {
+      '200': {
+        description: 'The attachments in their new order',
+        schema: z.array(projectAttachmentSchema),
+      },
+      '400': validationFailed,
+      '404': notYours('attachment'),
+      '409': error('ORDER_STALE: the list changed; reload it and try again'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'post',
+    path: '/v1/me/uploads',
+    operationId: 'createUpload',
+    tag: 'projects',
+    summary: 'Get a signed URL to upload an avatar, hero image, image or PDF',
+    description:
+      'The browser then PUTs the file straight to storage with the returned `headers` ' +
+      '(exactly: type and size are signed), and the app sends `fileUrl` in the matching ' +
+      'write. The URL lives `expiresAt`; the token never reaches the browser. Images: png, ' +
+      'jpeg, webp, gif; PDFs only as an attachment. `hero` and `attachment` need a ' +
+      '`projectId` of the caller’s. Rate-limited with its own budget. 409 at the per-user ' +
+      'file cap; 503 `STORAGE_UNAVAILABLE` when the server has no bucket configured.',
+    bearer: true,
+    body: uploadRequestSchema,
+    responses: {
+      '201': { description: 'The signed upload', schema: uploadResponseSchema },
+      '400': validationFailed,
+      '404': notYours('project'),
+      '409': error('LIMIT_REACHED: the user holds the maximum number of files'),
       ...authenticatedFailures,
     },
   },

@@ -231,6 +231,29 @@ Q11 is not weakened: the FE calls the API only from the server.
 If Levon picks D, §3.4–3.5 and `UploadsController` are dropped; `FileUrlService.accept()`
 becomes "any https URL".
 
+### 3.6 What PR (c) did differently from the text above
+
+- **Registration runs inside the write's transaction**, after the user or project lock, so a
+  rejected file writes nothing. `inTransaction` reruns its body after a deadlock; each request
+  remembers what it already registered (`registerOnce`), or the rerun would meet its own claim
+  and answer `FILE_IN_USE`.
+- **Only fields whose write path registers a file are ever signed on read**: avatar, hero,
+  image and PDF attachments. A `link` or `video` attachment may not point into our bucket
+  (400), and team-member avatars are not signed (no write path registers them; M5 must). Without
+  this rule, a URL of someone else's object in a free-text field could be turned into a signed
+  read by `readUrl`.
+- **A client may send back the signed read URL** it received: the key is read from the path,
+  the query ignored, and the stored canonical form kept (no new claim, nothing deleted).
+- **`GET /v1/me`, `GET`/`PATCH /v1/me/profile` and the profile** show the avatar signed, as the
+  project responses show hero and attachments. `team[].avatarUrl` stays unsigned (above).
+- **`STORAGE_BUCKET` unset is a supported mode**: URL-only, `POST /v1/me/uploads` answers 503
+  `STORAGE_UNAVAILABLE`, no URL is ever treated as ours. So the code can merge and deploy before
+  the variable is set.
+- **The first real-bucket checks** (claim precondition; one winner of two; adapter methods as
+  the runtime account; a full upload to delete flow) are recorded in the PR description and in
+  `m4-verification.md`. The IAM `signBlob` call the library makes on Cloud Run is checked at the
+  production round trip, because it needs the runtime identity.
+
 ## 4. Sanitizer (4.2): measured
 
 Corpus: 62 vectors in `corpus.mjs` (scratch; it becomes `sanitize.corpus.ts` in PR (b)),
