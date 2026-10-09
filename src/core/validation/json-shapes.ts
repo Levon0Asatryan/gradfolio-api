@@ -40,3 +40,12 @@ export function linkList({ maxItems }: { maxItems: number }) {
 
 /** `Record<string, string | number>`: activities.translation_params. */
 export const translationParams = z.record(z.string(), z.union([z.string(), z.number().finite()]));
+
+/** `NotificationParams`: notifications.params. Names are snapshots, so they are capped like the columns they came from. */
+export const notificationParams = z.strictObject({
+  actorId: z.string().max(36).nullish(),
+  actorName: z.string().min(1).max(255),
+  projectId: z.string().max(36),
+  projectTitle: z.string().min(1).max(255),
+  role: z.string().max(255).nullish(),
+});

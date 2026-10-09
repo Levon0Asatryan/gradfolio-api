@@ -56,8 +56,10 @@ export class ProjectService {
 
   /** Stored file URLs become short-lived signed read URLs (plan §2.2); external ones pass through. */
   private async signDetail(d: ProjectDetail): Promise<ProjectDetail> {
-    // Team rows are not signed: no write path registers a file for them yet (M5 must).
-    const [heroImageUrl, ownerAvatar, attachments] = await Promise.all([
+    // A linked member's photo is their profile's, a file the profile write registered.
+    // No team write accepts a photo URL, so a row's own `avatarUrl` is only ever an
+    // external one and `read` passes it through.
+    const [heroImageUrl, ownerAvatar, attachments, team] = await Promise.all([
       this.files.read(d.heroImageUrl),
       this.files.read(d.owner.avatarUrl),
       Promise.all(
@@ -71,7 +73,7 @@ export class ProjectService {
         d.team.map(async (m) => ({ ...m, avatarUrl: await this.files.read(m.avatarUrl) })),
       ),
     ]);
-    return { ...d, heroImageUrl, owner: { ...d.owner, avatarUrl: ownerAvatar }, attachments };
+    return { ...d, heroImageUrl, owner: { ...d.owner, avatarUrl: ownerAvatar }, attachments, team };
   }
 
   /** The caller's own projects, every state. */
@@ -127,6 +129,7 @@ export class ProjectService {
           r,
           { tags: tags.get(r.id) ?? [], technologies: technologies.get(r.id) ?? [] },
           viewerId,
+          scope.ownerId,
         );
         return { ...summary, heroImageUrl: await this.files.read(summary.heroImageUrl) };
       }),

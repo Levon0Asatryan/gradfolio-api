@@ -264,7 +264,14 @@ describe('GET /v1/users/:id', () => {
 
       const ownerView = (await http.get(`/v1/users/${owner.user.id}`).set(owner.auth).expect(200))
         .body as { projects: { title: string; role: string; tags: string[] }[] };
-      expect(titles(ownerView)).toEqual(['own draft', 'own private', 'own public', 'team public']);
+      // Q4: the member sees the private (never draft) project they are accepted on
+      expect(titles(ownerView)).toEqual([
+        'own draft',
+        'own private',
+        'own public',
+        'team private',
+        'team public',
+      ]);
       expect(ownerView.projects.find((p) => p.title === 'own public')).toMatchObject({
         role: 'owner',
         tags: ['b', 'a'],

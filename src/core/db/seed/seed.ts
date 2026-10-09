@@ -3,7 +3,12 @@ import { newId } from '../ids.js';
 import { toJsonColumn } from '../json.js';
 import { setProjectTerms, setUserSkills } from '../terms.js';
 import { inTransaction } from '../transaction.js';
-import { linkList, stringList, translationParams } from '../../validation/json-shapes.js';
+import {
+  linkList,
+  notificationParams,
+  stringList,
+  translationParams,
+} from '../../validation/json-shapes.js';
 import { termList } from '../../validation/terms.js';
 import { activities, integrations, notifications, projects, SEED_USERS, users } from './data.js';
 
@@ -18,6 +23,13 @@ const links = linkList({ maxItems: 20 });
  * JSON goes through `toJsonColumn`, terms through `setUserSkills` /
  * `setProjectTerms`: the same rules as the application.
  */
+/** The English fallback text the API writes for each type (notification-write.repository). */
+const SEED_NOTIFICATION_TITLES = {
+  team_invite: 'Team invitation',
+  team_accepted: 'Invitation accepted',
+  team_rejected: 'Invitation declined',
+} as const;
+
 export async function seed(db: Database): Promise<void> {
   await inTransaction(db, async (trx) => {
     await trx.deleteFrom('users').where('id', 'in', Object.values(SEED_USERS)).execute();
@@ -129,12 +141,11 @@ export async function seed(db: Database): Promise<void> {
           id: newId(),
           userId: n.user,
           type: n.type,
-          title: n.title,
-          message: n.message,
+          title: SEED_NOTIFICATION_TITLES[n.type],
+          params: toJsonColumn(notificationParams, { ...n.params, projectId: n.project }),
           isRead: n.isRead,
           referenceId: n.project,
           referenceType: 'project',
-          link: `/projects/${n.project}`,
         })
         .execute();
     }

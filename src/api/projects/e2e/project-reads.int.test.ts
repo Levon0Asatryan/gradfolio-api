@@ -240,8 +240,9 @@ describe('GET /v1/projects/:id (Q3 on projects)', () => {
 
     const anon = await http.get(`/v1/projects/${project.id}`).expect(200);
     expect(anon.body.team).toEqual([
+      // a linked member shows their live name (the row's 'Open' is only the saved one)
       expect.objectContaining({
-        name: 'Open',
+        name: 'open',
         userId: open.user.id,
         avatarUrl: 'https://img.example/open.png',
       }),
@@ -250,7 +251,7 @@ describe('GET /v1/projects/:id (Q3 on projects)', () => {
     ]);
     // the hidden member sees their own link
     const self = await http.get(`/v1/projects/${project.id}`).set(hidden.auth).expect(200);
-    expect(self.body.team[1]).toMatchObject({ name: 'Hidden', userId: hidden.user.id });
+    expect(self.body.team[1]).toMatchObject({ name: 'hidden', userId: hidden.user.id });
   });
 
   it('shows no avatar for the owner of a private profile, except to the owner', async () => {

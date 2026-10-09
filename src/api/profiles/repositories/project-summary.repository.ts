@@ -19,8 +19,8 @@ const SUMMARY_COLUMNS = [
  * their own, and those they are an *accepted* team member of.
  *
  * Everyone sees public, published projects only. The profile's owner also
- * sees their own private and draft ones. A project they merely belong to stays
- * public-only until the team model (Q4, M5) says members may see more. The
+ * sees their own private and draft ones, and the private (never draft)
+ * projects they are an accepted member of (Q4: a member may read them). The
  * predicate is in the SQL, so a private project never leaves the database for
  * a caller who may not see it.
  */
@@ -48,8 +48,8 @@ export async function listProfileProjects(
     .where('m.userId', '=', userId)
     .where('m.status', '=', 'accepted')
     .where('projects.userId', '<>', userId)
-    .where('projects.isPublic', '=', true)
     .where('projects.isDraft', '=', false)
+    .$if(!viewerIsOwner, (qb) => qb.where('projects.isPublic', '=', true))
     .orderBy('projects.createdAt', 'desc')
     .orderBy('projects.id')
     .limit(limit)

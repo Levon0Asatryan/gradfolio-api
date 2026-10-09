@@ -85,13 +85,28 @@ describe('seed', () => {
     ).toHaveLength(1);
   });
 
-  it('builds every notification link from a real project id (S12)', async () => {
+  it('writes notifications as the API does: reference to a real project, no stored link or message, params to render from (S12)', async () => {
     await seed(db);
-    const rows = await sql<{ link: string; resolves: number }>`
-      SELECT n.link, (p.id IS NOT NULL AND n.link = CONCAT('/projects/', p.id)) AS resolves
+    const rows = await sql<{
+      resolves: number;
+      link: string | null;
+      message: string | null;
+      title: string;
+      params: unknown;
+    }>`
+      SELECT n.link, n.message, n.title, n.params, (p.id IS NOT NULL) AS resolves
         FROM notifications n LEFT JOIN projects p ON p.id = n.reference_id`.execute(db);
     expect(rows.rows.length).toBe(4);
-    expect(rows.rows.every((r) => Number(r.resolves) === 1)).toBe(true);
+    for (const r of rows.rows) {
+      expect(Number(r.resolves)).toBe(1);
+      expect(r.link).toBeNull();
+      expect(r.message).toBeNull();
+      expect(r.title).toMatch(/^[\x20-\x7e]+$/); // English fallback
+      expect(r.params).toMatchObject({
+        actorName: expect.any(String),
+        projectId: expect.any(String),
+      });
+    }
   });
 
   it('never lists an owner as a member of their own project (S11)', async () => {

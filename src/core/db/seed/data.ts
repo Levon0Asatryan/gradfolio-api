@@ -501,45 +501,45 @@ export const projects: SeedProject[] = [
 export interface SeedNotification {
   user: UserId;
   type: 'team_invite' | 'team_accepted' | 'team_rejected';
-  title: string;
-  message: string;
   isRead: boolean;
   project: ProjectId;
+  /** What the frontend renders the text from (m5-plan §5.1); `title`/`message` are the fallback. */
+  params: { actorName: string; projectTitle: string; role?: string };
 }
 
-/** Each one is about a team row above; its link is built from the project id. */
+/**
+ * Each one is about a team row above. Like a notification written by the API: an
+ * English fallback `title` (the same text), no `message`, no stored link (the
+ * link is computed when read), and `params` to render from.
+ */
 export const notifications: SeedNotification[] = [
   {
     user: SEED_USERS.dmitri,
     type: 'team_invite',
-    title: 'Приглашение в команду',
-    message: 'Անահիտ Սարգսյան пригласила вас в «Gradfolio» как Backend Developer',
     isRead: false,
     project: SEED_PROJECTS.gradfolio,
+    params: { actorName: 'Անահիտ Սարգսյան', projectTitle: 'Gradfolio', role: 'Backend Developer' },
   },
   {
     user: SEED_USERS.anahit,
     type: 'team_accepted',
-    title: 'Հրավերն ընդունված է',
-    message: 'Мария Петросян-ը միացավ «Gradfolio» նախագծին',
     isRead: true,
     project: SEED_PROJECTS.gradfolio,
+    params: { actorName: 'Мария Петросян', projectTitle: 'Gradfolio' },
   },
   {
     user: SEED_USERS.dmitri,
     type: 'team_rejected',
-    title: 'Приглашение отклонено',
-    message: 'Tigran Hakobyan declined the invitation to «Маршруты ереванского метро»',
     isRead: false,
     project: SEED_PROJECTS.metroRoute,
+    params: { actorName: 'Tigran Hakobyan', projectTitle: 'Маршруты ереванского метро' },
   },
   {
     user: SEED_USERS.tigran,
     type: 'team_accepted',
-    title: 'Invitation accepted',
-    message: 'Emily Carter joined “Armenian Wine Quality Predictor”',
     isRead: true,
     project: SEED_PROJECTS.wineQuality,
+    params: { actorName: 'Emily Carter', projectTitle: 'Armenian Wine Quality Predictor' },
   },
 ];
 

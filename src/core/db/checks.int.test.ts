@@ -130,3 +130,55 @@ describe('unique keys', () => {
     expect(await errnoOf(insert(user.id, null))).toBeUndefined();
   });
 });
+
+/** What 0006 adds for teams and notifications, and the team table facts M5 relies on (m5-plan §2.1). */
+describe('teams and notifications schema (0006)', () => {
+  const db = testDatabase();
+  const errnoOf = (p: Promise<unknown>) => p.then(() => undefined, mysqlErrno);
+
+  it('notifications.params must be a JSON object', async () => {
+    const user = await createUser(db);
+    const insert = (params: string) =>
+      sql`INSERT INTO notifications (id, user_id, type, title, params) VALUES (${newId()}, ${user.id}, 'team_left', 't', ${params})`.execute(
+        db,
+      );
+    expect(await errnoOf(insert('[1]'))).toBe(MysqlErrno.CHECK_VIOLATED);
+    expect(await errnoOf(insert('"text"'))).toBe(MysqlErrno.CHECK_VIOLATED);
+    expect(await errnoOf(insert('{"actorName":"A"}'))).toBeUndefined(); // and team_left is a type
+  });
+
+  it('team members: many named-only rows per project, one row per linked user (R1, R2)', async () => {
+    const owner = await createUser(db);
+    const other = await createUser(db);
+    const projectId = newId();
+    await db
+      .insertInto('projects')
+      .values({ id: projectId, userId: owner.id, title: 'p' })
+      .execute();
+    const add = (userId: string | null) =>
+      db
+        .insertInto('projectTeamMembers')
+        .values({ id: newId(), projectId, userId, name: 'n', status: 'accepted' })
+        .execute();
+    expect(await errnoOf(add(null))).toBeUndefined();
+    expect(await errnoOf(add(null))).toBeUndefined();
+    expect(await errnoOf(add(other.id))).toBeUndefined();
+    expect(await errnoOf(add(other.id))).toBe(MysqlErrno.DUPLICATE_KEY);
+  });
+
+  it('the newest-first lists read an index in order, with no filesort', async () => {
+    const plan = async (table: string, column: string) => {
+      const { rows } = await sql<{ key: string | null; Extra: string | null }>`
+        EXPLAIN SELECT id FROM ${sql.table(table)} WHERE user_id = 'u' ORDER BY ${sql.ref(column)} DESC, id DESC LIMIT 20`.execute(
+        db,
+      );
+      return rows[0]!;
+    };
+    const notifications = await plan('notifications', 'created_at');
+    expect(notifications.key).toBe('idx_notifications_user_created');
+    expect(notifications.Extra ?? '').not.toMatch(/filesort/i);
+    const activities = await plan('activities', 'timestamp');
+    expect(activities.key).toBe('idx_activities_user_ts');
+    expect(activities.Extra ?? '').not.toMatch(/filesort/i);
+  });
+});

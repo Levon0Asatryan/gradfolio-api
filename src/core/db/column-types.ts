@@ -32,3 +32,12 @@ export type DateText = ColumnType<string | null, string | null | undefined, stri
 export type StringList = string[];
 export type LinkList = { label: string; url: string }[];
 export type TranslationParams = Record<string, string | number>;
+
+/** What a notification renders from (docs/m5-plan.md §5.1): names snapshotted when it was written. */
+export interface NotificationParams {
+  actorId?: string | null;
+  actorName: string;
+  projectId: string;
+  projectTitle: string;
+  role?: string | null;
+}

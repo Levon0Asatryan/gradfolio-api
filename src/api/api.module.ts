@@ -14,7 +14,9 @@ import { FilesModule } from './files/files.module.js';
 import { HealthModule } from './health/health.module.js';
 import { MeModule } from './me/me.module.js';
 import { ProfilesModule } from './profiles/profiles.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
+import { TeamModule } from './team/team.module.js';
 import { RateLimitGuard } from './rate-limit/guards/rate-limit.guard.js';
 import { RateLimitModule } from './rate-limit/rate-limit.module.js';
 import { CurrentUserGuard } from './users/guards/current-user.guard.js';
@@ -38,6 +40,8 @@ import { UsersModule } from './users/users.module.js';
     MeModule,
     ProfilesModule,
     ProjectsModule,
+    TeamModule,
+    NotificationsModule,
   ],
   providers: [
     ErrorFilter,

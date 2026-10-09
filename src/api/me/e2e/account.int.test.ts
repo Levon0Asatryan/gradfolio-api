@@ -259,6 +259,33 @@ describe('DELETE /v1/me', () => {
     ]);
   });
 
+  it('deletes the unanswered and declined invitations of the account instead of leaving nameless pending rows (m5-plan §2.4)', async () => {
+    const http = await start();
+    const alice = await account('alice');
+    const bob = await account('bob');
+    const mk = async (title: string, status: 'pending' | 'rejected' | 'accepted') => {
+      const { project } = await createProject(db, bob.user, { title });
+      await db
+        .insertInto('projectTeamMembers')
+        .values({ id: newId(), projectId: project.id, userId: alice.user.id, name: title, status })
+        .execute();
+      return project.id;
+    };
+    const pendingId = await mk('pending', 'pending');
+    const rejectedId = await mk('rejected', 'rejected');
+    const acceptedId = await mk('accepted', 'accepted');
+
+    await http.delete('/v1/me').set(alice.auth).expect(204);
+
+    const rows = await db
+      .selectFrom('projectTeamMembers')
+      .select(['projectId', 'userId', 'status'])
+      .where('projectId', 'in', [pendingId, rejectedId, acceptedId])
+      .execute();
+    // the accepted membership stays as a name; the other two are gone, not NULL-user rows
+    expect(rows).toEqual([{ projectId: acceptedId, userId: null, status: 'accepted' }]);
+  });
+
   it('makes the profile unreadable at once', async () => {
     const http = await start();
     const alice = await account('alice');
