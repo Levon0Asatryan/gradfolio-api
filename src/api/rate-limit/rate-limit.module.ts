@@ -46,6 +46,12 @@ function onlyWhereOptedIn(name: RateBudgetName): ThrottlerOptions['skipIf'] {
               skipIf: onlyWhereOptedIn('import'),
             },
             { name: 'ai', ttl, limit: cfg.RATE_LIMIT_AI, skipIf: onlyWhereOptedIn('ai') },
+            {
+              name: 'upload',
+              ttl,
+              limit: cfg.RATE_LIMIT_UPLOAD,
+              skipIf: onlyWhereOptedIn('upload'),
+            },
           ],
         };
       },
