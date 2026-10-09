@@ -254,6 +254,21 @@ becomes "any https URL".
   `m4-verification.md`. The IAM `signBlob` call the library makes on Cloud Run is checked at the
   production round trip, because it needs the runtime identity.
 
+### 3.7 Follow-up to PR (c), three review findings (all confirmed)
+
+- **Replay of a signed PUT.** The URL is now also signed with `x-goog-if-generation-match: 0`
+  (create-only), so it writes its key once; a replay is a 412. Run against the real bucket:
+  first PUT 200, replay with other bytes 412, object and generation unchanged. The claim now
+  carries _both_ preconditions, generation and metageneration (metageneration restarts at 1
+  for every generation, so it cannot tell replaced bytes from validated ones).
+- **Sweep.** It lists first, reads the references second, and deletes only the listed
+  generation and metageneration: an object claimed after the listing is kept (a claim bumps
+  the metageneration); one claimed before it has a refreshed `updated`, so the age floor
+  holds it until its row has long committed.
+- **Signing a read URL never fails a request.** A write that committed (and claimed a file)
+  is not reported as failed because the response could not be signed: the stored URL is
+  returned, the failure logged, and the next read signs again.
+
 ## 4. Sanitizer (4.2): measured
 
 Corpus: 62 vectors in `corpus.mjs` (scratch; it becomes `sanitize.corpus.ts` in PR (b)),
