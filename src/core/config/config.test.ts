@@ -143,6 +143,16 @@ describe('loadConfig', () => {
     ).toBe(5);
   });
 
+  it('refuses a default notification page size above the maximum, and accepts one equal to it', () => {
+    expect(() => loadConfig({ ...REQUIRED, NOTIFICATIONS_PAGE_MAX: '5' })).toThrow(
+      /NOTIFICATIONS_PAGE_SIZE/,
+    );
+    expect(
+      loadConfig({ ...REQUIRED, NOTIFICATIONS_PAGE_MAX: '5', NOTIFICATIONS_PAGE_SIZE: '5' })
+        .NOTIFICATIONS_PAGE_SIZE,
+    ).toBe(5);
+  });
+
   it('refuses a non-mysql database URL', () => {
     expect(() => loadConfig({ DATABASE_URL: 'postgres://u:p@h/db' })).toThrow(/mysql:\/\//);
   });
