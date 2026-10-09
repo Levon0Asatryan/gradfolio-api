@@ -44,6 +44,8 @@ describe('loadConfig', () => {
       PROJECT_MAX_TECHNOLOGIES: 30,
       PROJECT_MAX_LINKS: 10,
       PROJECT_DESCRIPTION_MAX_BYTES: 100_000,
+      NOTIFICATIONS_PAGE_MAX: 50,
+      NOTIFICATIONS_PAGE_SIZE: 20,
       PROJECTS_PAGE_SIZE: 20,
       PROJECTS_PAGE_MAX: 50,
       ATTACHMENT_VIDEO_HOSTS: [
@@ -125,6 +127,8 @@ describe('loadConfig', () => {
     ['UPLOAD_URL_TTL_S', '10'],
     ['FILE_READ_URL_TTL_S', '7200'],
     ['UPLOAD_MAX_IMAGE_BYTES', '10'],
+    ['NOTIFICATIONS_PAGE_SIZE', '0'],
+    ['NOTIFICATIONS_PAGE_MAX', '201'],
     ['PROJECTS_PAGE_SIZE', '0'],
     ['PROJECTS_PAGE_MAX', '201'],
   ])('refuses %s=%j', (key, value) => {

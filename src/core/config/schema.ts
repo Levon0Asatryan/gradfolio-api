@@ -185,6 +185,13 @@ const storage = {
   PROJECT_MAX_ATTACHMENTS: z.coerce.number().int().min(1).max(200).default(20),
 };
 
+/** Notifications (docs/m5-plan.md §5.3). */
+const notifications = {
+  // Items per page when `limit` is not given, and the most a caller may ask for.
+  NOTIFICATIONS_PAGE_SIZE: z.coerce.number().int().min(1).max(200).default(20),
+  NOTIFICATIONS_PAGE_MAX: z.coerce.number().int().min(1).max(200).default(50),
+};
+
 /** MySQL 8.4. */
 const database = {
   DATABASE_URL: z
@@ -263,6 +270,7 @@ export const configSchema = z
     ...rateLimit,
     ...profile,
     ...projects,
+    ...notifications,
     ...storage,
   })
   .refine(tlsInProduction, TLS_IN_PRODUCTION)
@@ -272,6 +280,10 @@ export const configSchema = z
     path: ['AUTH0_ISSUER_BASE_URL'],
   })
   // A default page larger than the maximum would 400 every list that omits `limit`.
+  .refine((c) => c.NOTIFICATIONS_PAGE_SIZE <= c.NOTIFICATIONS_PAGE_MAX, {
+    message: 'must not exceed NOTIFICATIONS_PAGE_MAX',
+    path: ['NOTIFICATIONS_PAGE_SIZE'],
+  })
   .refine((c) => c.PROJECTS_PAGE_SIZE <= c.PROJECTS_PAGE_MAX, {
     message: 'must not exceed PROJECTS_PAGE_MAX',
     path: ['PROJECTS_PAGE_SIZE'],

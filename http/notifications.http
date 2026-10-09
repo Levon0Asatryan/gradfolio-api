@@ -1,0 +1,35 @@
+### api/notifications -- the caller's own notifications (M5 PR a)
+#
+# Needs an Auth0 access token (see me.http). Put a notification id in .env as
+# `notificationId=…` (from the list below).
+
+@baseUrl = {{$dotenv baseUrl}}
+@accessToken = {{$dotenv accessToken}}
+@notificationId = {{$dotenv notificationId}}
+
+###
+# @name listMyNotifications
+# 200 { items, nextCursor }, newest first. Render the text from `type` + `params` in the
+# reader's language; `link` is computed now (null when the project is gone or not
+# readable by the caller), `invite.status` says whether Accept/Reject still applies.
+# Pass nextCursor back as cursor; a bad cursor or a limit over the maximum is 400.
+GET {{baseUrl}}/v1/me/notifications?limit=20
+Authorization: Bearer {{accessToken}}
+
+###
+# @name unreadCount
+# 200 { count }. Cheap: the frontend polls it about once a minute.
+GET {{baseUrl}}/v1/me/notifications/unread-count
+Authorization: Bearer {{accessToken}}
+
+###
+# @name markNotificationRead
+# 204. Idempotent. Someone else's notification id is 404, the same body as an unknown id.
+POST {{baseUrl}}/v1/me/notifications/{{notificationId}}/read
+Authorization: Bearer {{accessToken}}
+
+###
+# @name markAllNotificationsRead
+# 200 { updated }: how many were unread.
+POST {{baseUrl}}/v1/me/notifications/read-all
+Authorization: Bearer {{accessToken}}

@@ -6,6 +6,14 @@ import {
   createAttachmentSchema,
   patchAttachmentSchema,
 } from '../projects/dto/attachment.dto.js';
+import {
+  notificationIdParamSchema,
+  notificationPageSchema,
+  notificationQuerySchema,
+  readAllResultSchema,
+  unreadCountSchema,
+} from '../notifications/dto/notification.dto.js';
+import { projectTeamParamSchema, teamListSchema } from '../team/dto/team.dto.js';
 import { uploadRequestSchema, uploadResponseSchema } from '../files/dto/upload.dto.js';
 import { documentedProjectSchemas } from '../projects/dto/project-write.dto.js';
 import {
@@ -377,6 +385,7 @@ export const OPERATIONS: readonly Operation[] = [
     description:
       'Needs no token when the project is public and published; a token, when sent, ' +
       'identifies the owner (`isOwner`), who also reads their private and draft projects. ' +
+      'An accepted team member also reads a private project (never a draft). ' +
       'A project the caller may not read answers 404, exactly as an unknown id does. A token ' +
       'that is sent but invalid is a 401, not an anonymous read. `descriptionHtml` is ' +
       'sanitized on write; video attachments carry an `embedUrl` to use in an iframe.',
@@ -385,7 +394,7 @@ export const OPERATIONS: readonly Operation[] = [
       '200': { description: 'The project', schema: projectDetailSchema },
       '401': error('UNAUTHENTICATED: a token was sent and is invalid or expired'),
       '404': error(
-        'NOT_FOUND: no such project, or it is private/draft and the caller is not its owner',
+        'NOT_FOUND: no such project, or it is private/draft and the caller is neither its owner nor (private only) an accepted team member',
       ),
       '429': error('RATE_LIMITED: over budget; see the Retry-After header'),
       '503': error('AUTH_UNAVAILABLE or DATABASE_UNAVAILABLE'),
@@ -596,6 +605,81 @@ export const OPERATIONS: readonly Operation[] = [
       '503': error('AUTH_UNAVAILABLE or DATABASE_UNAVAILABLE'),
     },
   },
+  {
+    method: 'get',
+    path: '/v1/projects/{id}/team',
+    operationId: 'listProjectTeam',
+    tag: 'team',
+    summary: 'Every membership of the caller’s project',
+    description:
+      'The owner’s management view: pending, accepted and rejected rows. Accepted members ' +
+      'also appear on `ProjectDetail.team`. Owner only: anyone else, an accepted teammate ' +
+      'included, gets the 404 of an unknown project.',
+    bearer: true,
+    params: projectTeamParamSchema,
+    responses: {
+      '200': { description: 'The team', schema: teamListSchema },
+      '404': notYours('project'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'get',
+    path: '/v1/me/notifications',
+    operationId: 'listMyNotifications',
+    tag: 'notifications',
+    summary: 'The caller’s notifications, newest first',
+    description:
+      'Keyset pagination: pass `nextCursor` back as `cursor`. Render the text from `type` ' +
+      'and `params` in the reader’s language; `link` and `invite` are computed at read time.',
+    bearer: true,
+    query: notificationQuerySchema,
+    responses: {
+      '200': { description: 'One page', schema: notificationPageSchema },
+      '400': error('VALIDATION_FAILED: a query parameter is invalid (see `details`)'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'get',
+    path: '/v1/me/notifications/unread-count',
+    operationId: 'getUnreadNotificationCount',
+    tag: 'notifications',
+    summary: 'How many of the caller’s notifications are unread',
+    description: 'Cheap enough to poll (the frontend polls it about once a minute).',
+    bearer: true,
+    responses: {
+      '200': { description: 'The count', schema: unreadCountSchema },
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'post',
+    path: '/v1/me/notifications/read-all',
+    operationId: 'markAllNotificationsRead',
+    tag: 'notifications',
+    summary: 'Marks all of the caller’s notifications read',
+    bearer: true,
+    responses: {
+      '200': { description: 'How many were unread', schema: readAllResultSchema },
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'post',
+    path: '/v1/me/notifications/{id}/read',
+    operationId: 'markNotificationRead',
+    tag: 'notifications',
+    summary: 'Marks one notification read',
+    description: 'Idempotent. Someone else’s notification answers 404, as an unknown id does.',
+    bearer: true,
+    params: notificationIdParamSchema,
+    responses: {
+      '204': { description: 'Marked (or already read)' },
+      '404': notYours('notification'),
+      ...authenticatedFailures,
+    },
+  },
   ...sectionOperations({
     path: 'education',
     name: 'Education',
@@ -695,6 +779,8 @@ export function buildOpenApiDocument(
         name: 'projects',
         description: 'Projects: reading anyone’s public ones, managing your own',
       },
+      { name: 'team', description: 'Project teams: the owner’s view of memberships' },
+      { name: 'notifications', description: 'The caller’s own notifications' },
     ],
     paths,
     components: {

@@ -72,6 +72,16 @@ export default defineConfig({
         'src/api/projects/services/*.ts',
         'src/api/projects/utils/visibility.ts',
         'src/api/projects/*.controller.ts',
+        // Team and notification reads: owner-scoped statements, the visibility
+        // predicates and read-time links in SQL. MySQL behaviour, proved against
+        // MySQL 8.4 by notifications/e2e/notifications.int.test.ts,
+        // team/e2e/team.int.test.ts and projects/e2e/project-team-reads.int.test.ts.
+        'src/api/notifications/repositories/*.ts',
+        'src/api/notifications/services/*.ts',
+        'src/api/notifications/*.controller.ts',
+        'src/api/team/repositories/*.ts',
+        'src/api/team/services/*.ts',
+        'src/api/team/*.controller.ts',
         // File registration, signed reads and deletes, uploads, avatars: the claim
         // rule, per-user prefixes, object caps and after-commit deletes, proved
         // against MySQL 8.4 with a fake that has GCS's claim rule by
