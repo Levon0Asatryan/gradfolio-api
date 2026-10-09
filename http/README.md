@@ -14,6 +14,7 @@ after the module it exercises.
 | [projects.http](projects.http)           | `api/projects`      | read a project, the caller's list, a user's list; create, change, delete          |
 | [team.http](team.http)                   | `api/team`          | the owner's view of a project's memberships                                       |
 | [notifications.http](notifications.http) | `api/notifications` | the caller's notifications: list, unread count, mark one or all read              |
+| [activities.http](activities.http)       | `api/activities`    | the caller's activity feed                                                        |
 
 **A module added later gets a file here in the same pull request.** A file that
 does not list every route its module serves is worse than none: the gap reads as

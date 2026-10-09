@@ -1,0 +1,14 @@
+### api/activities -- the caller's activity feed (M5 PR c)
+#
+# Needs an Auth0 access token (see me.http).
+
+@baseUrl = {{$dotenv baseUrl}}
+@accessToken = {{$dotenv accessToken}}
+
+###
+# @name listMyActivities
+# 200 { items: [{ id, type, translationKey, translationParams, timestamp }], nextCursor },
+# newest first. The frontend renders the text from the key and the parameters. Only your
+# own feed exists. Pass nextCursor back as cursor; a bad cursor or a limit over the maximum is 400.
+GET {{baseUrl}}/v1/me/activities?limit=20
+Authorization: Bearer {{accessToken}}

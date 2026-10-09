@@ -75,7 +75,11 @@ export default defineConfig({
         // Team and notification reads: owner-scoped statements, the visibility
         // predicates and read-time links in SQL. MySQL behaviour, proved against
         // MySQL 8.4 by notifications/e2e/notifications.int.test.ts,
-        // team/e2e/team.int.test.ts and projects/e2e/project-team-reads.int.test.ts.
+        // team/e2e/team.int.test.ts, projects/e2e/project-team-reads.int.test.ts and
+        // activities/e2e/*.int.test.ts.
+        'src/api/activities/repositories/*.ts',
+        'src/api/activities/services/*.ts',
+        'src/api/activities/*.controller.ts',
         'src/api/notifications/repositories/*.ts',
         'src/api/notifications/services/*.ts',
         'src/api/notifications/*.controller.ts',
