@@ -11,6 +11,10 @@
 // never printed. Both accounts must have a public profile. Exits 1 on the first failed check,
 // after trying to delete what it created.
 //
+// After every team change it also reads GET /v1/me/teams for both accounts and compares the
+// project's state on each side with the stored rows (the owner's own team list). Needs an API with
+// that route (M5 5.8).
+//
 // Left behind, because the API has no way to delete a notification: a few read notifications
 // on both accounts (about projects that no longer exist; they render from their saved names).
 const API = (process.env.API_URL ?? '').replace(/\/$/, '');
@@ -57,6 +61,60 @@ try {
       (n) => n.params?.projectId === projectId && n.type === 'team_invite',
     );
 
+  // GET /v1/me/teams, read for both accounts and reduced to what one project looks like
+  // from each side, then compared with what the step must have stored.
+  const teamsOf = async (who) => (await call(who, 'GET', '/v1/me/teams?limit=50')).body;
+  const teamState = async (projectId) => {
+    const [ta, tb] = [await teamsOf('A'), await teamsOf('B')];
+    const owned = ta.owned.items.find((p) => p.id === projectId);
+    const stored = (await call('A', 'GET', `/v1/projects/${projectId}/team`)).body.items;
+    // The owner's view must be exactly the stored rows (ids and statuses); an empty team is not listed.
+    const same =
+      JSON.stringify((owned?.members ?? []).map((m) => [m.id, m.status]).sort()) ===
+      JSON.stringify(stored.map((m) => [m.id, m.status]).sort());
+    const incoming = tb.incoming.items.find((i) => i.project.id === projectId);
+    const member = tb.member.items.find((p) => p.id === projectId);
+    return {
+      ownedStatus: owned?.members.find((m) => m.userId === b.id)?.status ?? null,
+      ownedMatchesStored: same,
+      outgoing: ta.outgoing.items.some((o) => o.project.id === projectId && o.invitee.id === b.id),
+      incoming: incoming ? { title: incoming.project.title, by: incoming.invitedBy.name } : null,
+      member: member
+        ? { owner: member.owner.id, onTeam: member.team.some((m) => m.userId === b.id) }
+        : null,
+      // B never owns or sends anything on A's project, and A is never a member of it
+      crossed:
+        tb.owned.items.some((p) => p.id === projectId) ||
+        tb.outgoing.items.some((o) => o.project.id === projectId) ||
+        ta.member.items.some((p) => p.id === projectId) ||
+        ta.incoming.items.some((i) => i.project.id === projectId),
+    };
+  };
+  const expectTeams = async (label, projectId, titleSuffix, want) => {
+    const got = await teamState(projectId);
+    const full = {
+      ownedStatus: null,
+      outgoing: false,
+      incoming: null,
+      member: null,
+      crossed: false,
+      ownedMatchesStored: true,
+      ...want,
+    };
+    if (full.incoming) full.incoming = { title: `${tag}-${titleSuffix}`, by: a.name };
+    if (full.member) full.member = { owner: a.id, onTeam: true };
+    const canon = (o) =>
+      JSON.stringify(o, (_k, v) =>
+        v && typeof v === 'object' && !Array.isArray(v)
+          ? Object.fromEntries(Object.entries(v).sort(([x], [y]) => x.localeCompare(y)))
+          : v,
+      );
+    if (canon(got) !== canon(full)) {
+      console.error(`expected ${canon(full)}\n     got ${canon(got)}`);
+    }
+    check(canon(got) === canon(full), `/me/teams ${label}`);
+  };
+
   // --- the lookup, the invitation, the notification
   const found = await call(
     'A',
@@ -78,6 +136,11 @@ try {
     role: 'Teammate',
   });
   check(inv.status === 201 && inv.body.status === 'pending', 'A invites B: pending');
+  await expectTeams('after the invitation', pub, 'public', {
+    ownedStatus: 'pending',
+    outgoing: true,
+    incoming: true,
+  });
   check(
     (await call('A', 'POST', `/v1/projects/${pub}/team`, { userId: b.id })).body?.code ===
       'ALREADY_MEMBER',
@@ -120,6 +183,7 @@ try {
   // --- accept: both profiles, the owner is told
   const acc = await call('B', 'POST', `/v1/projects/${pub}/team/me/accept`);
   check(acc.status === 200 && acc.body.status === 'accepted', 'B accepts');
+  await expectTeams('after the accept', pub, 'public', { ownedStatus: 'accepted', member: true });
   check(
     (await call('B', 'POST', `/v1/projects/${pub}/team/me/accept`)).body?.code ===
       'INVITE_NOT_PENDING',
@@ -162,6 +226,11 @@ try {
     (await call('A', 'POST', `/v1/projects/${priv}/team`, { userId: b.id })).status === 201,
     'A invites B to the private project',
   );
+  await expectTeams('private, invited', priv, 'private', {
+    ownedStatus: 'pending',
+    outgoing: true,
+    incoming: true,
+  });
   check(
     (await call('B', 'GET', `/v1/projects/${priv}`)).status === 404,
     'a pending invitee cannot read it (404)',
@@ -170,6 +239,7 @@ try {
     (await call('B', 'POST', `/v1/projects/${priv}/team/me/reject`)).body?.status === 'rejected',
     'B rejects',
   );
+  await expectTeams('private, rejected', priv, 'private', { ownedStatus: 'rejected' });
   check(
     (await call('B', 'GET', `/v1/projects/${priv}`)).status === 404,
     'a rejected invitee cannot read it (404)',
@@ -181,10 +251,19 @@ try {
   );
   const rows = (await call('A', 'GET', `/v1/projects/${priv}/team`)).body.items;
   check(rows.length === 1, 'still one membership row (updated, not inserted)');
+  await expectTeams('private, invited again', priv, 'private', {
+    ownedStatus: 'pending',
+    outgoing: true,
+    incoming: true,
+  });
   check(
     (await call('B', 'POST', `/v1/projects/${priv}/team/me/accept`)).status === 200,
     'B accepts',
   );
+  await expectTeams('private, accepted', priv, 'private', {
+    ownedStatus: 'accepted',
+    member: true,
+  });
   check(
     (await call('B', 'GET', `/v1/projects/${priv}`)).status === 200,
     'an accepted teammate reads the private project',
@@ -193,6 +272,7 @@ try {
     (await call('A', 'DELETE', `/v1/projects/${priv}/team/${rows[0].id}`)).status === 204,
     'A removes B',
   );
+  await expectTeams('private, removed (no team left, so not listed)', priv, 'private', {});
   check(
     (await call('B', 'GET', `/v1/projects/${priv}`)).status === 404,
     'B can no longer read it (404)',
@@ -204,6 +284,11 @@ try {
     'B leaves the public project',
   );
   check((await onProfile('A', b.id)) === undefined, 'it is off B’s profile');
+  await expectTeams('after B left (no team left, so not listed)', pub, 'public', {});
+  const leftNote = (await call('A', 'GET', '/v1/me/notifications?limit=50')).body.items.find(
+    (n) => n.type === 'team_left' && n.params.projectId === pub,
+  );
+  check(leftNote && leftNote.params.actorName === b.name, 'A is told that B left');
   console.log('PASS  round trip complete');
 } catch (err) {
   console.error(String(err.message));
