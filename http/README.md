@@ -11,7 +11,7 @@ after the module it exercises.
 | [me.http](me.http)             | `api/me`       | the caller's account; 401 without a token                                         |
 | [sections.http](sections.http) | `api/profiles` | education, experience, certifications and skills: create, change, delete, reorder |
 | [profiles.http](profiles.http) | `api/profiles` | profiles by id (anonymous and signed in), the caller's header                     |
-| [projects.http](projects.http) | `api/projects` | a project by id, the caller's own list, a user's public list, filters and paging  |
+| [projects.http](projects.http) | `api/projects` | read a project, the caller's list, a user's list; create, change, delete          |
 
 **A module added later gets a file here in the same pull request.** A file that
 does not list every route its module serves is worse than none: the gap reads as
