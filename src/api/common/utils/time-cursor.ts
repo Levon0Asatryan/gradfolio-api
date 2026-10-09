@@ -11,8 +11,9 @@ export interface TimeCursor {
 }
 
 const cursorSchema = z.strictObject({
-  // Within the range of a JavaScript Date: anything beyond it would build an invalid Date.
-  t: z.number().int().nonnegative().max(8_640_000_000_000_000),
+  // Up to 9999-12-31T23:59:59.999Z, the last time a MySQL DATETIME holds (and well inside
+  // a JavaScript Date): a later one reaches the database as an invalid datetime, a 500.
+  t: z.number().int().nonnegative().max(253_402_300_799_999),
   id: z.string().max(36),
 });
 

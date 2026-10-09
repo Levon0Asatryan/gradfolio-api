@@ -175,10 +175,10 @@ describe('GET /v1/me/activities', () => {
     expect(res.body.code).toBe('VALIDATION_FAILED');
   });
 
-  it('answers 400, not a database error, for a cursor time beyond the Date range', async () => {
+  it('answers 400, not a database error, for a cursor time beyond the DATETIME range', async () => {
     const http = await start();
     const alice = await member('alice');
-    const cursor = Buffer.from(JSON.stringify({ t: 8_640_000_000_000_001, id: 'x' })).toString(
+    const cursor = Buffer.from(JSON.stringify({ t: 253_402_300_800_000, id: 'x' })).toString(
       'base64url',
     );
     const res = await http.get('/v1/me/activities').query({ cursor }).set(alice.auth).expect(400);

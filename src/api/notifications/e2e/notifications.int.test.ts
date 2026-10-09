@@ -158,9 +158,9 @@ describe('GET /v1/me/notifications', () => {
     ['a limit of zero', { limit: '0' }],
     ['an unknown key', { sort: 'oldest' }],
     [
-      'a cursor time beyond the Date range',
+      'a cursor time beyond the DATETIME range',
       {
-        cursor: Buffer.from(JSON.stringify({ t: 8_640_000_000_000_001, id: 'x' })).toString(
+        cursor: Buffer.from(JSON.stringify({ t: 253_402_300_800_000, id: 'x' })).toString(
           'base64url',
         ),
       },
