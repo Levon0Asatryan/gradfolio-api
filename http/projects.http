@@ -1,0 +1,47 @@
+### api/projects -- reading projects (M4 PR a)
+#
+# Needs an Auth0 access token for the /me routes (see me.http). Put a project id in
+# .env as `projectId=…` and a user id as `userId=…`.
+
+@baseUrl = {{$dotenv baseUrl}}
+@accessToken = {{$dotenv accessToken}}
+@projectId = {{$dotenv projectId}}
+@userId = {{$dotenv userId}}
+
+###
+# @name getProject
+# 200 a public, published project, no token needed. A token, when sent, identifies the
+# owner, who also reads private and draft projects. Anyone else gets 404, the same
+# body as an unknown id. A bad token is 401, never anonymous.
+GET {{baseUrl}}/v1/projects/{{projectId}}
+
+###
+# @name getProjectAsOwner
+GET {{baseUrl}}/v1/projects/{{projectId}}
+Authorization: Bearer {{accessToken}}
+
+###
+# @name listMyProjects
+# 200 { items, nextCursor }: the caller's projects in every state. Filters: state
+# (published|private|draft), category, status, tag, technology, q. Sort: newest
+# (default), oldest, updated, name_asc, name_desc. Pass nextCursor back as cursor with
+# the same sort; a cursor for another sort, an unknown key, or limit over the maximum is 400.
+GET {{baseUrl}}/v1/me/projects?sort=name_asc&limit=10
+Authorization: Bearer {{accessToken}}
+
+###
+# @name listMyDrafts
+GET {{baseUrl}}/v1/me/projects?state=draft&q=garden
+Authorization: Bearer {{accessToken}}
+
+###
+# @name listUserProjects
+# 200 the user's public, published projects, no token needed. 404 when the user's profile
+# is private (and the caller is not its owner) or the user does not exist.
+GET {{baseUrl}}/v1/users/{{userId}}/projects?category=research&technology=python
+
+###
+# @name nextPage
+# nextCursor from the previous response
+GET {{baseUrl}}/v1/me/projects?limit=10&cursor=PASTE_NEXT_CURSOR_HERE
+Authorization: Bearer {{accessToken}}

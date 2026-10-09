@@ -2,6 +2,13 @@ import { z, type ZodObject, type ZodType } from 'zod';
 import { LIVENESS_PATH, READINESS_PATH } from '../health/constants.js';
 import { meResponseSchema } from '../me/dto/me.dto.js';
 import {
+  myProjectsQuerySchema,
+  projectDetailSchema,
+  projectIdParamSchema,
+  projectPageSchema,
+  userProjectsQuerySchema,
+} from '../projects/dto/project.dto.js';
+import {
   certificationSchema,
   educationSchema,
   experienceSchema,
@@ -101,6 +108,8 @@ export interface Operation {
   description?: string;
   /** Path parameters, one key per `{name}` in `path`. */
   params?: ZodObject;
+  /** Query-string parameters; optional ones are those the schema marks optional. */
+  query?: ZodObject;
   /** The JSON request body. */
   body?: ZodType;
   responses: Record<string, { description: string; schema?: ZodType }>;
@@ -351,6 +360,70 @@ export const OPERATIONS: readonly Operation[] = [
       ...authenticatedFailures,
     },
   },
+  {
+    method: 'get',
+    path: '/v1/projects/{id}',
+    operationId: 'getProject',
+    tag: 'projects',
+    summary: 'A project with its attachments, tags, technologies and team',
+    description:
+      'Needs no token when the project is public and published; a token, when sent, ' +
+      'identifies the owner (`isOwner`), who also reads their private and draft projects. ' +
+      'A project the caller may not read answers 404, exactly as an unknown id does. A token ' +
+      'that is sent but invalid is a 401, not an anonymous read. `descriptionHtml` is ' +
+      'sanitized on write; video attachments carry an `embedUrl` to use in an iframe.',
+    params: projectIdParamSchema,
+    responses: {
+      '200': { description: 'The project', schema: projectDetailSchema },
+      '401': error('UNAUTHENTICATED: a token was sent and is invalid or expired'),
+      '404': error(
+        'NOT_FOUND: no such project, or it is private/draft and the caller is not its owner',
+      ),
+      '429': error('RATE_LIMITED: over budget; see the Retry-After header'),
+      '503': error('AUTH_UNAVAILABLE or DATABASE_UNAVAILABLE'),
+    },
+  },
+  {
+    method: 'get',
+    path: '/v1/me/projects',
+    operationId: 'listMyProjects',
+    tag: 'projects',
+    summary: 'The caller’s own projects, in every state',
+    description:
+      'Published, private and draft projects together; `state` narrows. Keyset pagination: ' +
+      'pass `nextCursor` back as `cursor` with the same `sort`. Unknown query keys, a cursor ' +
+      'for another sort and a `limit` over the maximum are 400.',
+    bearer: true,
+    query: myProjectsQuerySchema,
+    responses: {
+      '200': { description: 'One page', schema: projectPageSchema },
+      '400': error('VALIDATION_FAILED: a query parameter is invalid (see `details`)'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'get',
+    path: '/v1/users/{id}/projects',
+    operationId: 'listUserProjects',
+    tag: 'projects',
+    summary: 'A user’s public projects',
+    description:
+      'Public, published projects only, even for the owner (who uses `/v1/me/projects`). ' +
+      'Needs no token. 404 when the user’s profile is private and the caller is not its ' +
+      'owner, or the user does not exist. Same pagination as `/v1/me/projects`.',
+    params: userIdParamSchema,
+    query: userProjectsQuerySchema,
+    responses: {
+      '200': { description: 'One page', schema: projectPageSchema },
+      '400': error('VALIDATION_FAILED: a query parameter is invalid (see `details`)'),
+      '401': error('UNAUTHENTICATED: a token was sent and is invalid or expired'),
+      '404': error(
+        'NOT_FOUND: no such user, or their profile is private and the caller is not its owner',
+      ),
+      '429': error('RATE_LIMITED: over budget; see the Retry-After header'),
+      '503': error('AUTH_UNAVAILABLE or DATABASE_UNAVAILABLE'),
+    },
+  },
   ...sectionOperations({
     path: 'education',
     name: 'Education',
@@ -410,7 +483,9 @@ export function buildOpenApiDocument(
       summary: op.summary,
       ...(op.description ? { description: op.description } : {}),
       ...(op.bearer ? { security: [{ bearerAuth: [] }] } : {}),
-      ...(op.params ? { parameters: pathParameters(op, components) } : {}),
+      ...(op.params || op.query
+        ? { parameters: [...pathParameters(op, components), ...queryParameters(op, components)] }
+        : {}),
       ...(op.body
         ? {
             requestBody: {
@@ -444,6 +519,7 @@ export function buildOpenApiDocument(
       { name: 'health', description: 'Liveness and readiness, outside `/v1`' },
       { name: 'me', description: 'The caller’s own account' },
       { name: 'profiles', description: 'Profiles: reading anyone’s, editing your own' },
+      { name: 'projects', description: 'Projects: reading (writes arrive with M4 PRs b and c)' },
     ],
     paths,
     components: {
@@ -472,6 +548,18 @@ function pathParameters(op: Operation, components: Record<string, JsonSchema>): 
     required: true,
     schema: convert(schema as ZodType, components, 'input'),
   }));
+}
+
+function queryParameters(op: Operation, components: Record<string, JsonSchema>): unknown[] {
+  return Object.entries(op.query?.shape ?? {}).map(([name, schema]) => {
+    const zodSchema = schema as ZodType;
+    return {
+      name,
+      in: 'query',
+      required: !zodSchema.isOptional(),
+      schema: convert(zodSchema, components, 'input'),
+    };
+  });
 }
 
 function sortedByName(components: Record<string, JsonSchema>): Record<string, JsonSchema> {
