@@ -539,7 +539,8 @@ export const OPERATIONS: readonly Operation[] = [
     summary: 'Get a signed URL to upload an avatar, hero image, image or PDF',
     description:
       'The browser then PUTs the file straight to storage with the returned `headers` ' +
-      '(exactly: type and size are signed), and the app sends `fileUrl` in the matching ' +
+      '(exactly: type, size and a create-only precondition are signed; the URL writes its key once ' +
+      'and a replay is refused), and the app sends `fileUrl` in the matching ' +
       'write. The URL lives `expiresAt`; the token never reaches the browser. Images: png, ' +
       'jpeg, webp, gif; PDFs only as an attachment. `hero` and `attachment` need a ' +
       '`projectId` of the caller’s. Rate-limited with its own budget. 409 at the per-user ' +

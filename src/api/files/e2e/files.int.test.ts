@@ -83,8 +83,13 @@ async function upload(
     .expect(201);
   const fileUrl = res.body.fileUrl as string;
   const key = objectKeyOf(fileUrl, BUCKET)!;
-  storage.put(key, body, contentType);
-  return { fileUrl, key, ticket: res.body as Record<string, unknown> };
+  // the browser's PUT, with the signed headers enforced as the bucket enforces them
+  expect(storage.putSigned(res.body as never, body)).toBe(200);
+  return {
+    fileUrl,
+    key,
+    ticket: res.body as { uploadUrl: string; headers: Record<string, string> },
+  };
 }
 
 const rowOf = (id: string) =>
@@ -106,7 +111,11 @@ describe('POST /v1/me/uploads', () => {
 
     expect(res.body).toMatchObject({
       method: 'PUT',
-      headers: { 'Content-Type': 'image/jpeg', 'x-goog-content-length-range': '1234,1234' },
+      headers: {
+        'Content-Type': 'image/jpeg',
+        'x-goog-content-length-range': '1234,1234',
+        'x-goog-if-generation-match': '0',
+      },
     });
     const key = objectKeyOf(res.body.fileUrl as string, BUCKET)!;
     expect(key).toMatch(new RegExp(`^u/${me.user.id}/[0-9a-f-]{36}\\.jpg$`));
@@ -238,6 +247,42 @@ describe('POST /v1/me/uploads', () => {
     expect((await sign()).status).toBe(201);
     expect((await sign()).status).toBe(429);
     await http.get('/v1/me').set(me.auth).expect(200);
+  });
+});
+
+describe('a signed upload writes its key once', () => {
+  it('refuses a replay of the URL after the object exists: registered bytes cannot be replaced', async () => {
+    const http = await start();
+    const me = await member('me');
+    const { fileUrl, key, ticket } = await upload(http, me, 'avatar');
+    await http.patch('/v1/me/profile').set(me.auth).send({ avatarUrl: fileUrl }).expect(200);
+    const before = await storage.stat(key);
+
+    // the same URL, same headers, different bytes of the same length
+    const evil = Buffer.from(PNG);
+    evil[evil.length - 1] = 0x58;
+    expect(storage.putSigned(ticket, evil)).toBe(412);
+    expect(storage.objects.get(key)?.body.equals(PNG)).toBe(true);
+    expect(await storage.stat(key)).toEqual(before);
+  });
+
+  it('refuses to register bytes that were replaced after they were validated', async () => {
+    const http = await start();
+    const me = await member('me');
+    const { fileUrl, key } = await upload(http, me, 'avatar');
+    // between accept()'s read of the object and its claim, the bytes are replaced
+    storage.afterStat = () => {
+      storage.put(key, Buffer.concat([PNG, Buffer.from('swapped')]), 'image/png');
+      return Promise.resolve();
+    };
+    const res = await http
+      .patch('/v1/me/profile')
+      .set(me.auth)
+      .send({ avatarUrl: fileUrl })
+      .expect(400);
+    expect(res.body.code).toBe('FILE_IN_USE');
+    expect(await avatarOf(me.user.id)).toBeNull();
+    expect((await storage.stat(key))?.claimed).toBe(false);
   });
 });
 

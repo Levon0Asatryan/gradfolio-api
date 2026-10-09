@@ -104,7 +104,7 @@ export class FileUrlService {
     if (!matchesMagic(info.contentType, head)) {
       throw new FileRejectedError('INVALID_FILE', `the file is not really ${info.contentType}`);
     }
-    if (!(await storage.claim(key, info.metageneration, kind))) {
+    if (!(await storage.claim(key, info, kind))) {
       throw new FileRejectedError('FILE_IN_USE', 'that file is already in use');
     }
     return canonicalObjectUrl(bucket, key);
@@ -113,7 +113,9 @@ export class FileUrlService {
   /**
    * The URL to hand to a client for a stored one: a signed `GET` for ours
    * (valid FILE_READ_URL_TTL_S), cached so a repeated read gets the same URL
-   * and costs no IAM call; anything else unchanged.
+   * and costs no IAM call; anything else unchanged. If signing fails the stored
+   * URL is returned and the failure logged: a read never fails a request, and a
+   * write that committed is never reported as failed because of it.
    */
   async read<T extends string | null | undefined>(url: T): Promise<T> {
     const key = this.keyOf(url);
@@ -121,7 +123,19 @@ export class FileUrlService {
     const now = Date.now();
     const hit = this.cache.get(key);
     if (hit !== undefined && hit.validUntil > now) return hit.url as T;
-    const signed = await this.storage.signRead(key, this.cfg.FILE_READ_URL_TTL_S);
+    let signed: string;
+    try {
+      signed = await this.storage.signRead(key, this.cfg.FILE_READ_URL_TTL_S);
+    } catch (err) {
+      // A write that already committed must not fail because the *response* could
+      // not be signed (IAM or storage down): answer with the stored URL, which a
+      // private bucket refuses, and log it. The next read signs again.
+      this.logger.error(
+        { key, err: err instanceof Error ? err.name : 'unknown' },
+        'signing a read URL failed',
+      );
+      return url;
+    }
     this.remember(key, signed, now);
     return signed as T;
   }
