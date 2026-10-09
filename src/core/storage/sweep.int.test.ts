@@ -41,7 +41,7 @@ describe('sweepOrphans', () => {
     storage.put('elsewhere/x.png', png, 'image/png', old); // outside u/: never touched
 
     const dry = await sweepOrphans(db, storage, B, { apply: false, minAgeMs: DAY, now: NOW });
-    expect(dry).toEqual({ scanned: 5, orphans: [key('orphan-old')], deleted: 0 });
+    expect(dry).toEqual({ scanned: 5, orphans: [key('orphan-old')], deleted: 0, kept: 0 });
     expect(storage.deleted).toEqual([]);
 
     const done = await sweepOrphans(db, storage, B, { apply: true, minAgeMs: DAY, now: NOW });
@@ -70,5 +70,47 @@ describe('sweepOrphans', () => {
     expect(
       (await sweepOrphans(db, storage, B, { apply: false, minAgeMs: DAY, now: NOW })).orphans,
     ).toEqual([k]);
+  });
+
+  it('keeps an orphan that was registered after it was listed', async () => {
+    const storage = new FakeFileStorage(B);
+    const user = await createUser(db);
+    const k = `u/${user.id}/late.png`;
+    storage.put(k, png, 'image/png', old);
+    // between the listing and the delete, accept() claims the object (its row commits next)
+    storage.afterList = async () => {
+      const info = (await storage.stat(k))!;
+      expect(await storage.claim(k, info, 'hero')).toBe(true);
+    };
+    const res = await sweepOrphans(db, storage, B, { apply: true, minAgeMs: DAY, now: NOW });
+    expect(res).toEqual({ scanned: 1, orphans: [k], deleted: 0, kept: 1 });
+    expect(storage.objects.has(k)).toBe(true);
+    expect(storage.deleted).toEqual([]);
+  });
+
+  it('keeps an orphan whose bytes were replaced after it was listed', async () => {
+    const storage = new FakeFileStorage(B);
+    const user = await createUser(db);
+    const k = `u/${user.id}/swapped.png`;
+    storage.put(k, png, 'image/png', old);
+    storage.afterList = () => {
+      storage.put(k, Buffer.from('new bytes'), 'image/png', old);
+      return Promise.resolve();
+    };
+    const res = await sweepOrphans(db, storage, B, { apply: true, minAgeMs: DAY, now: NOW });
+    expect(res.kept).toBe(1);
+    expect(storage.objects.get(k)?.body.toString()).toBe('new bytes');
+  });
+
+  it('holds back a freshly claimed object whose row has not committed yet, by the age floor', async () => {
+    const storage = new FakeFileStorage(B);
+    const user = await createUser(db);
+    const k = `u/${user.id}/claimed.png`;
+    storage.put(k, png, 'image/png', old);
+    // claimed before the sweep started, row not committed: the claim refreshed `updated`
+    const info = (await storage.stat(k))!;
+    expect(await storage.claim(k, info, 'hero')).toBe(true);
+    const res = await sweepOrphans(db, storage, B, { apply: true, minAgeMs: DAY, now: Date.now() });
+    expect(res).toMatchObject({ orphans: [], deleted: 0 });
   });
 });

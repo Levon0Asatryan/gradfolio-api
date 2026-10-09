@@ -34,7 +34,7 @@ async function main(): Promise<void> {
     for (const key of result.orphans)
       process.stdout.write(`${apply ? 'deleted' : 'orphan'} ${key}\n`);
     process.stdout.write(
-      `sweep: ${result.scanned} scanned, ${result.orphans.length} orphans, ${result.deleted} deleted${apply ? '' : ' (dry run; pass --apply)'}\n`,
+      `sweep: ${result.scanned} scanned, ${result.orphans.length} orphans, ${result.deleted} deleted${result.kept > 0 ? `, ${result.kept} kept (changed meanwhile)` : ''}${apply ? '' : ' (dry run; pass --apply)'}\n`,
     );
   } finally {
     await pool.end();
