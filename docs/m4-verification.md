@@ -217,10 +217,15 @@ Steps for Levon (about 5 minutes; the existing database-connection test user is 
 4. Tell the orchestrator "token is in .env" (it lives 1 hour).
 
 Then (me): `docker-compose -p gradfolio-m4 up -d` with the real issuer and audience;
-`API_URL=http://127.0.0.1:3006 TOKEN=$M4_TEST_TOKEN node scripts/roundtrip.mjs`; read the
-stored rows (`projects`, `project_attachments`, `project_tags`, `project_technologies`,
-`terms`) and compare, check the log for the token, `sub` and email; record the output
-here.
+run `API_URL=http://127.0.0.1:3006 TOKEN=$M4_TEST_TOKEN PAUSE=1 node scripts/roundtrip.mjs`.
+`PAUSE=1` stops the script before its delete and prints the project id, because the script
+deletes the project at the end and the rows can only be compared while it still exists.
+While it waits, read the stored rows (`projects`, `project_attachments`, `project_tags`,
+`project_technologies`, `terms`) and compare them with what the script sent (after its
+edit: status `completed`, tags exactly `m4`, the professor cleared and the other three
+metadata keys kept, four attachments in the reordered order), then press Enter so the script
+deletes and checks the project is gone. Afterwards check the log for the token, `sub` and
+email, and record the output here.
 
 ## 10. Production round trip and library IAM signing — PENDING (needs Levon)
 
@@ -280,6 +285,7 @@ because removing one alone changes nothing observable.
 | #48 | sweep deletes unconditionally; ignores the age floor                                                                 | 2; 2                                                           |
 | #48 | a failed read signing fails the request; the create-only header dropped                                              | 1; 2                                                           |
 | #48 | CORS file lacks a signed header; a header added to the signature                                                     | 1; 1 (`cors-config.test.ts`)                                   |
+| fix | `roundtrip.mjs` against a local API whose PATCH replaces metadata; whose PATCH ignores the tags                      | script FAILs on the kept keys; FAILs on the tags               |
 
 A defect found while proving guards (not in shipped code): a proof script restored a
 half-mutated `attachment.repository.ts` (a missing project scope on the lookup); `tsc`

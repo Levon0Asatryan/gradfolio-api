@@ -2,15 +2,20 @@
 //
 //   API_URL=https://… TOKEN=<access token> node scripts/roundtrip.mjs            (rows only)
 //   API_URL=https://… TOKEN=<access token> FILES=1 node scripts/roundtrip.mjs    (+ uploads, signed reads)
+//   … PAUSE=1 node scripts/roundtrip.mjs   (stop before the delete so the stored rows can be read)
 //
 // Creates one project (title "m4-roundtrip-<time>"), exercises every field and attachment type,
 // edits, reorders, then deletes it; with FILES=1 it uploads a hero image and a PDF through the
 // signed-upload flow, reads them back through the signed read URLs, and checks the objects are
-// gone after the project is. The token is read from the environment and never printed.
+// gone after the project is. With PAUSE=1 it prints the project id to stderr and waits for Enter
+// on stdin before the delete, so the rows can be compared with what was sent. Each upload is
+// registered (hero set, attachment added) before the next fallible step, so a failure leaves
+// nothing the project delete does not remove. The token is read from the environment and never printed.
 // Exits 1 on the first failed check, after trying to delete what it created.
 const API = (process.env.API_URL ?? '').replace(/\/$/, '');
 const TOKEN = process.env.TOKEN ?? '';
 const FILES = process.env.FILES === '1';
+const PAUSE = process.env.PAUSE === '1';
 if (!API || !TOKEN) {
   console.error('set API_URL and TOKEN');
   process.exit(2);
@@ -61,9 +66,12 @@ async function upload(purpose, bytes, contentType) {
   );
   const put = await fetch(t.uploadUrl, { method: 'PUT', headers: t.headers, body: bytes });
   check(put.status === 200, `browser-style PUT to the signed URL: ${put.status}`);
+  return { fileUrl: t.fileUrl, replay: () => replayRefused(t, bytes) };
+}
+// Run only after the file is registered: a failing check here must not orphan the object.
+async function replayRefused(t, bytes) {
   const replay = await fetch(t.uploadUrl, { method: 'PUT', headers: t.headers, body: bytes });
   check(replay.status === 412, `replaying the same signed URL is refused: ${replay.status}`);
-  return t.fileUrl;
 }
 
 try {
@@ -120,11 +128,29 @@ try {
     tags: ['m4'],
     metadata: { professor: null },
   });
+  const sent = created.body;
+  const keptMeta = (m) =>
+    m.startDate === '2025-01-15' &&
+    m.endDate === '2025-06-01' &&
+    m.course === 'Course' &&
+    m.professor === null;
+  check(edit.status === 200, `PATCH: ${edit.status}`);
+  check(edit.body.status === 'completed', 'PATCH changed the status');
   check(
-    edit.status === 200 &&
-      edit.body.status === 'completed' &&
-      edit.body.metadata.professor === null,
-    'PATCH merges metadata per key and replaces tags',
+    keptMeta(edit.body.metadata),
+    'PATCH merged metadata per key: professor cleared, the other three keys kept',
+  );
+  check(
+    JSON.stringify(edit.body.tags) === JSON.stringify(['m4']),
+    `PATCH replaced the tags with exactly ["m4"]: ${JSON.stringify(edit.body.tags)}`,
+  );
+  check(
+    edit.body.title === title &&
+      edit.body.category === 'research' &&
+      edit.body.technologies.length === 2 &&
+      edit.body.links.length === sent.links.length &&
+      edit.body.files.length === sent.files.length,
+    'PATCH left the fields it did not name alone',
   );
   const order = [link.id, pdf.id, video.id, image.id];
   const reordered = await call('PUT', `/v1/projects/${projectId}/attachments/order`, {
@@ -142,16 +168,19 @@ try {
   let heroKeyUrl;
   if (FILES) {
     const hero = await upload('hero', PNG, 'image/png');
-    const doc = await upload('attachment', PDF, 'application/pdf');
-    heroKeyUrl = hero;
-    const set = await call('PATCH', `/v1/projects/${projectId}`, { heroImageUrl: hero });
+    heroKeyUrl = hero.fileUrl;
+    const set = await call('PATCH', `/v1/projects/${projectId}`, { heroImageUrl: hero.fileUrl });
     check(set.status === 200, `PATCH heroImageUrl with the uploaded file: ${set.status}`);
+    await hero.replay();
+    const pdfUp = await upload('attachment', PDF, 'application/pdf');
+    const doc = pdfUp.fileUrl;
     const file = await call('POST', `/v1/projects/${projectId}/attachments`, {
       type: 'pdf',
       url: doc,
       title: 'Uploaded PDF',
     });
     check(file.status === 201, `attachment from the uploaded PDF: ${file.status}`);
+    await pdfUp.replay();
     const reuse = await call('POST', `/v1/projects/${projectId}/attachments`, {
       type: 'pdf',
       url: doc,
@@ -165,6 +194,12 @@ try {
   const detail = await call('GET', `/v1/projects/${projectId}`);
   check(detail.status === 200 && detail.body.isOwner === true, 'GET as the owner');
   check(detail.body.attachments.length === (FILES ? 5 : 4), 'all attachments present');
+  check(
+    detail.body.status === 'completed' &&
+      keptMeta(detail.body.metadata) &&
+      JSON.stringify(detail.body.tags) === '["m4"]',
+    'the edit persisted: a fresh read shows the status, the merged metadata and the replaced tags',
+  );
   const signedUrls = [];
   if (FILES) {
     const hero = detail.body.heroImageUrl;
@@ -191,6 +226,10 @@ try {
     signedUrls.push(hero, pdfAtt.url);
   }
 
+  if (PAUSE) {
+    console.error(`PAUSED: project ${projectId} exists; read its rows, then press Enter to delete`);
+    await new Promise((resolve) => process.stdin.once('data', resolve).once('end', resolve));
+  }
   const del = await call('DELETE', `/v1/projects/${projectId}`);
   check(del.status === 204, `DELETE /v1/projects/:id: ${del.status}`);
   const id = projectId;
