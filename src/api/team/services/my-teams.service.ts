@@ -134,7 +134,7 @@ export class MyTeamsService {
             role: m.role,
             joinedAt: m.createdAt.toISOString(),
             owner: {
-              id: m.ownerId,
+              id: ownerVisible ? m.ownerId : null,
               name: m.ownerName,
               avatarUrl: ownerVisible ? await this.files.read(m.ownerAvatarUrl) : null,
             },

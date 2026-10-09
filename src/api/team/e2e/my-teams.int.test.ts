@@ -201,6 +201,20 @@ describe('GET /v1/me/teams', () => {
     expect(theirs.incoming.items[0]!.invitedBy).toEqual({ id: null, name: 'priv-owner' });
   });
 
+  it('gives a member no account link or photo for an owner whose profile is private', async () => {
+    const http = await start();
+    const owner = await who('priv-owner', {
+      isPublic: false,
+      avatarUrl: 'https://img.example/o.png',
+    });
+    const member = await who('member');
+    const { project } = await createProject(db, owner.user, { title: 'Owned privately' });
+    await addMember(project.id, member.user.id, 'accepted');
+    const t = (await http.get('/v1/me/teams').set(member.auth).expect(200)).body as Teams;
+    expect(t.member.items[0]!.owner).toEqual({ id: null, name: 'priv-owner', avatarUrl: null });
+    expect(JSON.stringify(t)).not.toContain(owner.user.id);
+  });
+
   it('follows the flow: invite, accept, reject, re-invite, remove, leave', async () => {
     const http = await start();
     const owner = await who('owner');
