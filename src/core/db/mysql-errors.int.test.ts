@@ -24,6 +24,16 @@ describe('MySQL error numbers, through the real transport', () => {
     expect(mysqlErrno(err)).toBe(MysqlErrno.DUPLICATE_KEY);
   });
 
+  it('1452 foreign key: the referenced user is gone', async () => {
+    const err = await caught(
+      db
+        .insertInto('notifications')
+        .values({ id: newId(), userId: newId(), type: 'general', title: 't' })
+        .execute(),
+    );
+    expect(mysqlErrno(err)).toBe(MysqlErrno.FOREIGN_KEY_MISSING);
+  });
+
   it('3819 check constraint', async () => {
     const user = await createUser(db);
     const err = await caught(

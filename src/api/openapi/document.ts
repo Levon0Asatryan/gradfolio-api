@@ -13,7 +13,16 @@ import {
   readAllResultSchema,
   unreadCountSchema,
 } from '../notifications/dto/notification.dto.js';
-import { projectTeamParamSchema, teamListSchema } from '../team/dto/team.dto.js';
+import {
+  addExternalMemberSchema,
+  inviteMemberSchema,
+  lookupQuerySchema,
+  lookupResultSchema,
+  memberParamsSchema,
+  projectTeamParamSchema,
+  teamListSchema,
+  teamMemberSchema,
+} from '../team/dto/team.dto.js';
 import { uploadRequestSchema, uploadResponseSchema } from '../files/dto/upload.dto.js';
 import { documentedProjectSchemas } from '../projects/dto/project-write.dto.js';
 import {
@@ -625,6 +634,134 @@ export const OPERATIONS: readonly Operation[] = [
   },
   {
     method: 'get',
+    path: '/v1/users/lookup',
+    operationId: 'lookupUsers',
+    tag: 'team',
+    summary: 'People to invite: public profiles by the start of a name',
+    description:
+      'Prefix match on the name, at least 3 characters, at most 8 results, never the caller, ' +
+      'never a private profile, never an email or other private field. Own rate budget ' +
+      '(`RATE_LIMIT_LOOKUP`) against enumeration.',
+    bearer: true,
+    query: lookupQuerySchema,
+    responses: {
+      '200': { description: 'Up to 8 people', schema: lookupResultSchema },
+      '400': error('VALIDATION_FAILED: `q` is missing or shorter than 3 characters'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'post',
+    path: '/v1/projects/{id}/team',
+    operationId: 'inviteTeamMember',
+    tag: 'team',
+    summary: 'Invites a user to the project',
+    description:
+      'Owner only. The invitee is notified in the same transaction. A user who rejected ' +
+      'earlier is invited again (their row goes back to `pending`). Inviting yourself is ' +
+      '400; a private profile and an unknown id are the same 404.',
+    bearer: true,
+    params: projectTeamParamSchema,
+    body: inviteMemberSchema,
+    responses: {
+      '201': { description: 'The pending membership', schema: teamMemberSchema },
+      '400': validationFailed,
+      '404': error('NOT_FOUND: no such project of the caller’s, or no such public user'),
+      '409': error(
+        'ALREADY_MEMBER: already pending or accepted; TEAM_FULL: PROJECT_MAX_TEAM rows; PROJECT_IS_DRAFT: a draft takes no invitations',
+      ),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'post',
+    path: '/v1/projects/{id}/team/external',
+    operationId: 'addExternalTeamMember',
+    tag: 'team',
+    summary: 'Adds a teammate who has no account',
+    description:
+      'Owner only. A name (and role) only: accepted at once, no invitation, no notification.',
+    bearer: true,
+    params: projectTeamParamSchema,
+    body: addExternalMemberSchema,
+    responses: {
+      '201': { description: 'The accepted membership', schema: teamMemberSchema },
+      '400': validationFailed,
+      '404': notYours('project'),
+      '409': error('TEAM_FULL: PROJECT_MAX_TEAM rows'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'delete',
+    path: '/v1/projects/{id}/team/{memberId}',
+    operationId: 'removeTeamMember',
+    tag: 'team',
+    summary: 'Removes a membership of the project',
+    description:
+      'Owner only. Any status, linked or external. Removing a pending invitation makes the ' +
+      'invitee’s notification read `invite.status: gone`.',
+    bearer: true,
+    params: memberParamsSchema,
+    responses: {
+      '204': { description: 'Removed' },
+      '404': error('NOT_FOUND: no such project of the caller’s, or no such member of it'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'post',
+    path: '/v1/projects/{id}/team/me/accept',
+    operationId: 'acceptTeamInvitation',
+    tag: 'team',
+    summary: 'The invitee accepts',
+    description:
+      'Only the invited user, only while `pending`. The owner is notified in the same ' +
+      'transaction. No invitation for the caller (or an unknown project) is 404.',
+    bearer: true,
+    params: projectTeamParamSchema,
+    responses: {
+      '200': { description: 'The accepted membership', schema: teamMemberSchema },
+      '404': error('NOT_FOUND: no such project, or no invitation for the caller'),
+      '409': error('INVITE_NOT_PENDING: already answered'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'post',
+    path: '/v1/projects/{id}/team/me/reject',
+    operationId: 'rejectTeamInvitation',
+    tag: 'team',
+    summary: 'The invitee declines',
+    description: 'As accept. The owner may invite the user again afterwards.',
+    bearer: true,
+    params: projectTeamParamSchema,
+    responses: {
+      '200': { description: 'The rejected membership', schema: teamMemberSchema },
+      '404': error('NOT_FOUND: no such project, or no invitation for the caller'),
+      '409': error('INVITE_NOT_PENDING: already answered'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'delete',
+    path: '/v1/projects/{id}/team/me',
+    operationId: 'leaveProjectTeam',
+    tag: 'team',
+    summary: 'An accepted teammate leaves',
+    description:
+      'Removes the caller’s own accepted membership; the owner is notified (`team_left`). ' +
+      'A pending invitee uses reject. Anyone else is 404.',
+    bearer: true,
+    params: projectTeamParamSchema,
+    responses: {
+      '204': { description: 'Left' },
+      '404': error('NOT_FOUND: no such project, or the caller is not an accepted member'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'get',
     path: '/v1/me/notifications',
     operationId: 'listMyNotifications',
     tag: 'notifications',
@@ -779,7 +916,7 @@ export function buildOpenApiDocument(
         name: 'projects',
         description: 'Projects: reading anyone’s public ones, managing your own',
       },
-      { name: 'team', description: 'Project teams: the owner’s view of memberships' },
+      { name: 'team', description: 'Project teams: invitations, answers, the owner’s view' },
       { name: 'notifications', description: 'The caller’s own notifications' },
     ],
     paths,
