@@ -226,6 +226,30 @@ async function hold(sql: string, params: unknown[]): Promise<Connection> {
   return conn;
 }
 
+describe('a signing failure after the write committed', () => {
+  it('does not fail the request: the attachment exists, the stored URL is returned and the failure logged', async () => {
+    const http = await start();
+    const me = await member('me');
+    const { project } = await createProject(db, me.user);
+    const key = `u/${me.user.id}/a.png`;
+    storage.put(key, PNG, 'image/png');
+    const url = `https://${BUCKET}.storage.googleapis.com/${key}`;
+
+    storage.failSignRead = true;
+    const res = await add(http, me, project.id, { type: 'image', url });
+    expect(res.body.url).toBe(url); // not signed, not an error
+    expect((await rows(project.id)).map((r) => r.url)).toEqual([url]);
+    expect(logs.lines().some((l) => l.msg === 'signing a read URL failed')).toBe(true);
+
+    // reads degrade the same way instead of 500; once signing works they are signed again
+    const detail = await http.get(`/v1/projects/${project.id}`).expect(200);
+    expect(detail.body.attachments[0].url).toBe(url);
+    storage.failSignRead = false;
+    const healed = await http.get(`/v1/projects/${project.id}`).expect(200);
+    expect(healed.body.attachments[0].url).toContain('X-Goog-Signature=read-');
+  });
+});
+
 describe('PATCH /v1/projects/:id/attachments/:attachmentId', () => {
   async function seeded(http: Http, me: Who) {
     const { project } = await createProject(db, me.user);
