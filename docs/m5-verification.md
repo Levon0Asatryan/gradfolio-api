@@ -2,9 +2,8 @@
 
 The final test record for M5 on the API side: tracker 5.1–5.5 and what FE tasks 5.6–5.7
 need from the API, [m5-plan.md](m5-plan.md). Fresh-clone, integration, HTTP and guard runs
-on 2026-10-09 against MySQL 8.4.11, on `m5/c` at `4936d97` (main `4fe0930` plus PR #54).
-One item needs a real Auth0 token for each of two accounts and Levon's hands; it is marked
-**PENDING** with the exact steps (§9) and is filled in by the next commit of this PR.
+on 2026-10-09 against MySQL 8.4.11, on `m5/c` at `4936d97` (main `4fe0930` plus PR #54), and
+the real two-account Auth0 runs of 2026-10-10 (§9), locally and on production.
 
 No token, secret or email appears in this record. Local-tenant tokens were signed by the
 test JWKS server. Every database run below started from an **empty volume**
@@ -37,8 +36,8 @@ Copilot failed on quota on every push; Codex reviewed alone.
 | 8   | Transaction proofs, both directions                                              | PASS (§6)                                                           |
 | 9   | Races forced with a barrier                                                      | PASS (§7)                                                           |
 | 10  | Two-account journey over HTTP against the compiled server, local test tenant     | PASS: 44 checks (§8)                                                |
-| 11  | Two-account journey with real Auth0 tokens                                       | **PENDING** (§9)                                                    |
-| 12  | Production `GET /readyz`                                                         | 200 (2026-10-09; the lead confirms again after the Deploy of #54)   |
+| 11  | Two-account journey with real Auth0 tokens, local and production                 | PASS: 44 checks each (§9)                                           |
+| 12  | Production `GET /readyz`                                                         | 200 (2026-10-10, after the Deploy of #54, `a435ac0`)                |
 | 13  | Guards proved by removal                                                         | PASS: 60+ guards (§10)                                              |
 
 ## 3. Fresh clone, migration
@@ -161,39 +160,41 @@ Stored afterwards: 0 projects, 0 team rows, 7 notifications (all read; no API de
 notification, they render from their saved names), 13 activities. The server log shows
 `authorization` as `[redacted]`; no token or email appears in the script output or the log.
 
-## 9. Real Auth0 two-account run — PENDING (needs Levon)
+## 9. Real Auth0 two-account run (2026-10-10)
 
-Goal: the same journey with real Auth0 access tokens for **two different accounts**, locally
-and then on production. The first part proves the real token path for a second user (a
-real `sub` for each); the second proves production after the Deploy of #54.
+Two disposable test accounts in the project's Auth0 tenant, each signed in through the
+frontend; one access token per account (issuer `https://dev-wkthnyn8b8mjn5ae.us.auth0.com/`,
+audience `https://api.gradfolio.app`, RS256, different `sub`s, checked without printing).
+Tokens lived in a gitignored, mode-600 `.env`, were passed to the script through the
+environment, and appear in no file, log or message.
 
-What I need from Levon:
+`scripts/team-roundtrip.mjs` (§8), unchanged, with the two real tokens:
 
-1. **A second test account** in the same Auth0 tenant (a database-connection user or a
-   second Google login is fine), signed in at least once so it exists, with its profile
-   **public** (the default). The first account is the existing test user.
-2. **One access token per account** (valid one hour), obtained the way
-   [m4-verification.md](m4-verification.md) §9 describes: the `gradfolio` checkout with
-   `AUTH0_AUDIENCE=https://api.gradfolio.app` in `.env.local`, `npm run dev -- -p 3011`, sign
-   in at `/auth/login`, open `/auth/access-token`, copy `token`. Use a **private/other
-   browser profile** for the second account, so the sessions do not mix.
-3. Put them in the gitignored `.env` of `gradfolio-api-m5v` as `M5_TOKEN_A=eyJ…` and
-   `M5_TOKEN_B=eyJ…` (never in chat), and tell the lead "tokens are in .env". Check
-   without printing:
-   `node -e 'const p=JSON.parse(Buffer.from(process.argv[1].split(".")[1],"base64url"));console.log(p.iss,p.aud)' "$M5_TOKEN_A"`.
-4. For the production run: #54 merged and its Deploy green (`/readyz` 200), so the activity
-   checks have something to read.
+| Run        | Target                                                                                                                                                                                | Result                  |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| Local      | the compiled server (`node dist/api/main.js`, `m5/c` at `1fccf04`) on `127.0.0.1:3007`, MySQL 8.4.11 from `gradfolio-m5` (port 3313) on an **empty volume**, real issuer and audience | exit 0, 44 PASS, 0 FAIL |
+| Production | `https://gradfolio-api-1058577031182.us-east1.run.app` after the Deploy of #54 (`a435ac0`); `/readyz` 200 first                                                                       | exit 0, 44 PASS, 0 FAIL |
 
-Then (me): local first, with the real issuer and audience in the compose environment
-(`AUTH0_ISSUER_BASE_URL=https://<tenant domain>/`, `AUTH0_AUDIENCE=https://api.gradfolio.app`,
-[auth0-setup.md](auth0-setup.md) §7) on an empty volume:
-`API_URL=http://127.0.0.1:3007 TOKEN_A=$M5_TOKEN_A TOKEN_B=$M5_TOKEN_B node scripts/team-roundtrip.mjs`,
-then the same with `API_URL=https://gradfolio-api-1058577031182.us-east1.run.app`. The script
-creates two projects titled `m5-roundtrip-<time>`, deletes them at the end, marks both
-accounts' notifications read, and prints PASS/FAIL per step. What it leaves: a few **read**
-notifications on both accounts about projects that no longer exist (no endpoint deletes a
-notification) and their activities. Afterwards I check the log for the token, `sub` and
-email, and record the output here.
+Both runs went through every step of §8 with real signatures: the second account is refused
+(404) on the first one's team, invitations and notifications and vice versa; accept, reject,
+re-invite (one row), remove and leave behave as in the test tenant; the activity feeds are read
+per project. Production also proves that migration 0006 is applied there (the invitation
+writes `notifications.params`, the leave writes the new `team_left` type) and that the
+`lookup`, notification and activity routes are served.
+
+Checks after the runs:
+
+- **Log hygiene.** The script output of both runs and the local API log (139 lines, 0 error
+  entries; the only non-2xx are the expected 8×404, 2×409, 1×400) were searched for both full
+  tokens, the `eyJ` prefix, both `sub`s and the stored email addresses: 0 hits. The API log
+  shows `authorization` as `[redacted]`.
+- **Stored state, local** (empty volume before): 2 users, 0 projects, 0 team rows, 7
+  notifications (all read), 13 activities.
+- **Production state** through the API afterwards: neither account has an `m5-roundtrip-*`
+  project; both have 0 unread notifications (4 and 3 read ones remain, about projects that no
+  longer exist: no endpoint deletes a notification). The first request of each account created
+  its user row on production (Q7).
+- The server's own logs on Cloud Run were not read; the script saw no 5xx.
 
 ## 10. Guards proved by removal
 
@@ -237,14 +238,10 @@ either alone changes nothing observable, removing both fails.
 
 ## 12. Not verified
 
-- **Real Auth0 tokens for two accounts** (§9). The local journey used the test JWKS server;
-  the token path itself is the M2 code, exercised with real tokens for one user in M3 and M4.
-- **Production after the Deploy of #54:** `/readyz` was 200 on 2026-10-09 (database
-  reachable); that migration 0006 is applied is not read from outside, and follows from the
-  Deploy workflow's migrate job succeeding.
+- **Cloud Run logs** of the production run were not read (no gcloud access in this session); the script saw no 5xx and the response shapes were as in the local run.
 - **Copilot:** every Copilot review failed on quota; Codex reviewed alone.
-- The compose "container stack" run is covered by the CI job on each PR; the local HTTP run
-  above used the compiled server directly, not the compose image.
+- The compose "container stack" run is covered by the CI job on each PR; the local HTTP runs
+  above used the compiled server directly with `gradfolio-m5`'s MySQL, not the compose API image.
 
 ## 13. Proposed tracker changes
 
