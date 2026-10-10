@@ -809,6 +809,8 @@ describe('every discovery route is rate limited (X14)', () => {
         RATE_LIMIT_SEARCH_SHARED: '1',
         RATE_LIMIT_BROWSE: '1',
         RATE_LIMIT_BROWSE_SHARED: '1',
+        RATE_LIMIT_SUGGEST: '1',
+        RATE_LIMIT_SUGGEST_SHARED: '1',
       });
       const query: Record<string, string> = {};
       for (const key of Object.keys(op.query?.shape ?? {})) {
