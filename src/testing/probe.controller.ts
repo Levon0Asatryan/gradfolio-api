@@ -28,6 +28,7 @@ export class ProbeController {
     return { sub: req.auth?.sub };
   }
 
+  @OptionalAuth()
   @RateBudget('search')
   @Get('search')
   search(): { ok: true } {

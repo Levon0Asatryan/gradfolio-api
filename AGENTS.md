@@ -147,7 +147,9 @@ it is wrong.
 - Flag a user-supplied key used to index an object or map without an own-property
   check.
 - Flag a new expensive or security-sensitive endpoint (search, import, AI summary, PDF,
-  email) with no rate limit, and one endpoint sharing another's rate-limit budget.
+  email) with no rate limit, and one endpoint spending another's allowance. Two routes under
+  one _named_ budget share only its limit value: the counter is per route (nestjs/throttler
+  6.7.1 keys on controller and handler), so that is not a finding.
 - Flag validation against an approximation of a downstream limit instead of the real
   one.
   - MySQL `VARCHAR(n)` counts characters, not bytes, under utf8mb4.

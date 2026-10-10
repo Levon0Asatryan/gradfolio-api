@@ -1,9 +1,11 @@
-import { Module } from '@nestjs/common';
+import { type ExecutionContext, Module } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { seconds, ThrottlerModule, type ThrottlerOptions } from '@nestjs/throttler';
 import { APP_CONFIG } from '../../core/config/config.module.js';
 import type { AppConfig } from '../../core/config/schema.js';
+import type { AuthenticatedRequest } from '../auth/auth.constants.js';
 import { RATE_BUDGET, type RateBudgetName } from './rate-limit.constants.js';
+import { identify, secretDigests } from './utils/client-identity.js';
 
 const reflector = new Reflector();
 
@@ -27,17 +29,35 @@ function onlyWhereOptedIn(name: RateBudgetName): ThrottlerOptions['skipIf'] {
       inject: [APP_CONFIG],
       useFactory: (cfg: AppConfig) => {
         const ttl = seconds(cfg.RATE_LIMIT_WINDOW_S);
+        const secrets = secretDigests(cfg.PROXY_SHARED_SECRETS);
+        // An anonymous caller with no vouched-for address shares one counter with
+        // every other such visitor, so it gets the higher number (plan §2.4).
+        const limitFor = (normal: number, shared: number) => (ctx: ExecutionContext) =>
+          identify(ctx.switchToHttp().getRequest<AuthenticatedRequest>(), secrets).kind ===
+          'address'
+            ? shared
+            : normal;
         return {
           // The guard sends Retry-After itself; the per-budget headers would
           // name each budget (`X-RateLimit-Limit-search`).
           setHeaders: false,
           throttlers: [
-            { name: 'default', ttl, limit: cfg.RATE_LIMIT_DEFAULT },
+            {
+              name: 'default',
+              ttl,
+              limit: limitFor(cfg.RATE_LIMIT_DEFAULT, cfg.RATE_LIMIT_DEFAULT_SHARED),
+            },
             {
               name: 'search',
               ttl,
-              limit: cfg.RATE_LIMIT_SEARCH,
+              limit: limitFor(cfg.RATE_LIMIT_SEARCH, cfg.RATE_LIMIT_SEARCH_SHARED),
               skipIf: onlyWhereOptedIn('search'),
+            },
+            {
+              name: 'browse',
+              ttl,
+              limit: limitFor(cfg.RATE_LIMIT_BROWSE, cfg.RATE_LIMIT_BROWSE_SHARED),
+              skipIf: onlyWhereOptedIn('browse'),
             },
             {
               name: 'import',

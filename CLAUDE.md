@@ -332,7 +332,11 @@ These are established in `docs/investigation.md`; do not re-argue them.
 - **Rate limits** (`RateLimitGuard`, after the token guard): keyed by the verified
   `sub`, else the address. The frontend calls from its server, so an address key would
   be shared by every user. Expensive routes add `@RateBudget('search' | 'import' |
-'ai')`; never give two routes one budget. `@nestjs/throttler` takes `ttl` in
+'ai' | 'browse' …)`. The throttler's counter key includes the controller and handler
+  (run, `@nestjs/throttler` 6.7.1), so routes under one named budget share its **limit
+  value**, never a counter: one route cannot spend another's allowance. A visitor the
+  frontend vouched for (`X-Client-IP` + `X-Gradfolio-Proxy-Secret`) is keyed by that
+  address (`docs/m6-plan.md` §2.4). `@nestjs/throttler` takes `ttl` in
   **milliseconds**. `TRUST_PROXY` is a hop count, never `true`.
 - **This repository owns the schema** (`src/core/db/migrations`). `gradfolio-sql` is
   reference docs; its `schema.sql` is frozen as `0001_baseline`.
