@@ -5,6 +5,7 @@ import { DbService } from '../../../core/db/db.service.js';
 import { ValidationError } from '../../../core/errors/app-error.js';
 import { decodeTimeCursor, encodeTimeCursor } from '../../common/utils/time-cursor.js';
 import type { ActivityPage, ActivityQuery } from '../dto/activity.dto.js';
+import { toActivity } from '../utils/activity-mapping.js';
 import { listActivityRows } from '../repositories/activity.repository.js';
 
 @Injectable()
@@ -35,13 +36,7 @@ export class ActivityService {
     const shown = rows.slice(0, limit);
     const last = shown.at(-1);
     return {
-      items: shown.map((r) => ({
-        id: r.id,
-        type: r.type,
-        translationKey: r.translationKey,
-        translationParams: r.translationParams,
-        timestamp: r.timestamp.toISOString(),
-      })),
+      items: shown.map(toActivity),
       nextCursor:
         rows.length > limit && last !== undefined
           ? encodeTimeCursor({ t: last.timestamp.getTime(), id: last.id })

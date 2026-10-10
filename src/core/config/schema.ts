@@ -155,6 +155,15 @@ const rateLimit = {
     }),
 };
 
+/** The caller's dashboard (docs/m6-plan.md §3.2). */
+const dashboard = {
+  // "Recent activity" counts the caller's activities in this many days.
+  DASHBOARD_ACTIVITY_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+  // Projects and feed entries shown on the dashboard.
+  DASHBOARD_RECENT_PROJECTS: z.coerce.number().int().min(1).max(20).default(3),
+  DASHBOARD_FEED_SIZE: z.coerce.number().int().min(1).max(50).default(5),
+};
+
 /** Search, browse and tag pages (docs/m6-plan.md §3.1). */
 const discovery = {
   // Items per page when `limit` is not given, and the most a caller may ask for.
@@ -322,6 +331,7 @@ export const configSchema = z
     ...projects,
     ...notifications,
     ...discovery,
+    ...dashboard,
     ...storage,
   })
   .refine(tlsInProduction, TLS_IN_PRODUCTION)

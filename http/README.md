@@ -16,6 +16,7 @@ after the module it exercises.
 | [notifications.http](notifications.http) | `api/notifications` | the caller's notifications: list, unread count, mark one or all read              |
 | [activities.http](activities.http)       | `api/activities`    | the caller's activity feed                                                        |
 | [discovery.http](discovery.http)         | `api/discovery`     | public search, tag pages and cloud, project gallery, people directory             |
+| [dashboard.http](dashboard.http)         | `api/dashboard`     | the caller's dashboard: counts, recent projects, activity feed                    |
 
 **A module added later gets a file here in the same pull request.** A file that
 does not list every route its module serves is worse than none: the gap reads as

@@ -1,0 +1,21 @@
+### api/dashboard -- the caller's dashboard (M6 PR c)
+#
+# Needs an Auth0 access token (see me.http). Only the caller's own data.
+
+@baseUrl = {{$dotenv baseUrl}}
+@accessToken = {{$dotenv accessToken}}
+
+###
+# @name getDashboard
+# 200 { stats: { projects: { total, published, private, draft }, githubStars, recentActivities },
+#       recentProjects: [{ id, title, summary, category, status, technologies, role, isPublic, isDraft,
+#       updatedAt }], activities: [{ id, type, translationKey, translationParams, timestamp }] }.
+# githubStars is null until an import stored any. recentActivities counts the last 30 days. There is
+# no linkedinConnections. A second user's token gets their own dashboard; no token is 401.
+GET {{baseUrl}}/v1/me/dashboard
+Authorization: Bearer {{accessToken}}
+
+###
+# @name getDashboardWithoutToken
+# 401 UNAUTHENTICATED.
+GET {{baseUrl}}/v1/me/dashboard
