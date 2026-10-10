@@ -392,6 +392,42 @@ describe('GET /v1/users (directory) and /v1/users/facets', () => {
     await http.get('/v1/users/facets').query({ x: '1' }).expect(400);
   });
 
+  it('shows one spelling per facet choice, the same whichever row was written first', async () => {
+    // `NPUA` and `npua` are one choice under the collation; which one is shown must not
+    // depend on insertion order (MIN() under that collation ties and returns the first
+    // row it meets). Upper case is the bytewise-first spelling, in every script.
+    const spellings = [
+      ['NPUA', 'npua'],
+      ['Информатика', 'информатика'],
+      ['Ծրագրավորում', 'ծրագրավորում'],
+    ] as const;
+    for (const order of [0, 1] as const) {
+      await db.deleteFrom('users').execute();
+      const http = await start();
+      for (const [upper, lower] of spellings) {
+        const first = order === 0 ? upper : lower;
+        const second = order === 0 ? lower : upper;
+        // the lower-case spelling is the commoner one: this is not "most frequent wins"
+        for (const [i, text] of [first, second, lower].entries()) {
+          const u = await who(`Facet ${order}-${upper}-${i}`);
+          await education(u.user.id, { institution: text, field: text, endYear: 2026 });
+        }
+      }
+      const f = (await http.get('/v1/users/facets').expect(200)).body as {
+        schools: { value: string }[];
+        majors: { value: string }[];
+      };
+      expect(f.schools.map((s) => s.value).toSorted()).toEqual(
+        spellings.map(([upper]) => upper).toSorted(),
+      );
+      expect(f.majors.map((s) => s.value).toSorted()).toEqual(
+        spellings.map(([upper]) => upper).toSorted(),
+      );
+      await app?.close();
+      app = undefined;
+    }
+  });
+
   it('caps each facet list at FACET_MAX', async () => {
     const s = await scene();
     for (let i = 0; i < 5; i++) {

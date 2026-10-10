@@ -94,6 +94,17 @@ export const browseUsers = (...args: Parameters<typeof browseUsersQuery>) =>
   browseUsersQuery(...args).execute();
 
 /**
+ * One spelling for a group of values that the column's collation treats as equal
+ * (`NPUA`, `npua`). `MIN()` over a text column compares under that collation, so
+ * every candidate ties and MySQL returns whichever row it met first: the facet's
+ * `value` then depended on insertion order (found by CI on #67). Comparing the
+ * bytes picks the same spelling whatever the order: upper case before lower case,
+ * in every script.
+ */
+const spelling = (column: string) =>
+  sql<string>`CONVERT(MIN(CAST(${sql.ref(column)} AS BINARY)) USING utf8mb4)`;
+
+/**
  * The values present on public profiles' education, most common first. `count`
  * is people (distinct users), not entries. Grouping is under the column's
  * collation, so `NPUA` and `npua` are one choice; one spelling is returned.
@@ -107,7 +118,7 @@ export async function userFacets(db: Database, max: number) {
   const [schools, majors, years] = await Promise.all([
     base()
       .select([
-        (eb) => eb.fn.min('e.institution').as('value'),
+        spelling('e.institution').as('value'),
         (eb) => eb.fn.count<number>('e.userId').distinct().as('count'),
       ])
       .groupBy('e.institution')
@@ -117,7 +128,7 @@ export async function userFacets(db: Database, max: number) {
       .execute(),
     base()
       .select([
-        (eb) => eb.fn.min('e.field').as('value'),
+        spelling('e.field').as('value'),
         (eb) => eb.fn.count<number>('e.userId').distinct().as('count'),
       ])
       .groupBy('e.field')
