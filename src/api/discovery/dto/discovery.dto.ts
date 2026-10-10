@@ -91,6 +91,40 @@ export const tagSummarySchema = z
   })
   .meta({ id: 'TagSummary' });
 
+export const tagCloudItemSchema = z
+  .object({
+    name: z.string().meta({ description: 'The site-wide spelling of the term.' }),
+    projects: z.number().int().meta({ description: 'Discoverable projects that use it.' }),
+    people: z.number().int().meta({ description: 'Public people who list it as a skill.' }),
+  })
+  .meta({ id: 'TagCloudItem' });
+
+export const tagCloudSchema = z
+  .object({
+    items: z.array(tagCloudItemSchema),
+    generatedAt: z.string().meta({
+      description:
+        'ISO 8601, UTC: when these counts were computed. A new project can take up to this long plus the cache time (60 s) to show.',
+    }),
+  })
+  .meta({ id: 'TagCloud' });
+
+const facetValue = <T extends z.ZodType>(value: T, id: string) =>
+  z.object({ value, count: z.number().int() }).meta({ id });
+
+export const userFacetsSchema = z
+  .object({
+    schools: z.array(facetValue(z.string(), 'SchoolFacet')),
+    majors: z.array(facetValue(z.string(), 'MajorFacet')),
+    years: z.array(facetValue(z.number().int(), 'YearFacet')),
+    generatedAt: z.string(),
+  })
+  .meta({
+    id: 'UserFacets',
+    description:
+      'The choices for the directory filters: the values present on public profiles, most common first, at most 50 each.',
+  });
+
 // ----------------------------------------------------------------- requests
 
 /**
@@ -146,6 +180,52 @@ const termName = z
 export const tagQuerySchema = z.strictObject({ name: termName });
 export const tagPageQuerySchema = z.strictObject({ name: termName, limit, cursor });
 
+const text200 = (description: string) =>
+  z
+    .string()
+    .transform((v) => normalizeText(v))
+    .pipe(z.string().min(1).max(200))
+    .meta({ description });
+
+/** Browse projects: unknown keys are 400. Every order ends in the id, so pages never repeat or skip. */
+export const BROWSE_PROJECT_SORTS = ['newest', 'updated'] as const;
+export const browseProjectsQuerySchema = z.strictObject({
+  sort: z.enum(BROWSE_PROJECT_SORTS).default('newest').meta({
+    description: 'newest by creation, updated by last change; both newest first.',
+  }),
+  category: z.enum(PROJECT_CATEGORIES).optional(),
+  status: z.enum(PROJECT_STATUSES).optional(),
+  limit,
+  cursor,
+});
+
+export const BROWSE_USER_SORTS = ['newest'] as const;
+export const browseUsersQuerySchema = z.strictObject({
+  sort: z.enum(BROWSE_USER_SORTS).default('newest').meta({
+    description: 'newest sign-up first. The only order today; sending it is allowed.',
+  }),
+  school: text200(
+    'Institution on an education entry, matched case-insensitively and exactly.',
+  ).optional(),
+  major: text200('Field of study on an education entry, matched exactly.').optional(),
+  gradYear: z.coerce.number().int().min(1950).max(2100).optional().meta({
+    description: 'End year of an education entry. One entry must match every filter given.',
+  }),
+  limit,
+  cursor,
+});
+
+export const tagCloudQuerySchema = z.strictObject({
+  limit: z.coerce.number().int().min(1).optional().meta({
+    description: 'Terms to return; at most TAG_CLOUD_MAX (100); 40 when omitted.',
+  }),
+});
+
+export type BrowseProjectsQuery = z.output<typeof browseProjectsQuerySchema>;
+export type BrowseUsersQuery = z.output<typeof browseUsersQuerySchema>;
+export type TagCloudQuery = z.output<typeof tagCloudQuerySchema>;
+export type TagCloud = z.infer<typeof tagCloudSchema>;
+export type UserFacets = z.infer<typeof userFacetsSchema>;
 export type SearchQuery = z.output<typeof searchQuerySchema>;
 export type SearchPageQuery = z.output<typeof searchPageQuerySchema>;
 export type TagQuery = z.output<typeof tagQuerySchema>;

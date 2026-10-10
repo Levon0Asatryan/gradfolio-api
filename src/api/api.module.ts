@@ -40,13 +40,14 @@ import { UsersModule } from './users/users.module.js';
     FilesModule,
     HealthModule,
     MeModule,
-    // TeamModule before ProfilesModule: `GET /users/lookup` must be matched before `GET /users/:id`.
+    // Before ProfilesModule: `GET /users/facets` and `/users/lookup` must be matched before
+    // `GET /users/:id`.
+    DiscoveryModule,
     TeamModule,
     ProfilesModule,
     ProjectsModule,
     NotificationsModule,
     ActivitiesModule,
-    DiscoveryModule,
   ],
   providers: [
     ErrorFilter,

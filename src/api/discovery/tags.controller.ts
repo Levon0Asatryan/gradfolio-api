@@ -5,12 +5,16 @@ import { RateBudget } from '../rate-limit/decorators/rate-budget.decorator.js';
 import {
   type DiscoveryProjectPage,
   type PersonPage,
+  type TagCloud,
+  type TagCloudQuery,
+  tagCloudQuerySchema,
   type TagPageQuery,
   type TagQuery,
   type TagSummary,
   tagPageQuerySchema,
   tagQuerySchema,
 } from './dto/discovery.dto.js';
+import { BrowseService } from './services/browse.service.js';
 import { TagService } from './services/tag.service.js';
 
 /** Tag pages: projects and people for a skill, technology or tag (docs/m6-plan.md §3). */
@@ -18,7 +22,15 @@ import { TagService } from './services/tag.service.js';
 @RateBudget('browse')
 @Controller('tags')
 export class TagsController {
-  constructor(private readonly tags: TagService) {}
+  constructor(
+    private readonly tags: TagService,
+    private readonly browse: BrowseService,
+  ) {}
+
+  @Get('cloud')
+  cloud(@Query(zodQuery(tagCloudQuerySchema)) query: TagCloudQuery): Promise<TagCloud> {
+    return this.browse.tagCloud(query);
+  }
 
   @Get()
   summary(@Query(zodQuery(tagQuerySchema)) query: TagQuery): Promise<TagSummary> {

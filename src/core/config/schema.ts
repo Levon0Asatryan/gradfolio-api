@@ -162,6 +162,14 @@ const discovery = {
   DISCOVERY_PAGE_MAX: z.coerce.number().int().min(1).max(100).default(30),
   // Items per group in the grouped `GET /v1/search` (no cursor there).
   SEARCH_GROUP_SIZE: z.coerce.number().int().min(1).max(30).default(6),
+  // How long the tag cloud and the directory's filter choices are served from
+  // memory (plan §3.4). 0 turns the cache off. Per process, so up to this long
+  // stale, and not the same instant on each instance.
+  DISCOVERY_CACHE_S: z.coerce.number().int().min(0).max(3600).default(60),
+  // The most terms the cloud returns and the most choices per directory filter.
+  TAG_CLOUD_MAX: z.coerce.number().int().min(1).max(200).default(100),
+  TAG_CLOUD_SIZE: z.coerce.number().int().min(1).max(200).default(40),
+  FACET_MAX: z.coerce.number().int().min(1).max(200).default(50),
 };
 
 /** Profile page bounds (docs/m3-plan.md §1, Limits). */
@@ -338,6 +346,10 @@ export const configSchema = z
   .refine((c) => c.DISCOVERY_PAGE_SIZE <= c.DISCOVERY_PAGE_MAX, {
     message: 'must not exceed DISCOVERY_PAGE_MAX',
     path: ['DISCOVERY_PAGE_SIZE'],
+  })
+  .refine((c) => c.TAG_CLOUD_SIZE <= c.TAG_CLOUD_MAX, {
+    message: 'must not exceed TAG_CLOUD_MAX',
+    path: ['TAG_CLOUD_SIZE'],
   })
   .refine((c) => c.SEARCH_GROUP_SIZE <= c.DISCOVERY_PAGE_MAX, {
     message: 'must not exceed DISCOVERY_PAGE_MAX',
