@@ -175,7 +175,7 @@ function projectRank(q: ParsedQuery): RawBuilder<number> {
 }
 
 /** The card's columns, listed one by one and never `selectAll`: a new column must be opted in here. */
-const CARD_COLUMNS = [
+export const CARD_COLUMNS = [
   'projects.id',
   'projects.title',
   'projects.summary',

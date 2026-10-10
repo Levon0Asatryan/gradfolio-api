@@ -1,4 +1,4 @@
-### api/discovery -- public search and tag pages (M6 PR a)
+### api/discovery -- public search, tag pages, browse and the tag cloud (M6 PRs a, b)
 #
 # No token needed: results are published projects of public profiles and public
 # profiles, the same for everyone (a private or draft project never appears, the
@@ -68,3 +68,40 @@ GET {{baseUrl}}/v1/tags/projects?name=C%23&limit=12
 ###
 # @name tagPeople
 GET {{baseUrl}}/v1/tags/people?name=ml&limit=12
+
+###
+# @name tagCloud
+# 200 { items: [{ name, projects, people }], generatedAt }, most used first. Served from a one-minute
+# cache: a change can take that long to show. limit at most 100 (400 above).
+GET {{baseUrl}}/v1/tags/cloud?limit=40
+
+###
+# @name browseProjects
+# 200 { items: ProjectCard[], nextCursor }: published projects of public profiles, newest first.
+# sort=newest (default) or updated; optional category and status. Pass nextCursor back as cursor.
+GET {{baseUrl}}/v1/projects?sort=newest&limit=12
+
+###
+# @name browseProjectsByCategory
+GET {{baseUrl}}/v1/projects?sort=updated&category=research&status=completed
+
+###
+# @name browseUsers
+# 200 { items: PersonSummary[], nextCursor }: public people, newest sign-up first (sort=newest is
+# the only order and may be sent). school, major and gradYear filter on one education entry that
+# must match all of them; take the choices from /v1/users/facets.
+GET {{baseUrl}}/v1/users?sort=newest&limit=6
+
+###
+# @name browseUsersFiltered
+GET {{baseUrl}}/v1/users?school=NPUA&gradYear=2026
+
+###
+# @name userFacets
+# 200 { schools, majors, years: [{ value, count }], generatedAt }, most common first, at most 50 each.
+GET {{baseUrl}}/v1/users/facets
+
+###
+# @name browseBadSort
+# 400 VALIDATION_FAILED: sort is newest or updated here (users: newest only).
+GET {{baseUrl}}/v1/projects?sort=oldest

@@ -8,6 +8,8 @@ import {
 } from '../projects/dto/attachment.dto.js';
 import { activityPageSchema, activityQuerySchema } from '../activities/dto/activity.dto.js';
 import {
+  browseProjectsQuerySchema,
+  browseUsersQuerySchema,
   discoveryProjectPageSchema,
   personPageSchema,
   searchPageQuerySchema,
@@ -15,7 +17,10 @@ import {
   searchResultsSchema,
   tagPageQuerySchema,
   tagQuerySchema,
+  tagCloudQuerySchema,
+  tagCloudSchema,
   tagSummarySchema,
+  userFacetsSchema,
 } from '../discovery/dto/discovery.dto.js';
 import {
   notificationIdParamSchema,
@@ -353,6 +358,59 @@ function discoveryOperations(): Operation[] {
       description: `${visibility} A name nobody public lists is an empty page, not an error.`,
       query: tagPageQuerySchema,
       responses: { '200': { description: 'One page', schema: personPageSchema }, ...failures },
+    },
+    {
+      ...base,
+      method: 'get',
+      path: '/v1/tags/cloud',
+      operationId: 'getTagCloud',
+      summary: 'The most used skills, technologies and tags, with counts',
+      description:
+        `${visibility} Most used first (projects plus people), then by name. Served from a ` +
+        'one-minute in-memory cache, so a change can take up to a minute (and a little more ' +
+        'per server instance) to show: `generatedAt` says when the counts were computed.',
+      query: tagCloudQuerySchema,
+      responses: { '200': { description: 'The cloud', schema: tagCloudSchema }, ...failures },
+    },
+    {
+      ...base,
+      method: 'get',
+      path: '/v1/projects',
+      operationId: 'browseProjects',
+      summary: 'Browse projects',
+      description:
+        `${visibility} Newest first by creation (\`sort=newest\`, the default) or by last ` +
+        'change (`sort=updated`), optionally one `category` and/or `status`. Every order ends ' +
+        'in the id, so pages never repeat or skip a row. Cursors are not signed.',
+      query: browseProjectsQuerySchema,
+      responses: {
+        '200': { description: 'One page', schema: discoveryProjectPageSchema },
+        ...failures,
+      },
+    },
+    {
+      ...base,
+      method: 'get',
+      path: '/v1/users',
+      operationId: 'browseUsers',
+      summary: 'Browse people',
+      description:
+        `${visibility} Newest sign-up first (\`sort=newest\`, the only order). \`school\`, ` +
+        '`major` and `gradYear` filter on the education entries: one entry must match every ' +
+        'filter given. Take the choices from `/v1/users/facets`.',
+      query: browseUsersQuerySchema,
+      responses: { '200': { description: 'One page', schema: personPageSchema }, ...failures },
+    },
+    {
+      ...base,
+      method: 'get',
+      path: '/v1/users/facets',
+      operationId: 'getUserFacets',
+      summary: 'The school, major and graduation-year choices of the people directory',
+      description:
+        `${visibility} Values present on public profiles, most common first, at most 50 each; ` +
+        'cached for a minute like the tag cloud.',
+      responses: { '200': { description: 'The choices', schema: userFacetsSchema }, ...failures },
     },
   ];
 }

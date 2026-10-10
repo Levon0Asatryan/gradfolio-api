@@ -53,6 +53,10 @@ describe('loadConfig', () => {
       DISCOVERY_PAGE_SIZE: 12,
       DISCOVERY_PAGE_MAX: 30,
       SEARCH_GROUP_SIZE: 6,
+      DISCOVERY_CACHE_S: 60,
+      TAG_CLOUD_MAX: 100,
+      TAG_CLOUD_SIZE: 40,
+      FACET_MAX: 50,
       TEAMS_PAGE_MAX: 50,
       TEAMS_PAGE_SIZE: 20,
       ACTIVITIES_PAGE_MAX: 50,
@@ -151,6 +155,11 @@ describe('loadConfig', () => {
     ['PROJECTS_PAGE_SIZE', '0'],
     ['PROJECTS_PAGE_MAX', '201'],
     ['DISCOVERY_PAGE_SIZE', '0'],
+    ['DISCOVERY_CACHE_S', '-1'],
+    ['DISCOVERY_CACHE_S', '3601'],
+    ['TAG_CLOUD_MAX', '201'],
+    ['TAG_CLOUD_SIZE', '0'],
+    ['FACET_MAX', '0'],
     ['DISCOVERY_PAGE_MAX', '101'],
     ['SEARCH_GROUP_SIZE', '31'],
     ['RATE_LIMIT_BROWSE', '0'],
@@ -181,6 +190,13 @@ describe('loadConfig', () => {
       SEARCH_GROUP_SIZE: '5',
     });
     expect(ok.DISCOVERY_PAGE_SIZE).toBe(5);
+  });
+
+  it('refuses a default tag cloud size above its maximum', () => {
+    expect(() => loadConfig({ ...REQUIRED, TAG_CLOUD_MAX: '10' })).toThrow(/TAG_CLOUD_SIZE/);
+    expect(
+      loadConfig({ ...REQUIRED, TAG_CLOUD_MAX: '10', TAG_CLOUD_SIZE: '10' }).TAG_CLOUD_SIZE,
+    ).toBe(10);
   });
 
   it('reads PROXY_SHARED_SECRETS as a list of at most two secrets, none by default', () => {
