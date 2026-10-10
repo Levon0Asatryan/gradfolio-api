@@ -595,21 +595,29 @@ For each row the request is made **anonymous, as a second user, and as the owner
 expected set is identical for all three (N1), and the private, draft, pending and
 private-owner fixtures are absent.
 
-| Query                               | People expected                                  | Projects expected                                                                             | Path exercised                                     |
-| ----------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `IoT`                               | users with skill/headline IoT                    | published with technology IoT, or text `IoT`                                                  | long token, FULLTEXT + term                        |
-| `ML`                                | skill `ML`, headline `ML engineer`               | technology `ML`, summary word `ML`                                                            | short, registry + word-start                       |
-| `AI`                                | skill `AI`                                       | technology `AI`, summary `… with AI …`; **not** `main`, `email`                               | short                                              |
-| `Go`                                | skill `Go`                                       | technology `Go`, word `Go`; **not** `ago`, `Google`                                           | short                                              |
-| `C#`                                | skill `C#`                                       | technology `C#`                                                                               | short with punctuation                             |
-| `ai` / `AI` / `Ai`                  | same set                                         | same set                                                                                      | case                                               |
-| an Armenian name (`Արմեն`, `ԱՐՄԵՆ`) | users of that name                               | projects titled with Armenian words                                                           | collation                                          |
-| a Russian name (`Алёна`, `алена`)   | same set for both spellings                      | `Ёлочная`/`елочная`                                                                           | ё/е                                                |
-| `the chat`, `an app`                | n/a                                              | results for `chat` / `app` (stopword dropped); `the` alone: titles with a word starting `the` | finding 1                                          |
-| `a`, `i` (one character, stopword)  | 200, only an exact term `a`/`i` (normally empty) | same                                                                                          | single-character rule wins over the stopword rules |
-| `R`                                 | users/projects with the term `R`                 | same                                                                                          | single character, exact term                       |
-| `machine learning`                  | two tokens, AND                                  | AND                                                                                           | multi-token                                        |
-| `+(`, `"x`, `@3`, `*`               | 200, empty or literal match                      | same                                                                                          | finding 2                                          |
+**Fixture for the single-character rows.** The scene registers the exact one-character
+terms `a` and `i` (a skill on one public person, a technology on one published project,
+and `R` likewise) beside rows whose text contains the _words_ `a` and `i` ("a chat", "i
+robot") but not the terms. `q=a` must return exactly the holders of the term `a`, and
+nothing for the text: an implementation that discards every stopword returns nothing
+and fails, one that treats `a` as a word-start `LIKE` returns the text rows and fails.
+`q=a chat` is `chat` (the stopword dropped), asserted next to it.
+
+| Query                               | People expected                                                         | Projects expected                                                                             | Path exercised                                     |
+| ----------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `IoT`                               | users with skill/headline IoT                                           | published with technology IoT, or text `IoT`                                                  | long token, FULLTEXT + term                        |
+| `ML`                                | skill `ML`, headline `ML engineer`                                      | technology `ML`, summary word `ML`                                                            | short, registry + word-start                       |
+| `AI`                                | skill `AI`                                                              | technology `AI`, summary `… with AI …`; **not** `main`, `email`                               | short                                              |
+| `Go`                                | skill `Go`                                                              | technology `Go`, word `Go`; **not** `ago`, `Google`                                           | short                                              |
+| `C#`                                | skill `C#`                                                              | technology `C#`                                                                               | short with punctuation                             |
+| `ai` / `AI` / `Ai`                  | same set                                                                | same set                                                                                      | case                                               |
+| an Armenian name (`Արմեն`, `ԱՐՄԵՆ`) | users of that name                                                      | projects titled with Armenian words                                                           | collation                                          |
+| a Russian name (`Алёна`, `алена`)   | same set for both spellings                                             | `Ёлочная`/`елочная`                                                                           | ё/е                                                |
+| `the chat`, `an app`                | n/a                                                                     | results for `chat` / `app` (stopword dropped); `the` alone: titles with a word starting `the` | finding 1                                          |
+| `a`, `i` (one character, stopword)  | with the fixture below: only the people holding the exact skill `a`/`i` | with the fixture: only projects whose technology/tag is exactly `a`/`i`                       | single-character rule wins over the stopword rules |
+| `R`                                 | users/projects with the term `R`                                        | same                                                                                          | single character, exact term                       |
+| `machine learning`                  | two tokens, AND                                                         | AND                                                                                           | multi-token                                        |
+| `+(`, `"x`, `@3`, `*`               | 200, empty or literal match                                             | same                                                                                          | finding 2                                          |
 
 Beyond search: a fresh clone passes `verify`, `test:coverage` (≥ 90 %) and `test:int`;
 the grep of X5 over real responses; p95 and EXPLAIN recorded; **the real-token run**
