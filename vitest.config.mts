@@ -45,6 +45,8 @@ export default defineConfig({
         'src/core/db/user-lock.ts',
         'src/core/db/seed/seed.ts',
         'src/core/db/seed/cli.ts',
+        'src/core/db/seed/perf-seed.ts',
+        'src/core/db/seed/perf-cli.ts',
         'src/core/db/resanitize-cli.ts',
         'src/core/storage/sweep-cli.ts',
         // Rows against objects: proved against MySQL by sweep.int.test.ts.
@@ -86,6 +88,15 @@ export default defineConfig({
         'src/api/team/repositories/*.ts',
         'src/api/team/services/*.ts',
         'src/api/team/*.controller.ts',
+        // Search and tag pages: the visibility predicates, FULLTEXT and word-start
+        // fallbacks, ranking and keyset paging in SQL. MySQL behaviour, proved against
+        // MySQL 8.4 by discovery/e2e/search.int.test.ts (privacy matrix, short words,
+        // ё/е, cursors, statement counts, signing) and search-tokens.int.test.ts.
+        // The pure parts (tokenizer, cursor) are unit tested and counted.
+        'src/api/discovery/repositories/*.ts',
+        'src/api/discovery/services/*.ts',
+        'src/api/discovery/*.controller.ts',
+        'src/api/discovery/utils/discoverable.ts',
         // File registration, signed reads and deletes, uploads, avatars: the claim
         // rule, per-user prefixes, object caps and after-commit deletes, proved
         // against MySQL 8.4 with a fake that has GCS's claim rule by

@@ -8,6 +8,16 @@ import {
 } from '../projects/dto/attachment.dto.js';
 import { activityPageSchema, activityQuerySchema } from '../activities/dto/activity.dto.js';
 import {
+  discoveryProjectPageSchema,
+  personPageSchema,
+  searchPageQuerySchema,
+  searchQuerySchema,
+  searchResultsSchema,
+  tagPageQuerySchema,
+  tagQuerySchema,
+  tagSummarySchema,
+} from '../discovery/dto/discovery.dto.js';
+import {
   notificationIdParamSchema,
   notificationPageSchema,
   notificationQuerySchema,
@@ -240,6 +250,109 @@ function sectionOperations(s: {
         '409': error('ORDER_STALE: the list changed; reload it and try again'),
         ...authenticatedFailures,
       },
+    },
+  ];
+}
+
+/** Public search and tag pages: no token needed, results are the same for everyone (docs/m6-plan.md). */
+function discoveryOperations(): Operation[] {
+  const base = { tag: 'discovery' } as const;
+  const failures = {
+    '400': error('VALIDATION_FAILED: a query parameter is invalid (see `details`)'),
+    '401': error('UNAUTHENTICATED: a token was sent and is invalid or expired'),
+    '429': error('RATE_LIMITED: over budget; see the Retry-After header'),
+    '503': error('AUTH_UNAVAILABLE or DATABASE_UNAVAILABLE'),
+  };
+  const visibility =
+    'Only published projects of public profiles, and public profiles: private and draft ' +
+    'work never appears, **for anyone, the owner included** (use `/v1/me/projects` for your own). ' +
+    'Needs no token; one that is sent is verified and only changes whose rate budget is used.';
+  return [
+    {
+      ...base,
+      method: 'get',
+      path: '/v1/search',
+      operationId: 'search',
+      summary: 'Search people and projects',
+      description:
+        `${visibility} Each group is the best few matches, in relevance order, with \`hasMore\`; ` +
+        'page one group with `/v1/search/people` or `/v1/search/projects`. Words of two ' +
+        'characters or fewer (`AI`, `ML`, `Go`), and `C#`-style words, match whole skills, ' +
+        'technologies and tags exactly and the start of words in names and titles. Common ' +
+        'English words (`the`, `an`) are ignored when other words remain.',
+      query: searchQuerySchema,
+      responses: {
+        '200': { description: 'The best matches', schema: searchResultsSchema },
+        ...failures,
+      },
+    },
+    {
+      ...base,
+      method: 'get',
+      path: '/v1/search/people',
+      operationId: 'searchPeople',
+      summary: 'Search people, paged',
+      description:
+        `${visibility} Order: relevance (name equals the query, then every word starts a word ` +
+        'of the name, then headline or skill), then newest. Cursors are not signed: they only ' +
+        'position the page.',
+      query: searchPageQuerySchema,
+      responses: { '200': { description: 'One page', schema: personPageSchema }, ...failures },
+    },
+    {
+      ...base,
+      method: 'get',
+      path: '/v1/search/projects',
+      operationId: 'searchProjects',
+      summary: 'Search projects, paged',
+      description:
+        `${visibility} Order: relevance (title equals the query, then every word in the title ` +
+        'or a technology/tag, then the summary), then newest. Cursors are not signed.',
+      query: searchPageQuerySchema,
+      responses: {
+        '200': { description: 'One page', schema: discoveryProjectPageSchema },
+        ...failures,
+      },
+    },
+    {
+      ...base,
+      method: 'get',
+      path: '/v1/tags',
+      operationId: 'getTag',
+      summary: 'A skill, technology or tag and how many public things use it',
+      description:
+        `${visibility} The name is matched case-insensitively and returned in the site-wide ` +
+        'spelling. A name that no public project or profile uses is 404, the same answer for ' +
+        'one that is only used privately.',
+      query: tagQuerySchema,
+      responses: {
+        '200': { description: 'The term', schema: tagSummarySchema },
+        '404': error('NOT_FOUND: no public project or profile uses this name'),
+        ...failures,
+      },
+    },
+    {
+      ...base,
+      method: 'get',
+      path: '/v1/tags/projects',
+      operationId: 'listTagProjects',
+      summary: 'Projects that use a skill, technology or tag, newest first',
+      description: `${visibility} A name nobody public uses is an empty page, not an error.`,
+      query: tagPageQuerySchema,
+      responses: {
+        '200': { description: 'One page', schema: discoveryProjectPageSchema },
+        ...failures,
+      },
+    },
+    {
+      ...base,
+      method: 'get',
+      path: '/v1/tags/people',
+      operationId: 'listTagPeople',
+      summary: 'People who list a skill, newest first',
+      description: `${visibility} A name nobody public lists is an empty page, not an error.`,
+      query: tagPageQuerySchema,
+      responses: { '200': { description: 'One page', schema: personPageSchema }, ...failures },
     },
   ];
 }
@@ -861,6 +974,7 @@ export const OPERATIONS: readonly Operation[] = [
       ...authenticatedFailures,
     },
   },
+  ...discoveryOperations(),
   ...sectionOperations({
     path: 'education',
     name: 'Education',
@@ -948,7 +1062,8 @@ export function buildOpenApiDocument(
       description:
         'Backend for Gradfolio, a student portfolio platform. Every route except the health ' +
         'checks is under `/v1` and needs an Auth0 access token, except reading a public profile ' +
-        '(`GET /v1/users/{id}`). Every failure answers with ' +
+        '(`GET /v1/users/{id}`), a public project, and search and tag pages (`discovery`). ' +
+        'Every failure answers with ' +
         'an `ErrorResponse`.',
       license: { name: 'MIT' },
     },
@@ -963,6 +1078,10 @@ export function buildOpenApiDocument(
       { name: 'team', description: 'Project teams: invitations, answers, the owner’s view' },
       { name: 'notifications', description: 'The caller’s own notifications' },
       { name: 'activities', description: 'The caller’s own activity feed' },
+      {
+        name: 'discovery',
+        description: 'Public search and tag pages: published work of public profiles only',
+      },
     ],
     paths,
     components: {
