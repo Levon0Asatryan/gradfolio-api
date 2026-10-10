@@ -277,7 +277,7 @@ changes the rate-limit key). Query objects are `z.strictObject`: an unknown key 
 | GET    | `/tags/people`           | 6.2  | `?name&limit&cursor`.                                                                |
 | GET    | `/tags/cloud`            | 6.4  | `?limit` (≤ 100, default 40). Cached.                                                |
 | GET    | `/projects`              | 6.3  | Browse. `?sort&category&status&limit&cursor`.                                        |
-| GET    | `/users`                 | 6.3  | Browse. `?school&major&gradYear&limit&cursor`.                                       |
+| GET    | `/users`                 | 6.3  | Browse. `?sort=newest&school&major&gradYear&limit&cursor`.                           |
 | GET    | `/users/facets`          | 6.3  | `{schools, majors, years}` with counts, top 50 each. Registered before `/users/:id`. |
 | GET    | `/me/dashboard`          | 6.5  | Token. The caller only.                                                              |
 | GET    | `/projects/{id}/similar` | 6.7  | Stretch (PR d).                                                                      |
@@ -295,7 +295,17 @@ and `GET /users/lookup`, `GET /users/:id`.
   grouped `/search` uses `SEARCH_GROUP_SIZE` (6, max 10). All in `schema.ts`, no literals.
 - `cursor`: opaque base64url, ≤ 600 characters, strict schema `{r?, t, id, s}` where `s`
   names the list (`search-people`, `search-projects`, `browse-projects:<sort>`, …) so a
-  cursor from one list is a 400 on another (the `time-cursor.ts` pattern).
+  cursor from one list is a 400 on another (the `time-cursor.ts` pattern). **A cursor is
+  not authenticated** (no MAC, as in M4 and M5): a client can change `r`, `t` or `id` to
+  another value of the right shape. That is harmless by construction. The cursor only
+  positions a keyset comparison **inside** a statement that still applies the query's
+  predicates and the visibility predicates, so every row it can return is a row the same
+  query returns on page one; a forged cursor lets its holder skip or repeat rows of their
+  own listing and nothing else. What is guaranteed is therefore: malformed, out-of-range
+  (`r` outside 0–3, `t` outside the DATETIME range, `id` over 36 characters) and
+  wrong-list cursors are 400; a well-formed forged one never returns a row that is not in
+  the listing. We do not sign: a MAC key would be one more secret to rotate to protect
+  nothing that is not already public.
 - `sort` (browse projects): `newest` (default), `updated`. `category` and `status` are the
   existing enums. `gradYear`: integer 1950–2100. `school`, `major`: ≤ 200 characters,
   compared with `=` under the column collation after the same normalization.
@@ -352,9 +362,16 @@ M4), deduplicated per response; §8 asserts one signing per distinct key.
 ### 3.3 Search semantics (6.1)
 
 Tokens are the whitespace-separated words of `q` (after §3.1). Each token is **long**
-(entirely letters and digits in any script, length ≥ 3, not in the stopword list) or
-**short** (anything else: ≤ 2 characters, or containing `#`, `+`, `.`, `-`, `/`, or a
-stopword). Every token must match (AND across tokens, OR across fields).
+(entirely letters and digits in any script, length ≥ 3, not in the stopword list),
+**short** (not a stopword, and ≤ 2 characters or containing `#`, `+`, `.`, `-`, `/`), or
+a **stopword** (a word in the list below, whatever its length). Every long and short token
+must match (AND across tokens, OR across fields). **Stopwords are dropped before the AND
+when another token remains** (`the chat` is `chat`, `an app` is `app`): requiring them
+would exclude rows that only contain `chat`, and InnoDB would return nothing for a
+required stopword anyway (finding 1). When the query is stopwords only (`the`, `how to`),
+they are not dropped but matched as short tokens (word-start `LIKE`, plus an exact term),
+so `The Library` is still found by `the`. Known cost: `IT support` drops `it`, because
+`it` is on the list.
 
 - **People**, per token: long → `MATCH(name, headline)` boolean `+tok*`, **or** a skill
   equal to the token (registry spelling, case-insensitive by collation) **or** a skill
@@ -384,11 +401,25 @@ both a tag and a technology of one project counts once) and distinct people.
 
 ### 3.5 Browse users (6.3)
 
-Public users, newest first (`created_at DESC, id DESC`), optionally those with an
+Public users, newest first (`created_at DESC, id DESC`; `sort` accepts only `newest`, so
+the FE may send it explicitly and the order can grow later without a contract break),
+optionally those with an
 `education` row matching `school`, `major` and/or `gradYear` (`end_year`; a user matches
 when **one** row matches all given filters, not each filter on a different row: one
 `EXISTS` with all conditions). A user with no education row is excluded when any filter is
 set.
+
+**Landing page (FE #82 note).** "Newest people" is supported with no new field:
+`GET /v1/users?sort=newest&limit=6` (the default order is already newest) and "newest
+projects" is `GET /v1/projects?sort=newest&limit=6`. Both are anonymous, viewer-independent
+(N1) and served from `idx_users_browse` / `idx_projects_browse` without a sort (§6). The
+contract has **no `createdAt` on `PersonSummary`**: the order is the API's promise, and
+sign-up time of a public profile is not needed to render a card. If the FE wants a
+"joined" label it is one additive field. Two limits to know: "newest" is by sign-up, so a
+fresh account with an empty headline can head the list (an optional `withProjects=true`
+filter is possible, one `EXISTS`, but is not in this plan unless the FE asks), and the
+rate budget is `browse` (§9), so a landing page that calls both lists uses 2 of the 60
+per minute per client.
 
 ## 4. Query design
 
@@ -493,22 +524,22 @@ recorded in `m6-verification.md`.
 Every proof is a test **seen failing with the guard removed**, recorded in the
 verification doc.
 
-| #   | Property                                                                                                                                                                                        | Proof                                                                                                                                                                                                                                                                                                       |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| X1  | A private project, a draft and a project of a private profile never appear in `/search*`, `/tags*`, `/projects`, `/users`, the cloud, `similar`, **for the owner, another user, and anonymous** | One fixture of 8 rows per class (published, private, draft, private-owner, pending member, rejected member, accepted-member-of-private, deleted owner); every route called with 3 viewers; assert the id sets. Remove `isPublished` → fails; remove `visibleTo` on the owner join → fails (separately).     |
-| X2  | A private profile is not in people search, browse, tag people, facets, or as a `ProjectCard.owner`                                                                                              | Same fixture; users with `is_public = 0` named so that the query would hit them by name, skill and headline.                                                                                                                                                                                                |
-| X3  | Direct reads are not weakened: a published project of a private profile still answers `GET /projects/:id` (M4) while being absent from discovery                                                | Pair of assertions on one id.                                                                                                                                                                                                                                                                               |
-| X4  | Accepted team membership never exposes a private project; a pending invitee sees nothing new                                                                                                    | Accepted member of a private project: absent from every list for the member; `projectCount` excludes it; published team project counts for owner and accepted member, not for pending/rejected.                                                                                                             |
-| X5  | No private field in any discovery response                                                                                                                                                      | A key-set test on every response schema (`PersonSummary`, `ProjectCard`) plus a **grep over the recorded real responses** in the verification run for `birthday`, `phone`, `auth0`, `email`, `contactEmail`, `access_token`, `refresh_token`, `external_user_id`, `descriptionHtml`, `isDraft`, `isPublic`. |
-| X6  | The `ProjectCard`/`PersonSummary` columns are listed one by one, never `selectAll`                                                                                                              | Column-list constants as in `project.repository.ts`; a test adding a column to the row type fails to compile into a response (the M4 approach) and `architecture.test.ts` rejects `selectAll` in `src/api/discovery`.                                                                                       |
-| X7  | The dashboard shows only the caller's rows; nothing of another user                                                                                                                             | Two users with overlapping team projects: A's dashboard never includes B's private title, B's activities, or A's pending-invite project; a `teamJoined` activity carries only the title the member may see (m5-plan §8). Second user's token → own data only. Remove `WHERE user_id = ?` → fails.           |
-| X8  | Query injection and syntax: operators, quotes, `%`, `_`, `\`, NUL, 10 KB strings, lone surrogates, mixed scripts                                                                                | Table-driven test over the finding-2 strings: 200 with an empty or correct result, never 500; 101 characters and 7 tokens are 400. Remove the sanitizer → the `+(` case returns 500 (proved).                                                                                                               |
-| X9  | Short-token and stopword behavior: `AI`, `ML`, `Go`, `C#`, `UI`, `the chat`, `IoT`, `an app`, `R`                                                                                               | The search matrix in §10.                                                                                                                                                                                                                                                                                   |
-| X10 | Case, ё/е and Armenian case                                                                                                                                                                     | `Алёна`/`алена`/`АЛЕНА`; `Фёдор`/`Федор`; `Արմեն`/`ԱՐՄԵՆ`; one row each in people and projects; skills and tags the same.                                                                                                                                                                                   |
-| X11 | Cursor forgery and cross-list reuse: another list's cursor, a tampered rank, a negative `t`, `id` of 5 KB                                                                                       | 400 `VALIDATION_FAILED`, never a page.                                                                                                                                                                                                                                                                      |
-| X12 | Tag page `name` is data: `'; DROP`, `%`, `\`, a 255-character name                                                                                                                              | Bound parameters; the unknown-tag 404 equals the private-only-tag 404 (no existence oracle).                                                                                                                                                                                                                |
-| X13 | The forwarded-IP header is honored only with the secret (D4)                                                                                                                                    | Without secret, wrong secret, previous secret (accepted during rotation), garbage IP, IPv6, header present with a token (token wins): each asserted by which bucket 429s. Remove the secret check → forged-IP request chooses its own bucket (proved by test). Barrier, not sleep, for the window.          |
-| X14 | Every new route is rate limited, and a budget is per route                                                                                                                                      | A test that reads `OPERATIONS` and asserts each M6 route has `RateBudget` metadata, and that the 31st request to `/search/people` is 429 while `/search/projects` still answers.                                                                                                                            |
+| #   | Property                                                                                                                                                                                                                                                                  | Proof                                                                                                                                                                                                                                                                                                       |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| X1  | A private project, a draft and a project of a private profile never appear in `/search*`, `/tags*`, `/projects`, `/users`, the cloud, `similar`, **for the owner, another user, and anonymous**                                                                           | One fixture of 8 rows per class (published, private, draft, private-owner, pending member, rejected member, accepted-member-of-private, deleted owner); every route called with 3 viewers; assert the id sets. Remove `isPublished` → fails; remove `visibleTo` on the owner join → fails (separately).     |
+| X2  | A private profile is not in people search, browse, tag people, facets, or as a `ProjectCard.owner`                                                                                                                                                                        | Same fixture; users with `is_public = 0` named so that the query would hit them by name, skill and headline.                                                                                                                                                                                                |
+| X3  | Direct reads are not weakened: a published project of a private profile still answers `GET /projects/:id` (M4) while being absent from discovery                                                                                                                          | Pair of assertions on one id.                                                                                                                                                                                                                                                                               |
+| X4  | Accepted team membership never exposes a private project; a pending invitee sees nothing new                                                                                                                                                                              | Accepted member of a private project: absent from every list for the member; `projectCount` excludes it; published team project counts for owner and accepted member, not for pending/rejected.                                                                                                             |
+| X5  | No private field in any discovery response                                                                                                                                                                                                                                | A key-set test on every response schema (`PersonSummary`, `ProjectCard`) plus a **grep over the recorded real responses** in the verification run for `birthday`, `phone`, `auth0`, `email`, `contactEmail`, `access_token`, `refresh_token`, `external_user_id`, `descriptionHtml`, `isDraft`, `isPublic`. |
+| X6  | The `ProjectCard`/`PersonSummary` columns are listed one by one, never `selectAll`                                                                                                                                                                                        | Column-list constants as in `project.repository.ts`; a test adding a column to the row type fails to compile into a response (the M4 approach) and `architecture.test.ts` rejects `selectAll` in `src/api/discovery`.                                                                                       |
+| X7  | The dashboard shows only the caller's rows; nothing of another user                                                                                                                                                                                                       | Two users with overlapping team projects: A's dashboard never includes B's private title, B's activities, or A's pending-invite project; a `teamJoined` activity carries only the title the member may see (m5-plan §8). Second user's token → own data only. Remove `WHERE user_id = ?` → fails.           |
+| X8  | Query injection and syntax: operators, quotes, `%`, `_`, `\`, NUL, 10 KB strings, lone surrogates, mixed scripts                                                                                                                                                          | Table-driven test over the finding-2 strings: 200 with an empty or correct result, never 500; 101 characters and 7 tokens are 400. Remove the sanitizer → the `+(` case returns 500 (proved).                                                                                                               |
+| X9  | Short-token and stopword behavior: `AI`, `ML`, `Go`, `C#`, `UI`, `the chat`, `IoT`, `an app`, `R`                                                                                                                                                                         | The search matrix in §10.                                                                                                                                                                                                                                                                                   |
+| X10 | Case, ё/е and Armenian case                                                                                                                                                                                                                                               | `Алёна`/`алена`/`АЛЕНА`; `Фёдор`/`Федор`; `Արմեն`/`ԱՐՄԵՆ`; one row each in people and projects; skills and tags the same.                                                                                                                                                                                   |
+| X11 | Cursor validation and forgery: another list's cursor, `r` = 9, a negative `t`, `id` of 5 KB are 400; a well-formed cursor with a changed rank or id returns **only rows that are in the unforged listing** (subset assertion), never a private, draft or non-matching row | 400 `VALIDATION_FAILED` for the malformed cases. For the forged-but-valid cursor the assertion is the subset one (the fixture's private rows sit at every rank so a leak would show); remove the visibility predicate from the keyset statement and this fails.                                             |
+| X12 | Tag page `name` is data: `'; DROP`, `%`, `\`, a 255-character name                                                                                                                                                                                                        | Bound parameters; the unknown-tag 404 equals the private-only-tag 404 (no existence oracle).                                                                                                                                                                                                                |
+| X13 | The forwarded-IP header is honored only with the secret (D4)                                                                                                                                                                                                              | Without secret, wrong secret, previous secret (accepted during rotation), garbage IP, IPv6, header present with a token (token wins): each asserted by which bucket 429s. Remove the secret check → forged-IP request chooses its own bucket (proved by test). Barrier, not sleep, for the window.          |
+| X14 | Every new route is rate limited, and a budget is per route                                                                                                                                                                                                                | A test that reads `OPERATIONS` and asserts each M6 route has `RateBudget` metadata, and that the 31st request to `/search/people` is 429 while `/search/projects` still answers.                                                                                                                            |
 
 ## 8. Other tests
 
@@ -559,19 +590,19 @@ For each row the request is made **anonymous, as a second user, and as the owner
 expected set is identical for all three (N1), and the private, draft, pending and
 private-owner fixtures are absent.
 
-| Query                               | People expected                    | Projects expected                                               | Path exercised               |
-| ----------------------------------- | ---------------------------------- | --------------------------------------------------------------- | ---------------------------- |
-| `IoT`                               | users with skill/headline IoT      | published with technology IoT, or text `IoT`                    | long token, FULLTEXT + term  |
-| `ML`                                | skill `ML`, headline `ML engineer` | technology `ML`, summary word `ML`                              | short, registry + word-start |
-| `AI`                                | skill `AI`                         | technology `AI`, summary `… with AI …`; **not** `main`, `email` | short                        |
-| `Go`                                | skill `Go`                         | technology `Go`, word `Go`; **not** `ago`, `Google`             | short                        |
-| `C#`                                | skill `C#`                         | technology `C#`                                                 | short with punctuation       |
-| `ai` / `AI` / `Ai`                  | same set                           | same set                                                        | case                         |
-| an Armenian name (`Արմեն`, `ԱՐՄԵՆ`) | users of that name                 | projects titled with Armenian words                             | collation                    |
-| a Russian name (`Алёна`, `алена`)   | same set for both spellings        | `Ёлочная`/`елочная`                                             | ё/е                          |
-| `the chat`, `an app`                | n/a                                | results for `chat` / `app` (stopword not required)              | finding 1                    |
-| `machine learning`                  | two tokens, AND                    | AND                                                             | multi-token                  |
-| `+(`, `"x`, `@3`, `*`               | 200, empty or literal match        | same                                                            | finding 2                    |
+| Query                               | People expected                    | Projects expected                                                                             | Path exercised               |
+| ----------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------- |
+| `IoT`                               | users with skill/headline IoT      | published with technology IoT, or text `IoT`                                                  | long token, FULLTEXT + term  |
+| `ML`                                | skill `ML`, headline `ML engineer` | technology `ML`, summary word `ML`                                                            | short, registry + word-start |
+| `AI`                                | skill `AI`                         | technology `AI`, summary `… with AI …`; **not** `main`, `email`                               | short                        |
+| `Go`                                | skill `Go`                         | technology `Go`, word `Go`; **not** `ago`, `Google`                                           | short                        |
+| `C#`                                | skill `C#`                         | technology `C#`                                                                               | short with punctuation       |
+| `ai` / `AI` / `Ai`                  | same set                           | same set                                                                                      | case                         |
+| an Armenian name (`Արմեն`, `ԱՐՄԵՆ`) | users of that name                 | projects titled with Armenian words                                                           | collation                    |
+| a Russian name (`Алёна`, `алена`)   | same set for both spellings        | `Ёлочная`/`елочная`                                                                           | ё/е                          |
+| `the chat`, `an app`                | n/a                                | results for `chat` / `app` (stopword dropped); `the` alone: titles with a word starting `the` | finding 1                    |
+| `machine learning`                  | two tokens, AND                    | AND                                                                                           | multi-token                  |
+| `+(`, `"x`, `@3`, `*`               | 200, empty or literal match        | same                                                                                          | finding 2                    |
 
 Beyond search: a fresh clone passes `verify`, `test:coverage` (≥ 90 %) and `test:int`;
 the grep of X5 over real responses; p95 and EXPLAIN recorded; **the real-token run**
