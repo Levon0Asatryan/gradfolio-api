@@ -42,5 +42,6 @@ export const activityQuerySchema = z.strictObject({
   }),
 });
 
+export type Activity = z.infer<typeof activitySchema>;
 export type ActivityPage = z.infer<typeof activityPageSchema>;
 export type ActivityQuery = z.output<typeof activityQuerySchema>;
