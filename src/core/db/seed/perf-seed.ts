@@ -1,5 +1,10 @@
 import type { Database } from '../database.js';
+import type { Insertable } from 'kysely';
+import type { Activities } from '../types.generated.js';
 import { newId } from '../ids.js';
+import { toJsonColumn } from '../json.js';
+import { inTransaction } from '../transaction.js';
+import { translationParams } from '../../validation/json-shapes.js';
 
 /**
  * A deterministic, realistic-size dataset for measuring search, browse and the
@@ -127,9 +132,43 @@ async function insertChunks<T extends object>(
   for (let i = 0; i < rows.length; i += 500) await insert(rows.slice(i, i + 500));
 }
 
-export async function perfSeed(
+/** Activities per user, as the plan's workload says (5,000 for 1,000 users). */
+const ACTIVITIES_PER_USER = 5;
+
+/**
+ * A database name this seed must never write to: the integration suite's
+ * (`*_test`, which every test file resets) and anything that says it is
+ * production. Pure, so the CLI and a unit test share it.
+ */
+export function perfSeedRefusal(databaseUrl: string): string | undefined {
+  let name: string;
+  try {
+    name = decodeURIComponent(new URL(databaseUrl).pathname.replace(/^\//, ''));
+  } catch {
+    return 'DATABASE_URL is not a URL';
+  }
+  if (name === '') return 'DATABASE_URL names no database';
+  if (/(^|[_-])test($|[_-])/i.test(name)) {
+    return `refusing to seed ${name}: it looks like the integration test database`;
+  }
+  if (/prod/i.test(name)) return `refusing to seed ${name}: it looks like production`;
+  return undefined;
+}
+
+/**
+ * One transaction: a failure part-way leaves the database as it was, so a
+ * retry starts clean instead of tripping over half a dataset.
+ */
+export function perfSeed(
   db: Database,
-  { users = 1000, projectsPerUser = 3 }: PerfSeedOptions = {},
+  options: PerfSeedOptions = {},
+): Promise<{ users: number; projects: number }> {
+  return inTransaction(db, (trx) => load(trx, options));
+}
+
+async function load(
+  db: Database,
+  { users = 1000, projectsPerUser = 3 }: PerfSeedOptions,
 ): Promise<{ users: number; projects: number }> {
   const { next, pick, zipf } = prng();
   const now = Date.now();
@@ -167,6 +206,7 @@ export async function perfSeed(
   const tech: { projectId: string; name: string; sortOrder: number }[] = [];
   const tags: { projectId: string; name: string; sortOrder: number }[] = [];
   const members: { id: string; projectId: string; userId: string; name: string }[] = [];
+  const feed: Insertable<Activities>[] = [];
 
   for (let i = 0; i < users; i++) {
     const id = newId();
@@ -203,6 +243,7 @@ export async function perfSeed(
       skills.push({ id: newId(), userId: id, skillName, sortOrder: order++ });
       terms.add(skillName);
     }
+    const own: { id: string; title: string }[] = [];
     for (let j = 0; j < projectsPerUser; j++) {
       const pid = newId();
       const at = new Date(created.getTime() + next() * 200 * 86_400_000);
@@ -231,8 +272,42 @@ export async function perfSeed(
         tags.push({ projectId: pid, name, sortOrder: o++ });
         terms.add(name);
       }
-      if (next() < 0.3) {
-        members.push({ id: newId(), projectId: pid, userId: pick(u).id, name: 'Member' });
+      own.push({ id: pid, title: proj.at(-1)!.title });
+      // A team member is someone else: the owner is implicit (docs/m5-plan.md §2.2).
+      // `u` ends with the current owner, so the others are all but the last.
+      if (u.length > 1 && next() < 0.3) {
+        const other = u[Math.floor(next() * (u.length - 1))]!;
+        members.push({ id: newId(), projectId: pid, userId: other.id, name: 'Member' });
+      }
+    }
+    // Activities the application could have written: its registry's keys and shapes.
+    const skillNames = [...mine];
+    for (let k = 0; k < ACTIVITIES_PER_USER; k++) {
+      const timestamp = new Date(now - next() * 90 * 86_400_000);
+      const project = own[k % own.length];
+      if (project !== undefined && k % 2 === 0) {
+        feed.push({
+          id: newId(),
+          userId: id,
+          type: 'project',
+          translationKey: 'projectCreated',
+          translationParams: toJsonColumn(translationParams, {
+            projectId: project.id,
+            projectName: project.title,
+          }),
+          timestamp,
+        });
+      } else {
+        feed.push({
+          id: newId(),
+          userId: id,
+          type: 'profile',
+          translationKey: 'newSkill',
+          translationParams: toJsonColumn(translationParams, {
+            skillName: skillNames[k % skillNames.length] ?? 'AI',
+          }),
+          timestamp,
+        });
       }
     }
   }
@@ -277,5 +352,6 @@ export async function perfSeed(
       .onDuplicateKeyUpdate((eb) => ({ id: eb.ref('projectTeamMembers.id') }))
       .execute(),
   );
+  await insertChunks(feed, (c) => db.insertInto('activities').values(c).execute());
   return { users: u.length, projects: proj.length };
 }
