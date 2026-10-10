@@ -29,6 +29,17 @@ GET {{baseUrl}}/v1/search?q=C%23
 GET {{baseUrl}}/v1/search?q=%D4%B1%D6%80%D5%B4%D5%A5%D5%B6
 
 ###
+# @name searchSuggestions
+# 200 { query, people: [{ id, label, avatarUrl }], projects: [{ id, label, avatarUrl: null }], tags: [string] }:
+# at most 5 of each, best first. Matches the start of the text or of a word in it; a single letter
+# works. q is 1 to 50 characters (400 otherwise). Its own, larger rate budget (typeahead bursts).
+GET {{baseUrl}}/v1/search/suggestions?q=al
+
+###
+# @name searchSuggestionsArmenian
+GET {{baseUrl}}/v1/search/suggestions?q=%D4%B1%D6%80%D5%B4
+
+###
 # @name searchPeople
 # 200 { items: PersonSummary[], nextCursor }. Pass nextCursor back as cursor; another list's cursor is 400.
 GET {{baseUrl}}/v1/search/people?q=designer&limit=12

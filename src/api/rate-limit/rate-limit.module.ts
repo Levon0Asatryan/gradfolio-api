@@ -54,6 +54,12 @@ function onlyWhereOptedIn(name: RateBudgetName): ThrottlerOptions['skipIf'] {
               skipIf: onlyWhereOptedIn('search'),
             },
             {
+              name: 'suggest',
+              ttl,
+              limit: limitFor(cfg.RATE_LIMIT_SUGGEST, cfg.RATE_LIMIT_SUGGEST_SHARED),
+              skipIf: onlyWhereOptedIn('suggest'),
+            },
+            {
               name: 'browse',
               ttl,
               limit: limitFor(cfg.RATE_LIMIT_BROWSE, cfg.RATE_LIMIT_BROWSE_SHARED),

@@ -125,6 +125,26 @@ export const userFacetsSchema = z
       'The choices for the directory filters: the values present on public profiles, most common first, at most 50 each.',
   });
 
+export const suggestionSchema = z
+  .object({
+    id: z.string().meta({ description: 'The person’s or project’s id, for a link.' }),
+    label: z.string().meta({ description: 'The name or title to show.' }),
+    avatarUrl: z.string().nullable().meta({ description: 'People only; null for projects.' }),
+  })
+  .meta({ id: 'Suggestion' });
+
+export const suggestionsSchema = z
+  .object({
+    query: z.string().meta({ description: 'The text as normalized.' }),
+    people: z.array(suggestionSchema),
+    projects: z.array(suggestionSchema),
+    tags: z.array(z.string()).meta({
+      description:
+        'Skills, technologies and tags in the site-wide spelling that a public project or profile uses.',
+    }),
+  })
+  .meta({ id: 'Suggestions' });
+
 // ----------------------------------------------------------------- requests
 
 /**
@@ -226,6 +246,32 @@ export type BrowseUsersQuery = z.output<typeof browseUsersQuerySchema>;
 export type TagCloudQuery = z.output<typeof tagCloudQuerySchema>;
 export type TagCloud = z.infer<typeof tagCloudSchema>;
 export type UserFacets = z.infer<typeof userFacetsSchema>;
+/**
+ * Typeahead text: normalized like search, 1 to 50 characters. The whole text is
+ * the prefix, so `alice sm` completes `Alice Smith` (no word limit to enforce:
+ * 50 characters bound it).
+ */
+export const SUGGEST_MAX_CHARS = 50;
+export const suggestionsQuerySchema = z.strictObject({
+  q: z
+    .string()
+    .transform((raw, ctx) => {
+      const text = normalizeText(raw);
+      const n = charCount(text);
+      if (n < 1 || n > SUGGEST_MAX_CHARS) {
+        ctx.addIssue({ code: 'custom', message: `must be 1 to ${SUGGEST_MAX_CHARS} characters` });
+        return z.NEVER;
+      }
+      return text;
+    })
+    .meta({
+      description:
+        'The start of a name, title or term, 1 to 50 characters. Matches the start of the text or the start of any word in it.',
+    }),
+});
+
+export type SuggestionsQuery = z.output<typeof suggestionsQuerySchema>;
+export type Suggestions = z.infer<typeof suggestionsSchema>;
 export type SearchQuery = z.output<typeof searchQuerySchema>;
 export type SearchPageQuery = z.output<typeof searchPageQuerySchema>;
 export type TagQuery = z.output<typeof tagQuerySchema>;

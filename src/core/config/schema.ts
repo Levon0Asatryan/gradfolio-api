@@ -132,12 +132,17 @@ const rateLimit = {
   RATE_LIMIT_UPLOAD: z.coerce.number().int().min(1).max(100_000).default(20),
   // Browse, tag pages and the tag cloud (docs/m6-plan.md §9).
   RATE_LIMIT_BROWSE: z.coerce.number().int().min(1).max(100_000).default(60),
+  // Typeahead: a debounced box sends a burst per keystroke pause, so this is the
+  // largest per-route number, kept small by the cost of one suggestion (three
+  // statements of at most 5 rows).
+  RATE_LIMIT_SUGGEST: z.coerce.number().int().min(1).max(100_000).default(240),
   // The same budgets for an anonymous caller whose address is the frontend's
   // shared egress: no token and no valid forwarded-client-IP secret. Higher,
   // because every anonymous visitor then shares one counter (plan §2.4).
   RATE_LIMIT_DEFAULT_SHARED: z.coerce.number().int().min(1).max(1_000_000).default(600),
   RATE_LIMIT_SEARCH_SHARED: z.coerce.number().int().min(1).max(1_000_000).default(300),
   RATE_LIMIT_BROWSE_SHARED: z.coerce.number().int().min(1).max(1_000_000).default(600),
+  RATE_LIMIT_SUGGEST_SHARED: z.coerce.number().int().min(1).max(1_000_000).default(2400),
   // Comma-separated, current first, previous second while rotating. When set,
   // a request carrying `X-Gradfolio-Proxy-Secret` equal to one of them may name
   // the real client in `X-Client-IP`. Unset: the header is ignored.
@@ -171,6 +176,8 @@ const discovery = {
   DISCOVERY_PAGE_MAX: z.coerce.number().int().min(1).max(100).default(30),
   // Items per group in the grouped `GET /v1/search` (no cursor there).
   SEARCH_GROUP_SIZE: z.coerce.number().int().min(1).max(30).default(6),
+  // Suggestions per group (people, projects, tags) in the typeahead.
+  SUGGEST_SIZE: z.coerce.number().int().min(1).max(10).default(5),
   // How long the tag cloud and the directory's filter choices are served from
   // memory (plan §3.4). 0 turns the cache off. Per process, so up to this long
   // stale, and not the same instant on each instance.

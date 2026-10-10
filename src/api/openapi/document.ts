@@ -16,6 +16,8 @@ import {
   searchPageQuerySchema,
   searchQuerySchema,
   searchResultsSchema,
+  suggestionsQuerySchema,
+  suggestionsSchema,
   tagPageQuerySchema,
   tagQuerySchema,
   tagCloudQuerySchema,
@@ -289,6 +291,23 @@ function discoveryOperations(): Operation[] {
       query: searchQuerySchema,
       responses: {
         '200': { description: 'The best matches', schema: searchResultsSchema },
+        ...failures,
+      },
+    },
+    {
+      ...base,
+      method: 'get',
+      path: '/v1/search/suggestions',
+      operationId: 'searchSuggestions',
+      summary: 'Typeahead: a few people, projects and terms that start with the text',
+      description:
+        `${visibility} Matches the start of the text or of any word in it, so a single letter ` +
+        'works; at most 5 of each. Tags are skills, technologies and tags that a public project or ' +
+        'profile uses, in the site-wide spelling. Has its own, larger rate budget for debounced ' +
+        'bursts. Use `/v1/search` for results.',
+      query: suggestionsQuerySchema,
+      responses: {
+        '200': { description: 'The suggestions', schema: suggestionsSchema },
         ...failures,
       },
     },
