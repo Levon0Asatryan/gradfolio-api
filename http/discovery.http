@@ -1,0 +1,70 @@
+### api/discovery -- public search and tag pages (M6 PR a)
+#
+# No token needed: results are published projects of public profiles and public
+# profiles, the same for everyone (a private or draft project never appears, the
+# owner included). A token that is sent is verified and only changes whose rate
+# budget is used.
+#
+# Behind the frontend, an anonymous visitor's address is forwarded with
+#   X-Client-IP: <address>
+#   X-Gradfolio-Proxy-Secret: <the shared secret>
+# Without a valid secret the header is ignored.
+
+@baseUrl = {{$dotenv baseUrl}}
+@accessToken = {{$dotenv accessToken}}
+
+###
+# @name search
+# 200 { query, people: { items, hasMore }, projects: { items, hasMore } }: the best few of each.
+# Short words (AI, ML, Go, C#) match whole skills/technologies/tags and word starts; "the"/"an"
+# are ignored beside other words. q is 1 to 100 characters, at most 6 words; more is 400.
+GET {{baseUrl}}/v1/search?q=ML
+
+###
+# @name searchShortWord
+GET {{baseUrl}}/v1/search?q=C%23
+
+###
+# @name searchArmenian
+GET {{baseUrl}}/v1/search?q=%D4%B1%D6%80%D5%B4%D5%A5%D5%B6
+
+###
+# @name searchPeople
+# 200 { items: PersonSummary[], nextCursor }. Pass nextCursor back as cursor; another list's cursor is 400.
+GET {{baseUrl}}/v1/search/people?q=designer&limit=12
+
+###
+# @name searchProjects
+# 200 { items: ProjectCard[], nextCursor }.
+GET {{baseUrl}}/v1/search/projects?q=iot&limit=12
+
+###
+# @name searchSignedIn
+# The same results; the token only picks the rate budget.
+GET {{baseUrl}}/v1/search?q=iot
+Authorization: Bearer {{accessToken}}
+
+###
+# @name searchEmpty
+# 400 VALIDATION_FAILED: q is required and must not be blank.
+GET {{baseUrl}}/v1/search?q=%20
+
+###
+# @name searchTooLong
+# 400 VALIDATION_FAILED: at most 100 characters and 6 words.
+GET {{baseUrl}}/v1/search?q=a%20b%20c%20d%20e%20f%20g
+
+###
+# @name tag
+# 200 { name, projectCount, peopleCount }; name is the site-wide spelling. 404 NOT_FOUND when no public
+# project or profile uses it (also for a name used only privately). A query parameter, so C# and CI/CD
+# need no escaping beyond URL encoding.
+GET {{baseUrl}}/v1/tags?name=react
+
+###
+# @name tagProjects
+GET {{baseUrl}}/v1/tags/projects?name=C%23&limit=12
+
+###
+# @name tagPeople
+GET {{baseUrl}}/v1/tags/people?name=ml&limit=12

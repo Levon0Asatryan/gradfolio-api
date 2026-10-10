@@ -542,7 +542,12 @@ describe('onboarding', () => {
 
 describe('rate limits', () => {
   it('gives every new route its own per-caller budget', async () => {
-    const http = await start({ RATE_LIMIT_DEFAULT: '2', RATE_LIMIT_WINDOW_S: '60' });
+    const http = await start({
+      RATE_LIMIT_DEFAULT: '2',
+      // An anonymous caller with no vouched-for address is on the shared number.
+      RATE_LIMIT_DEFAULT_SHARED: '2',
+      RATE_LIMIT_WINDOW_S: '60',
+    });
     const me = await member('rl');
     const calls: [string, () => request.Test][] = [
       ['GET /users/:id (anonymous)', () => http.get(`/v1/users/${me.user.id}`)],

@@ -130,6 +130,38 @@ const rateLimit = {
   RATE_LIMIT_AI: z.coerce.number().int().min(1).max(100_000).default(10),
   RATE_LIMIT_LOOKUP: z.coerce.number().int().min(1).max(100_000).default(30),
   RATE_LIMIT_UPLOAD: z.coerce.number().int().min(1).max(100_000).default(20),
+  // Browse, tag pages and the tag cloud (docs/m6-plan.md §9).
+  RATE_LIMIT_BROWSE: z.coerce.number().int().min(1).max(100_000).default(60),
+  // The same budgets for an anonymous caller whose address is the frontend's
+  // shared egress: no token and no valid forwarded-client-IP secret. Higher,
+  // because every anonymous visitor then shares one counter (plan §2.4).
+  RATE_LIMIT_DEFAULT_SHARED: z.coerce.number().int().min(1).max(1_000_000).default(600),
+  RATE_LIMIT_SEARCH_SHARED: z.coerce.number().int().min(1).max(1_000_000).default(300),
+  RATE_LIMIT_BROWSE_SHARED: z.coerce.number().int().min(1).max(1_000_000).default(600),
+  // Comma-separated, current first, previous second while rotating. When set,
+  // a request carrying `X-Gradfolio-Proxy-Secret` equal to one of them may name
+  // the real client in `X-Client-IP`. Unset: the header is ignored.
+  PROXY_SHARED_SECRETS: z
+    .string()
+    .default('')
+    .transform((v) =>
+      v
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+    )
+    .refine((list) => list.length <= 2 && list.every((s) => s.length >= 32 && s.length <= 256), {
+      message: 'must be one or two secrets of 32 to 256 characters, comma-separated',
+    }),
+};
+
+/** Search, browse and tag pages (docs/m6-plan.md §3.1). */
+const discovery = {
+  // Items per page when `limit` is not given, and the most a caller may ask for.
+  DISCOVERY_PAGE_SIZE: z.coerce.number().int().min(1).max(100).default(12),
+  DISCOVERY_PAGE_MAX: z.coerce.number().int().min(1).max(100).default(30),
+  // Items per group in the grouped `GET /v1/search` (no cursor there).
+  SEARCH_GROUP_SIZE: z.coerce.number().int().min(1).max(30).default(6),
 };
 
 /** Profile page bounds (docs/m3-plan.md §1, Limits). */
@@ -281,6 +313,7 @@ export const configSchema = z
     ...profile,
     ...projects,
     ...notifications,
+    ...discovery,
     ...storage,
   })
   .refine(tlsInProduction, TLS_IN_PRODUCTION)
@@ -301,6 +334,14 @@ export const configSchema = z
   .refine((c) => c.ACTIVITIES_PAGE_SIZE <= c.ACTIVITIES_PAGE_MAX, {
     message: 'must not exceed ACTIVITIES_PAGE_MAX',
     path: ['ACTIVITIES_PAGE_SIZE'],
+  })
+  .refine((c) => c.DISCOVERY_PAGE_SIZE <= c.DISCOVERY_PAGE_MAX, {
+    message: 'must not exceed DISCOVERY_PAGE_MAX',
+    path: ['DISCOVERY_PAGE_SIZE'],
+  })
+  .refine((c) => c.SEARCH_GROUP_SIZE <= c.DISCOVERY_PAGE_MAX, {
+    message: 'must not exceed DISCOVERY_PAGE_MAX',
+    path: ['SEARCH_GROUP_SIZE'],
   })
   .refine((c) => c.PROJECTS_PAGE_SIZE <= c.PROJECTS_PAGE_MAX, {
     message: 'must not exceed PROJECTS_PAGE_MAX',

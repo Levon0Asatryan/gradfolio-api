@@ -66,6 +66,20 @@ describe('architecture', () => {
     ).toEqual([]);
   });
 
+  // Discovery lists columns one by one (docs/m6-plan.md §7 X6): a column added to a
+  // table must be opted in before it can reach a public response.
+  it('never selects every column in src/api/discovery', async () => {
+    const files = (await sourceFiles(join(SRC, 'api/discovery'))).filter((f) => !isTest(f));
+    expect(files.length).toBeGreaterThan(0);
+    const offenders: string[] = [];
+    for (const file of files) {
+      if (/\.selectAll\(\s*\)/.test(await readFile(file, 'utf8'))) {
+        offenders.push(relative(SRC, file));
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it('flags core importing api, and shipped code importing testing', () => {
     const at = (p: string) => join(SRC, p);
     expect(

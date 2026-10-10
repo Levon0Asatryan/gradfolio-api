@@ -46,6 +46,13 @@ describe('loadConfig', () => {
       PROJECT_DESCRIPTION_MAX_BYTES: 100_000,
       PROJECT_MAX_TEAM: 20,
       RATE_LIMIT_LOOKUP: 30,
+      RATE_LIMIT_BROWSE: 60,
+      RATE_LIMIT_DEFAULT_SHARED: 600,
+      RATE_LIMIT_SEARCH_SHARED: 300,
+      RATE_LIMIT_BROWSE_SHARED: 600,
+      DISCOVERY_PAGE_SIZE: 12,
+      DISCOVERY_PAGE_MAX: 30,
+      SEARCH_GROUP_SIZE: 6,
       TEAMS_PAGE_MAX: 50,
       TEAMS_PAGE_SIZE: 20,
       ACTIVITIES_PAGE_MAX: 50,
@@ -143,6 +150,13 @@ describe('loadConfig', () => {
     ['NOTIFICATIONS_PAGE_MAX', '201'],
     ['PROJECTS_PAGE_SIZE', '0'],
     ['PROJECTS_PAGE_MAX', '201'],
+    ['DISCOVERY_PAGE_SIZE', '0'],
+    ['DISCOVERY_PAGE_MAX', '101'],
+    ['SEARCH_GROUP_SIZE', '31'],
+    ['RATE_LIMIT_BROWSE', '0'],
+    ['RATE_LIMIT_SEARCH_SHARED', '0'],
+    ['PROXY_SHARED_SECRETS', 'too-short'],
+    ['PROXY_SHARED_SECRETS', `${'a'.repeat(40)},${'b'.repeat(40)},${'c'.repeat(40)}`],
   ])('refuses %s=%j', (key, value) => {
     expect(() => loadConfig({ ...REQUIRED, [key]: value })).toThrow(new RegExp(key));
   });
@@ -153,6 +167,29 @@ describe('loadConfig', () => {
       loadConfig({ ...REQUIRED, PROJECTS_PAGE_MAX: '5', PROJECTS_PAGE_SIZE: '5' })
         .PROJECTS_PAGE_SIZE,
     ).toBe(5);
+  });
+
+  it('refuses a discovery page size or group size above the maximum, and accepts one equal to it', () => {
+    expect(() => loadConfig({ ...REQUIRED, DISCOVERY_PAGE_MAX: '5' })).toThrow(
+      /DISCOVERY_PAGE_SIZE/,
+    );
+    expect(() => loadConfig({ ...REQUIRED, DISCOVERY_PAGE_MAX: '5' })).toThrow(/SEARCH_GROUP_SIZE/);
+    const ok = loadConfig({
+      ...REQUIRED,
+      DISCOVERY_PAGE_MAX: '5',
+      DISCOVERY_PAGE_SIZE: '5',
+      SEARCH_GROUP_SIZE: '5',
+    });
+    expect(ok.DISCOVERY_PAGE_SIZE).toBe(5);
+  });
+
+  it('reads PROXY_SHARED_SECRETS as a list of at most two secrets, none by default', () => {
+    expect(loadConfig(REQUIRED).PROXY_SHARED_SECRETS).toEqual([]);
+    const a = 'a'.repeat(40);
+    const b = 'b'.repeat(40);
+    expect(
+      loadConfig({ ...REQUIRED, PROXY_SHARED_SECRETS: ` ${a} , ${b} ` }).PROXY_SHARED_SECRETS,
+    ).toEqual([a, b]);
   });
 
   it('refuses a default notification page size above the maximum, and accepts one equal to it', () => {
