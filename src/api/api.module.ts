@@ -12,6 +12,7 @@ import { AccessTokenGuard } from './auth/guards/access-token.guard.js';
 import { ErrorFilter } from './common/filters/error.filter.js';
 import { FilesModule } from './files/files.module.js';
 import { HealthModule } from './health/health.module.js';
+import { DashboardModule } from './dashboard/dashboard.module.js';
 import { DiscoveryModule } from './discovery/discovery.module.js';
 import { ActivitiesModule } from './activities/activities.module.js';
 import { MeModule } from './me/me.module.js';
@@ -48,6 +49,7 @@ import { UsersModule } from './users/users.module.js';
     ProjectsModule,
     NotificationsModule,
     ActivitiesModule,
+    DashboardModule,
   ],
   providers: [
     ErrorFilter,

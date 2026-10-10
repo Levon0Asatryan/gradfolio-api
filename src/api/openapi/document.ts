@@ -7,6 +7,7 @@ import {
   patchAttachmentSchema,
 } from '../projects/dto/attachment.dto.js';
 import { activityPageSchema, activityQuerySchema } from '../activities/dto/activity.dto.js';
+import { dashboardSchema } from '../dashboard/dto/dashboard.dto.js';
 import {
   browseProjectsQuerySchema,
   browseUsersQuerySchema,
@@ -1029,6 +1030,24 @@ export const OPERATIONS: readonly Operation[] = [
     responses: {
       '204': { description: 'Marked (or already read)' },
       '404': notYours('notification'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'get',
+    path: '/v1/me/dashboard',
+    operationId: 'getDashboard',
+    tag: 'me',
+    summary: 'The caller’s dashboard',
+    description:
+      'Counts of the caller’s projects by state, the sum of stored GitHub stars (null until an ' +
+      'import stores any), the three most recently changed projects (own, plus non-draft ones ' +
+      'they are an accepted member of), the number of feed entries in the last 30 days and the ' +
+      'five newest feed entries, in one call. Only the caller’s own data. Render the feed from ' +
+      '`translationKey` and `translationParams`.',
+    bearer: true,
+    responses: {
+      '200': { description: 'The dashboard', schema: dashboardSchema },
       ...authenticatedFailures,
     },
   },

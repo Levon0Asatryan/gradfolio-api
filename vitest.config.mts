@@ -93,6 +93,11 @@ export default defineConfig({
         // MySQL 8.4 by discovery/e2e/search.int.test.ts (privacy matrix, short words,
         // ё/е, cursors, statement counts, signing) and search-tokens.int.test.ts.
         // The pure parts (tokenizer, cursor) are unit tested and counted.
+        // The dashboard: owner-scoped counts, the 30-day window and the feed in SQL,
+        // proved against MySQL 8.4 by dashboard/e2e/dashboard.int.test.ts.
+        'src/api/dashboard/repositories/*.ts',
+        'src/api/dashboard/services/*.ts',
+        'src/api/dashboard/*.controller.ts',
         'src/api/discovery/repositories/*.ts',
         'src/api/discovery/services/*.ts',
         'src/api/discovery/*.controller.ts',
