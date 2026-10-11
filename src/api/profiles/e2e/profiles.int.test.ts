@@ -181,8 +181,7 @@ describe('GET /v1/users/:id', () => {
           userId: owner.user.id,
           integrationType: 'github',
           status: 'connected',
-          accessToken: 'SECRET-ACCESS-TOKEN',
-          refreshToken: 'SECRET-REFRESH-TOKEN',
+          // No token can be stored (0008 CHECK); the GitHub id is private too.
           externalUserId: 'SECRET-EXTERNAL-ID',
         })
         .execute();
@@ -201,13 +200,7 @@ describe('GET /v1/users/:id', () => {
             .expect(200)
         ).body,
       ];
-      const banned = [
-        ...SECRETS,
-        owner.sub,
-        'SECRET-ACCESS-TOKEN',
-        'SECRET-REFRESH-TOKEN',
-        'SECRET-EXTERNAL-ID',
-      ];
+      const banned = [...SECRETS, owner.sub, 'SECRET-EXTERNAL-ID'];
       for (const body of bodies) {
         const { keys, values } = walk(body);
         expect(keys.filter((k) => FORBIDDEN_KEYS.includes(k))).toEqual([]);

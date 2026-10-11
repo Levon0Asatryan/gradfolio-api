@@ -44,7 +44,7 @@ describe('0007_discovery_indexes', () => {
     );
     const before = await dumpSchema(conn);
 
-    await up(conn, o);
+    await up(conn, o, '0007_discovery_indexes');
     const after = await dumpSchema(conn);
 
     const lines = (s: string) => s.split('\n').map((l) => l.trim().replace(/,$/, ''));
@@ -70,12 +70,13 @@ describe('0007_discovery_indexes', () => {
 
   it('applies twice with nothing left, and down then up gives the same schema', async () => {
     const o = await opts();
-    expect(await up(conn, o)).toContain('0007_discovery_indexes');
-    expect(await up(conn, o)).toEqual([]);
+    const to = '0007_discovery_indexes';
+    expect(await up(conn, o, to)).toContain(to);
+    expect(await up(conn, o, to)).toEqual([]);
     const first = await dumpSchema(conn);
-    expect(await down(conn, o)).toEqual(['0007_discovery_indexes']);
+    expect(await down(conn, o)).toEqual([to]);
     expect(await dumpSchema(conn)).not.toBe(first);
-    await up(conn, o);
+    await up(conn, o, to);
     expect(await dumpSchema(conn)).toBe(first);
   });
 });

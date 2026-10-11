@@ -3,7 +3,7 @@
  * Please do not edit it manually.
  */
 
-import type { Bool, DateText, JsonColumn, LinkList, NotificationParams, StringList, TranslationParams } from "./column-types.js";
+import type { Bool, DateText, GithubImportSnapshot, JsonColumn, LinkList, NotificationParams, StringList, TranslationParams } from "./column-types.js";
 import type { ColumnType } from "kysely";
 
 export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
@@ -56,16 +56,24 @@ export interface Experience {
   userId: string;
 }
 
-export interface Integrations {
-  accessToken: string | null;
+export interface IntegrationNonces {
   createdAt: Generated<Date>;
+  expiresAt: Date;
+  hash: string;
+  userId: string;
+}
+
+export interface Integrations {
+  accessToken: null;
+  createdAt: Generated<Date>;
+  externalLogin: string | null;
   externalUserId: string | null;
   id: string;
   integrationType: "github" | "linkedin";
   lastSyncedAt: Date | null;
-  refreshToken: string | null;
-  status: Generated<"connected" | "not_connected">;
-  tokenExpiresAt: Date | null;
+  refreshToken: null;
+  status: Generated<"connected" | "linking" | "not_connected">;
+  tokenExpiresAt: null;
   updatedAt: Generated<Date>;
   userId: string;
 }
@@ -92,6 +100,12 @@ export interface ProjectAttachments {
   title: string | null;
   type: "image" | "link" | "pdf" | "video";
   url: string;
+}
+
+export interface ProjectGithubImports {
+  projectId: string;
+  snapshot: JsonColumn<GithubImportSnapshot>;
+  syncedAt: Date;
 }
 
 export interface Projects {
@@ -189,9 +203,11 @@ export interface DB {
   certifications: Certifications;
   education: Education;
   experience: Experience;
+  integrationNonces: IntegrationNonces;
   integrations: Integrations;
   notifications: Notifications;
   projectAttachments: ProjectAttachments;
+  projectGithubImports: ProjectGithubImports;
   projects: Projects;
   projectTags: ProjectTags;
   projectTeamMembers: ProjectTeamMembers;

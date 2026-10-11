@@ -132,10 +132,11 @@ async function populate(owner: Account, other: Account) {
     .values({
       id: newId(),
       userId: owner.user.id,
-      integrationType: 'github',
-      status: 'connected',
-      accessToken: 'tok',
-      refreshToken: 'ref',
+      // Not connected: deleting a connected one revokes at GitHub first, which
+      // integrations/e2e/github-connect.int.test.ts covers against a fake GitHub.
+      integrationType: 'linkedin',
+      status: 'not_connected',
+      lastSyncedAt: new Date(),
     })
     .execute();
   await db
