@@ -9,6 +9,13 @@ import {
 import { activityPageSchema, activityQuerySchema } from '../activities/dto/activity.dto.js';
 import { dashboardSchema } from '../dashboard/dto/dashboard.dto.js';
 import {
+  connectResponseSchema,
+  disconnectResponseSchema,
+  integrationsResponseSchema,
+  linkRequestSchema,
+  linkResponseSchema,
+} from '../integrations/dto/integration.dto.js';
+import {
   browseProjectsQuerySchema,
   browseUsersQuerySchema,
   discoveryProjectPageSchema,
@@ -431,6 +438,124 @@ function discoveryOperations(): Operation[] {
         `${visibility} Values present on public profiles, most common first, at most 50 each; ` +
         'cached for a minute like the tag cloud.',
       responses: { '200': { description: 'The choices', schema: userFacetsSchema }, ...failures },
+    },
+  ];
+}
+
+/** The caller's integrations: GitHub connect (docs/m7-plan.md §2.3, §7 items 1–4). */
+function integrationOperations(): Operation[] {
+  const base = { tag: 'integrations', bearer: true } as const;
+  const unavailable = error(
+    'INTEGRATION_UNAVAILABLE: GitHub connect is not configured on this server, or Auth0 could ' +
+      'not be used (see Retry-After when it is a rate limit); AUTH_UNAVAILABLE or ' +
+      'DATABASE_UNAVAILABLE as on every route',
+  );
+  // Each operation names its own 429 and 503.
+  const { '401': unauthenticated } = authenticatedFailures;
+  const failures = { '401': unauthenticated };
+  const inProgress = 'GITHUB_LINK_IN_PROGRESS: a link started moments ago is still running';
+  return [
+    {
+      ...base,
+      method: 'get',
+      path: '/v1/me/integrations',
+      operationId: 'getMyIntegrations',
+      summary: 'The caller’s GitHub and LinkedIn status',
+      description:
+        'Only the caller’s own state; never a token, a nonce or the GitHub numeric id. GitHub is ' +
+        '`connected` only once confirmed: a link still in progress reads `not_connected`. A link ' +
+        'left half-done (the server stopped between Auth0 and our database) is settled here from ' +
+        'Auth0’s record. LinkedIn is `connected` when the caller signs in with LinkedIn.',
+      responses: {
+        '200': { description: 'The integrations', schema: integrationsResponseSchema },
+        '409': error('GITHUB_NOT_LINKED: settling a half-done link found the GitHub token refused'),
+        '429': error(
+          'RATE_LIMITED (over budget) or GITHUB_RATE_LIMITED; see the Retry-After header',
+        ),
+        '502': error('GITHUB_UNAVAILABLE: GitHub failed while a half-done link was settled'),
+        ...failures,
+        '503': unavailable,
+      },
+    },
+    {
+      ...base,
+      method: 'post',
+      path: '/v1/me/integrations/github/connect',
+      operationId: 'connectGithub',
+      summary: 'Connect GitHub, or get a nonce to link it',
+      description:
+        'When Auth0 already holds a GitHub identity for the caller (they sign in with GitHub, or ' +
+        'linked it), GitHub confirms its token and the account is connected: `state: ' +
+        'connected`. Otherwise `state: link_required` with a single-use nonce for a secondary ' +
+        'GitHub sign-in (see `link`). Public repositories only (D6). A connected GitHub counts ' +
+        'toward `verified`.',
+      responses: {
+        '200': { description: 'Connected, or a link is required', schema: connectResponseSchema },
+        '409': error(
+          'GITHUB_NOT_LINKED: GitHub refused the token Auth0 holds (sign in with GitHub again); ' +
+            `GITHUB_ACCOUNT_IN_USE: another Gradfolio account has this GitHub account; ${inProgress}`,
+        ),
+        '429': error('RATE_LIMITED or GITHUB_RATE_LIMITED; see the Retry-After header'),
+        '502': error('GITHUB_UNAVAILABLE: GitHub failed or timed out'),
+        ...failures,
+        '503': unavailable,
+      },
+    },
+    {
+      ...base,
+      method: 'post',
+      path: '/v1/me/integrations/github/link',
+      operationId: 'linkGithub',
+      summary: 'Link a GitHub sign-in to the caller’s account',
+      description:
+        'Send the `id_token` of the secondary GitHub sign-in started with the nonce from ' +
+        '`connect`. It must be fresh (issued within 5 minutes), for this application, and carry ' +
+        'that nonce, which works once. The GitHub account is reserved first, so no other ' +
+        'account can take it, then Auth0 links it. When Auth0’s answer is lost, the reservation ' +
+        'is settled later from Auth0’s record (`GET /v1/me/integrations`).',
+      body: linkRequestSchema,
+      responses: {
+        '200': { description: 'Connected', schema: linkResponseSchema },
+        '400': error(
+          'INVALID_ID_TOKEN: the id token is not a valid, fresh GitHub sign-in for this ' +
+            'application; INVALID_NONCE: the nonce is unknown, expired, used, or another ' +
+            'user’s; VALIDATION_FAILED: the body',
+        ),
+        '409': error(
+          'GITHUB_ACCOUNT_IN_USE: that GitHub account is a Gradfolio account of its own, or ' +
+            'another account holds it; GITHUB_ALREADY_CONNECTED; GITHUB_LINK_REFUSED: Auth0 ' +
+            `refused the link; ${inProgress}; GITHUB_NOT_LINKED`,
+        ),
+        '429': error('RATE_LIMITED or GITHUB_RATE_LIMITED; see the Retry-After header'),
+        '502': error('GITHUB_UNAVAILABLE: GitHub failed while confirming the new link'),
+        ...failures,
+        '503': error(
+          'INTEGRATION_UNAVAILABLE: not configured, or Auth0 failed (when its answer was lost the ' +
+            'link is settled later); AUTH_UNAVAILABLE: the signing keys could not be fetched',
+        ),
+      },
+    },
+    {
+      ...base,
+      method: 'delete',
+      path: '/v1/me/integrations/github',
+      operationId: 'disconnectGithub',
+      summary: 'Disconnect GitHub, revoking access at GitHub first',
+      description:
+        'Revokes the GitHub app grant first (every token of it, including the one Auth0 holds); ' +
+        'only once GitHub confirms, or there is nothing left to revoke, is GitHub disconnected. ' +
+        'A failed revocation changes nothing (502): retry. Idempotent. Imported projects stay. ' +
+        'The GitHub identity stays linked at Auth0 (a GitHub sign-in keeps working); ' +
+        'reconnecting needs one fresh GitHub sign-in. `verified` falls back to the email.',
+      responses: {
+        '200': { description: 'Disconnected', schema: disconnectResponseSchema },
+        '409': error(inProgress),
+        '502': error(
+          'GITHUB_REVOKE_FAILED: GitHub did not confirm the revocation; nothing changed',
+        ),
+        ...failures,
+        '503': unavailable,
+      },
     },
   ];
 }
@@ -1071,6 +1196,7 @@ export const OPERATIONS: readonly Operation[] = [
     },
   },
   ...discoveryOperations(),
+  ...integrationOperations(),
   ...sectionOperations({
     path: 'education',
     name: 'Education',
@@ -1174,6 +1300,10 @@ export function buildOpenApiDocument(
       { name: 'team', description: 'Project teams: invitations, answers, the owner’s view' },
       { name: 'notifications', description: 'The caller’s own notifications' },
       { name: 'activities', description: 'The caller’s own activity feed' },
+      {
+        name: 'integrations',
+        description: 'The caller’s GitHub and LinkedIn connections and imports',
+      },
       {
         name: 'discovery',
         description: 'Public search and tag pages: published work of public profiles only',

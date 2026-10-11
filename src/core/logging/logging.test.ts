@@ -36,14 +36,21 @@ describe('redaction', () => {
     expect(line).toContain(REDACT_CENSOR);
   });
 
-  it.each(['phone', 'birthday', 'accessToken', 'refresh_token', 'email', 'claims'])(
-    'never writes a nested %s',
-    (field) => {
-      const { logger, lines } = capture();
-      logger.info({ user: { [field]: 'SENSITIVE-VALUE' } }, 'x');
-      expect(JSON.stringify(lines()[0])).not.toContain('SENSITIVE-VALUE');
-    },
-  );
+  it.each([
+    'phone',
+    'birthday',
+    'accessToken',
+    'refresh_token',
+    'email',
+    'claims',
+    'idToken',
+    'nonce',
+    'code',
+  ])('never writes a nested %s', (field) => {
+    const { logger, lines } = capture();
+    logger.info({ user: { [field]: 'SENSITIVE-VALUE' } }, 'x');
+    expect(JSON.stringify(lines()[0])).not.toContain('SENSITIVE-VALUE');
+  });
 });
 
 describe('requestSerializer', () => {

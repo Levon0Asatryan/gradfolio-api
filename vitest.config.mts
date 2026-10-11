@@ -108,6 +108,14 @@ export default defineConfig({
         // files/e2e/files.int.test.ts and projects/e2e/attachments.int.test.ts.
         'src/api/files/services/*.ts',
         'src/api/files/*.controller.ts',
+        // GitHub connect: the reservation, the nonce, the user lock, reconciliation
+        // and the unique key on the GitHub id are MySQL behaviour, proved against
+        // MySQL 8.4 with a fake Auth0 and a fake GitHub over HTTP (barriers
+        // included) by integrations/e2e/github-connect.int.test.ts. The clients
+        // they call (src/core/auth0, src/core/github) are unit tested and counted.
+        'src/api/integrations/repositories/*.ts',
+        'src/api/integrations/services/*.ts',
+        'src/api/integrations/*.controller.ts',
         // The Google client. Its calls were run against the real bucket as the
         // runtime service account (docs/m4-plan.md §3.3, PR (c) description).
         'src/core/storage/gcs-file-storage.ts',

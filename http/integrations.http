@@ -1,0 +1,42 @@
+### api/integrations -- the caller's GitHub and LinkedIn connections (docs/m7-plan.md §7)
+#
+# Needs an Auth0 access token for the Gradfolio API audience (see me.http), and,
+# for the GitHub routes, a server with all five GitHub connect credentials set
+# (.env.example); without them they answer 503 INTEGRATION_UNAVAILABLE.
+
+@baseUrl = {{$dotenv baseUrl}}
+@accessToken = {{$dotenv accessToken}}
+
+###
+# @name integrations
+# 200 {"github":{"available":true,"status":"not_connected","login":null,"lastSyncedAt":null},
+#      "linkedin":{"status":"not_connected","lastSyncedAt":null}}
+# Never a token, a nonce or the GitHub numeric id.
+GET {{baseUrl}}/v1/me/integrations
+Authorization: Bearer {{accessToken}}
+
+###
+# @name connectGithub
+# 200 {"state":"connected","login":"…"} when you sign in with GitHub (or linked it);
+# else {"state":"link_required","nonce":"…","expiresAt":"…"}: start Auth0's
+# /authorize with connection=github and that nonce, then send the id_token below.
+POST {{baseUrl}}/v1/me/integrations/github/connect
+Authorization: Bearer {{accessToken}}
+
+###
+# @name linkGithub
+# 200 {"state":"connected","login":"…"}. 400 INVALID_ID_TOKEN or INVALID_NONCE for a
+# stale, foreign or reused sign-in; 409 GITHUB_ACCOUNT_IN_USE when that GitHub account
+# is another Gradfolio account. The id token is never stored or logged.
+POST {{baseUrl}}/v1/me/integrations/github/link
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "idToken": "{{$dotenv githubIdToken}}" }
+
+###
+# @name disconnectGithub
+# 200 {"status":"not_connected"} after GitHub confirmed the revocation (idempotent);
+# 502 GITHUB_REVOKE_FAILED changes nothing.
+DELETE {{baseUrl}}/v1/me/integrations/github
+Authorization: Bearer {{accessToken}}
