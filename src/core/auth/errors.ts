@@ -37,3 +37,16 @@ export class AuthUnavailableError extends AppError {
     this.logDetail = `token signing keys unavailable: ${source}`;
   }
 }
+
+/**
+ * 400: the id token a link request forwarded is not a fresh, valid GitHub
+ * sign-in for this application. A 400, not a 401: the caller's own access
+ * token is fine, and a 401 would tell the frontend to sign the user out. The
+ * reason goes to the log only, never the token or its claims.
+ */
+export class InvalidIdTokenError extends AppError {
+  constructor(readonly reason: RejectionReason | 'not-github' | 'nonce') {
+    super('INVALID_ID_TOKEN', 'the GitHub sign-in could not be verified; start again', 400);
+    this.logDetail = `link id token rejected: ${reason}`;
+  }
+}
