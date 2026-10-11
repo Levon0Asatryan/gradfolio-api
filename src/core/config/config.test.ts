@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { loadConfig, loadDatabaseConfig, parseByteSize } from './index.js';
+import {
+  githubIntegrationSettings,
+  loadConfig,
+  loadDatabaseConfig,
+  parseByteSize,
+} from './index.js';
 
 const DATABASE_URL = 'mysql://gradfolio:gradfolio@localhost:3306/gradfolio';
 const AUTH = {
@@ -346,6 +351,100 @@ describe('loadConfig', () => {
         /DATABASE_SOCKET_PATH/,
       );
     });
+  });
+});
+
+describe('GitHub connect settings (docs/m7-plan.md §8)', () => {
+  const GITHUB = {
+    AUTH0_CLIENT_ID: 'spa-client',
+    AUTH0_M2M_CLIENT_ID: 'm2m-client',
+    AUTH0_M2M_CLIENT_SECRET: 'm2m-secret',
+    GITHUB_CLIENT_ID: 'gh-client',
+    GITHUB_CLIENT_SECRET: 'gh-secret',
+  };
+
+  it('are all optional, with defaults; unset, the integration is off', () => {
+    const cfg = loadConfig(REQUIRED);
+    expect(cfg).toMatchObject({
+      GITHUB_API_BASE_URL: 'https://api.github.com/',
+      GITHUB_TIMEOUT_MS: 10_000,
+      GITHUB_TOKEN_CACHE_S: 300,
+      GITHUB_TOKEN_CACHE_MAX: 1000,
+      AUTH0_MANAGEMENT_TIMEOUT_MS: 5000,
+      AUTH0_MANAGEMENT_SPACING_MS: 500,
+      INTEGRATION_NONCE_TTL_S: 600,
+      LINK_ID_TOKEN_MAX_AGE_S: 300,
+      RATE_LIMIT_INTEGRATION: 30,
+    });
+    expect(githubIntegrationSettings(cfg)).toBeUndefined();
+  });
+
+  it('are on only when all five credentials are set', () => {
+    expect(githubIntegrationSettings(loadConfig({ ...REQUIRED, ...GITHUB }))).toEqual({
+      auth0ClientId: 'spa-client',
+      m2mClientId: 'm2m-client',
+      m2mClientSecret: 'm2m-secret',
+      githubClientId: 'gh-client',
+      githubClientSecret: 'gh-secret',
+    });
+    for (const key of ['AUTH0_CLIENT_ID', 'AUTH0_M2M_CLIENT_ID', 'GITHUB_CLIENT_ID'] as const) {
+      const partial: Record<string, string | undefined> = { ...REQUIRED, ...GITHUB };
+      delete partial[key];
+      if (key === 'AUTH0_M2M_CLIENT_ID') delete partial.AUTH0_M2M_CLIENT_SECRET;
+      if (key === 'GITHUB_CLIENT_ID') delete partial.GITHUB_CLIENT_SECRET;
+      expect(githubIntegrationSettings(loadConfig(partial)), key).toBeUndefined();
+    }
+  });
+
+  it('read a blank value as unset', () => {
+    const cfg = loadConfig({ ...REQUIRED, ...GITHUB, AUTH0_CLIENT_ID: '  ' });
+    expect(cfg.AUTH0_CLIENT_ID).toBeUndefined();
+    expect(githubIntegrationSettings(cfg)).toBeUndefined();
+  });
+
+  it.each([
+    ['AUTH0_M2M_CLIENT_ID', 'AUTH0_M2M_CLIENT_SECRET'],
+    ['AUTH0_M2M_CLIENT_SECRET', 'AUTH0_M2M_CLIENT_SECRET'],
+    ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET'],
+    ['GITHUB_CLIENT_SECRET', 'GITHUB_CLIENT_SECRET'],
+  ])('refuse %s without its pair', (alone, reported) => {
+    expect(() => loadConfig({ ...REQUIRED, [alone]: 'x' })).toThrow(
+      new RegExp(`${reported}: .*must be set together`),
+    );
+  });
+
+  it('normalize the GitHub API base to end in a slash, and refuse anything but an http(s) URL', () => {
+    expect(
+      loadConfig({ ...REQUIRED, GITHUB_API_BASE_URL: 'http://127.0.0.1:9999' }).GITHUB_API_BASE_URL,
+    ).toBe('http://127.0.0.1:9999/');
+    expect(
+      loadConfig({ ...REQUIRED, GITHUB_API_BASE_URL: 'https://ghe.example/api/v3' })
+        .GITHUB_API_BASE_URL,
+    ).toBe('https://ghe.example/api/v3/');
+    for (const bad of ['ftp://x.example/', 'https://u:p@x.example/', 'https://x.example/?a=1']) {
+      expect(() => loadConfig({ ...REQUIRED, GITHUB_API_BASE_URL: bad }), bad).toThrow(
+        /GITHUB_API_BASE_URL/,
+      );
+    }
+  });
+
+  it('require https for the GitHub API in production', () => {
+    const production = {
+      ...REQUIRED,
+      NODE_ENV: 'production',
+      DATABASE_SSL: 'required',
+    };
+    expect(() => loadConfig({ ...production, GITHUB_API_BASE_URL: 'http://x.example/' })).toThrow(
+      /GITHUB_API_BASE_URL: must be https in production/,
+    );
+    expect(loadConfig(production).GITHUB_API_BASE_URL).toBe('https://api.github.com/');
+  });
+
+  it('bound the token cache to 15 minutes', () => {
+    expect(() => loadConfig({ ...REQUIRED, GITHUB_TOKEN_CACHE_S: '901' })).toThrow(
+      /GITHUB_TOKEN_CACHE_S/,
+    );
+    expect(loadConfig({ ...REQUIRED, GITHUB_TOKEN_CACHE_S: '0' }).GITHUB_TOKEN_CACHE_S).toBe(0);
   });
 });
 

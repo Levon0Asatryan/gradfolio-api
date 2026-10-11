@@ -84,6 +84,12 @@ function onlyWhereOptedIn(name: RateBudgetName): ThrottlerOptions['skipIf'] {
               limit: cfg.RATE_LIMIT_UPLOAD,
               skipIf: onlyWhereOptedIn('upload'),
             },
+            {
+              name: 'integration',
+              ttl,
+              limit: cfg.RATE_LIMIT_INTEGRATION,
+              skipIf: onlyWhereOptedIn('integration'),
+            },
           ],
         };
       },

@@ -136,6 +136,8 @@ const rateLimit = {
   // largest per-route number, kept small by the cost of one suggestion (three
   // statements of at most 5 rows).
   RATE_LIMIT_SUGGEST: z.coerce.number().int().min(1).max(100_000).default(240),
+  // Integrations status, connect, link, disconnect (docs/m7-plan.md §7).
+  RATE_LIMIT_INTEGRATION: z.coerce.number().int().min(1).max(100_000).default(30),
   // The same budgets for an anonymous caller whose address is the frontend's
   // shared egress: no token and no valid forwarded-client-IP secret. Higher,
   // because every anonymous visitor then shares one counter (plan §2.4).
@@ -258,6 +260,72 @@ const notifications = {
   ACTIVITIES_PAGE_MAX: z.coerce.number().int().min(1).max(200).default(50),
 };
 
+/** An optional, non-empty setting: unset (or blank) means the feature is off. */
+const optionalSetting = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .transform((v) => (v === '' ? undefined : v));
+
+/**
+ * GitHub's API base: an http(s) URL with no query, fragment or credentials,
+ * normalized to end in `/` so paths resolve under it.
+ */
+const githubApiBaseUrl = z
+  .url()
+  .default('https://api.github.com/')
+  .refine(
+    (v) => {
+      const u = URL.parse(v);
+      return (
+        u !== null &&
+        (u.protocol === 'https:' || u.protocol === 'http:') &&
+        u.search === '' &&
+        u.hash === '' &&
+        u.username === '' &&
+        u.password === ''
+      );
+    },
+    { message: 'must be an http(s) URL such as "https://api.github.com/"' },
+  )
+  .transform((v) => (v.endsWith('/') ? v : `${v}/`));
+
+/**
+ * GitHub connect (docs/m7-plan.md §2, §8). Every setting is optional: with any
+ * of the five credentials unset, every GitHub route answers 503
+ * INTEGRATION_UNAVAILABLE and production still boots.
+ */
+const integrations = {
+  // The `Gradfolio` application's client id: the audience of the id token the
+  // link flow forwards (plan §2.3). Not a secret.
+  AUTH0_CLIENT_ID: optionalSetting(200),
+  // The machine-to-machine application holding `read:user_idp_tokens` and
+  // `update:users` on the Management API. The secret reads every user's GitHub
+  // token: Secret Manager only.
+  AUTH0_M2M_CLIENT_ID: optionalSetting(200),
+  AUTH0_M2M_CLIENT_SECRET: optionalSetting(500),
+  // Bounds one Management API call. A link still pending after twice this long
+  // is settled from Auth0's record (plan §2.3).
+  AUTH0_MANAGEMENT_TIMEOUT_MS: z.coerce.number().int().min(500).max(30_000).default(5000),
+  // Spacing between Management API calls: the Free tenant allows 2 per second.
+  AUTH0_MANAGEMENT_SPACING_MS: z.coerce.number().int().min(0).max(10_000).default(500),
+  // The GitHub OAuth App behind Auth0's GitHub connection. Required (D9): only
+  // its grant delete removes a token at GitHub, so without it nothing connects.
+  GITHUB_CLIENT_ID: optionalSetting(200),
+  GITHUB_CLIENT_SECRET: optionalSetting(500),
+  GITHUB_API_BASE_URL: githubApiBaseUrl,
+  GITHUB_TIMEOUT_MS: z.coerce.number().int().min(500).max(60_000).default(10_000),
+  // How long a GitHub token read from Auth0 is kept in memory, and how many. 0
+  // turns the cache off. Never persisted (D2).
+  GITHUB_TOKEN_CACHE_S: z.coerce.number().int().min(0).max(900).default(300),
+  GITHUB_TOKEN_CACHE_MAX: z.coerce.number().int().min(1).max(100_000).default(1000),
+  // A link nonce's lifetime, and the most an id token's `iat` may lie in the past.
+  INTEGRATION_NONCE_TTL_S: z.coerce.number().int().min(60).max(3600).default(600),
+  LINK_ID_TOKEN_MAX_AGE_S: z.coerce.number().int().min(30).max(3600).default(300),
+};
+
 /** MySQL 8.4. */
 const database = {
   DATABASE_URL: z
@@ -340,12 +408,29 @@ export const configSchema = z
     ...discovery,
     ...dashboard,
     ...storage,
+    ...integrations,
   })
   .refine(tlsInProduction, TLS_IN_PRODUCTION)
   .refine(noTlsOnSocket, NO_TLS_ON_SOCKET)
   .refine((c) => c.NODE_ENV !== 'production' || c.AUTH0_ISSUER_BASE_URL.startsWith('https:'), {
     message: 'must be https in production',
     path: ['AUTH0_ISSUER_BASE_URL'],
+  })
+  .refine((c) => c.NODE_ENV !== 'production' || c.GITHUB_API_BASE_URL.startsWith('https:'), {
+    message: 'must be https in production',
+    path: ['GITHUB_API_BASE_URL'],
+  })
+  // Half a credential pair is a typo, not a choice: refuse it at boot.
+  .refine(
+    (c) => (c.AUTH0_M2M_CLIENT_ID === undefined) === (c.AUTH0_M2M_CLIENT_SECRET === undefined),
+    {
+      message: 'AUTH0_M2M_CLIENT_ID and AUTH0_M2M_CLIENT_SECRET must be set together',
+      path: ['AUTH0_M2M_CLIENT_SECRET'],
+    },
+  )
+  .refine((c) => (c.GITHUB_CLIENT_ID === undefined) === (c.GITHUB_CLIENT_SECRET === undefined), {
+    message: 'GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET must be set together',
+    path: ['GITHUB_CLIENT_SECRET'],
   })
   // A default page larger than the maximum would 400 every list that omits `limit`.
   .refine((c) => c.NOTIFICATIONS_PAGE_SIZE <= c.NOTIFICATIONS_PAGE_MAX, {
@@ -379,3 +464,33 @@ export const configSchema = z
 
 export type DatabaseConfig = z.infer<typeof databaseConfigSchema>;
 export type AppConfig = z.infer<typeof configSchema>;
+
+/** The five credentials GitHub connect needs, present together (docs/m7-plan.md §8, D9). */
+export interface GithubIntegrationSettings {
+  auth0ClientId: string;
+  m2mClientId: string;
+  m2mClientSecret: string;
+  githubClientId: string;
+  githubClientSecret: string;
+}
+
+/** The GitHub connect credentials, or undefined when any is unset (every GitHub route 503s). */
+export function githubIntegrationSettings(cfg: AppConfig): GithubIntegrationSettings | undefined {
+  const {
+    AUTH0_CLIENT_ID: auth0ClientId,
+    AUTH0_M2M_CLIENT_ID: m2mClientId,
+    AUTH0_M2M_CLIENT_SECRET: m2mClientSecret,
+    GITHUB_CLIENT_ID: githubClientId,
+    GITHUB_CLIENT_SECRET: githubClientSecret,
+  } = cfg;
+  if (
+    auth0ClientId === undefined ||
+    m2mClientId === undefined ||
+    m2mClientSecret === undefined ||
+    githubClientId === undefined ||
+    githubClientSecret === undefined
+  ) {
+    return undefined;
+  }
+  return { auth0ClientId, m2mClientId, m2mClientSecret, githubClientId, githubClientSecret };
+}
