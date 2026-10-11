@@ -545,6 +545,23 @@ describe('disconnect (revoke first, D9)', () => {
     expect(me.body.verified).toBe(false);
   });
 
+  it('revokes with the token Auth0 holds now, not a cached one GitHub already refuses', async () => {
+    const http = await start();
+    const s = await connected(http, 'github|104', '104');
+    // The student signed in with GitHub again since: Auth0 now holds a new token,
+    // and the one cached at connect is dead at GitHub.
+    const stale = auth0.githubTokenFor('104');
+    gh.tokens.delete(stale);
+    auth0.githubTokenFor = (id) => `gho_SENTINEL_renewed_${id}`;
+    try {
+      linkedAtAuth0(s.sub, '104', '104-login');
+      await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+      expect(gh.revoked).toEqual(['gho_SENTINEL_renewed_104']);
+    } finally {
+      auth0.githubTokenFor = (id) => `gho_SENTINEL_${id}`;
+    }
+  });
+
   it('a GitHub failure changes nothing: 502 GITHUB_REVOKE_FAILED, still connected', async () => {
     const http = await start();
     const s = await connected(http, 'github|101', '101');
