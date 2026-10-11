@@ -41,6 +41,25 @@ export async function findCaller(
 }
 
 /**
+ * Whether another account has reserved or connected the GitHub account a
+ * `github|<id>` subject signs in as (docs/m7-plan.md §2.3). A locking read on
+ * the `(integration_type, external_user_id)` key: with the link's locking read
+ * of `users` by that subject, a provisioning and a link of the same GitHub
+ * account cannot both commit (one waits, or InnoDB picks a deadlock victim
+ * that `inTransaction` retries and that then sees the other's row).
+ */
+export async function githubIdTaken(trx: Transaction<DB>, githubId: string): Promise<boolean> {
+  const row = await trx
+    .selectFrom('integrations')
+    .select('userId')
+    .where('integrationType', '=', 'github')
+    .where('externalUserId', '=', githubId)
+    .forShare()
+    .executeTakeFirst();
+  return row !== undefined;
+}
+
+/**
  * Creates the row for `auth0Id` unless one exists, and returns the row,
  * whoever inserted it. Run inside `inTransaction` (it retries the deadlock a
  * competitor's rollback can cause).

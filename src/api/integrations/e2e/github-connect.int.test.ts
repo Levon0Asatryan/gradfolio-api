@@ -350,6 +350,84 @@ describe('link', () => {
     expect(await githubRow(s.id)).toBeUndefined();
   });
 
+  it.each(['linking', 'connected'] as const)(
+    'a first request as a GitHub login another account holds (%s) is refused and creates no row',
+    async (status) => {
+      const http = await start();
+      const holder = await student('auth0|holds-150');
+      await db
+        .insertInto('integrations')
+        .values({
+          id: newId(),
+          userId: holder.id,
+          integrationType: 'github',
+          status,
+          externalUserId: '150',
+        })
+        .execute();
+      const token = await tenant.sign({ sub: 'github|150' });
+      const res = await http
+        .get('/v1/me')
+        .set({ Authorization: `Bearer ${token}` })
+        .expect(401);
+      expect((res.body as { code: string }).code).toBe('UNAUTHENTICATED');
+      expect(
+        await db.selectFrom('users').select('id').where('auth0Id', '=', 'github|150').execute(),
+      ).toEqual([]);
+    },
+  );
+
+  it('a link and a first login of the same GitHub account at once: never both (barrier)', async () => {
+    const http = await start();
+    const s = await student('auth0|linking-151');
+    githubKnows('151', 'both');
+    const token = await idToken('151', await nonceFor(http, s));
+    const github151 = { Authorization: `Bearer ${await tenant.sign({ sub: 'github|151' })}` };
+
+    const holder = await createConnection({ uri: testDatabaseUrl() });
+    let linkRes: request.Response;
+    let meRes: request.Response;
+    try {
+      // Holds the reservation's key: the link stops after its account check,
+      // right before it inserts the reservation.
+      await holder.query('START TRANSACTION');
+      await holder.query(
+        "SELECT id FROM integrations WHERE integration_type = 'github' AND external_user_id = '151' FOR UPDATE",
+      );
+      const linking = http
+        .post('/v1/me/integrations/github/link')
+        .set(s.auth)
+        .send({ idToken: token })
+        .then((r) => r);
+      await waitForLockWaiters(1);
+      // The first request as that GitHub login, now: its provisioning either
+      // waits on the link's lock (fixed) or commits at once (not fixed).
+      const provisioning = http
+        .get('/v1/me')
+        .set(github151)
+        .then((r) => r);
+      const waited = waitForLockWaiters(2).then(() => 'waiting');
+      waited.catch(() => undefined);
+      await Promise.race([waited, provisioning]);
+      await holder.query('ROLLBACK');
+      [linkRes, meRes] = await Promise.all([linking, provisioning]);
+    } finally {
+      await holder.end();
+    }
+
+    const orphan = await db
+      .selectFrom('users')
+      .select('id')
+      .where('auth0Id', '=', 'github|151')
+      .executeTakeFirst();
+    const held = (await githubRow(s.id))?.externalUserId === '151';
+    // One of them wins; a users row for a GitHub account linked to another account never stands.
+    expect(orphan !== undefined && held).toBe(false);
+    expect([`link ${linkRes.status}`, `me ${meRes.status}`].join(', ')).toMatch(
+      /^(link 200, me 401|link 409, me 200)$/,
+    );
+  });
+
   it('a GitHub id another Gradfolio user holds is 409 on the unique key, before Auth0 is touched', async () => {
     const http = await start();
     const holder = await student('auth0|holder');

@@ -3,13 +3,18 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { AccessTokenIdentity } from '../../../core/auth/access-token.js';
 import { DbService } from '../../../core/db/db.service.js';
 import { inTransaction } from '../../../core/db/transaction.js';
+import { UnauthenticatedError } from '../../../core/auth/errors.js';
 import {
   findCaller,
+  githubIdTaken,
   setVerified,
   type UserRow,
   upsertByAuth0Id,
 } from '../repositories/user.repository.js';
 import { hasProfileClaims, prefillFrom } from '../utils/prefill.js';
+
+/** A GitHub login's subject, and the GitHub user id in it. */
+const GITHUB_SUB = /^github\|([0-9]+)$/;
 
 @Injectable()
 export class UsersService {
@@ -38,7 +43,15 @@ export class UsersService {
           'token carries no profile claims',
         );
       }
-      user = await inTransaction(db, (trx) => upsertByAuth0Id(trx, identity.sub, prefill));
+      const githubId = GITHUB_SUB.exec(identity.sub)?.[1];
+      user = await inTransaction(db, async (trx) => {
+        // A GitHub account another account reserved or connected is a login
+        // Auth0 merges into that account: a row for it would be an orphan.
+        if (githubId !== undefined && (await githubIdTaken(trx, githubId))) {
+          throw new UnauthenticatedError('linked-elsewhere');
+        }
+        return upsertByAuth0Id(trx, identity.sub, prefill);
+      });
     }
 
     // A brand-new row has no integration yet.

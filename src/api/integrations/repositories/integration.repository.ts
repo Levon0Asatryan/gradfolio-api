@@ -131,12 +131,19 @@ export function staleReservation(
   return (lock ? query.forUpdate() : query).executeTakeFirst();
 }
 
-/** Whether a Gradfolio account signs in as `auth0Id` (the secondary GitHub login). */
+/**
+ * Whether a Gradfolio account signs in as `auth0Id` (the secondary GitHub
+ * login). A locking read: it holds the `auth0_id` key (or its gap) until the
+ * reservation commits, so a first login as that subject cannot be provisioned
+ * in between (provisioning makes the matching read of the reservation's key;
+ * users/repositories/user.repository.ts `githubIdTaken`).
+ */
 export async function accountExists(trx: Transaction<DB>, auth0Id: string): Promise<boolean> {
   const row = await trx
     .selectFrom('users')
     .select('id')
     .where('auth0Id', '=', auth0Id)
+    .forShare()
     .executeTakeFirst();
   return row !== undefined;
 }

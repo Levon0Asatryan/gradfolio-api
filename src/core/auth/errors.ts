@@ -13,7 +13,9 @@ export type RejectionReason =
   | 'expired'
   | 'unknown-key'
   | `claim:${string}`
-  | 'invalid';
+  | 'invalid'
+  /** A `github|<id>` subject whose GitHub account another Gradfolio account linked. */
+  | 'linked-elsewhere';
 
 /** 401 for any missing, malformed or invalid access token. */
 export class UnauthenticatedError extends AppError {
