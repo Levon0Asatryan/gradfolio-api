@@ -176,12 +176,25 @@ the secondary `id_token` and forwards it to the API.
 `POST /v1/me/integrations/github/link { idToken }`
 : 1. verify `idToken`: RS256 only, signature against the JWKS, issuer, audience = the `Gradfolio`
 client id (`AUTH0_CLIENT_ID`, new config), `exp`, `iat` within 5 minutes, `sub` starts `github|`; 2. `nonce` claim: consume the row (`DELETE … WHERE hash = ? AND user_id = ? AND expires_at >
-UTC_TIMESTAMP()`, one row or 400 `INVALID_NONCE`), so it is the caller's own, unexpired, unused; 3. refuse with `409 GITHUB_ACCOUNT_IN_USE` when a `users` row with `auth0_id = <secondary sub>`
-exists (that student logged into Gradfolio as GitHub-only; linking would orphan the row), or when
-another Gradfolio user already holds this GitHub id (`UNIQUE (integration_type,
-external_user_id)`); 4. `POST /api/v2/users/{callerSub}/identities` `{ link_with: idToken }` with
-the M2M token (`update:users`); 5. flag, `external_user_id`, `external_login`, `verified`, all in
-one transaction (§5.1). The id token is never logged and never stored.
+UTC_TIMESTAMP()`, one row or 400 `INVALID_NONCE`), so it is the caller's own, unexpired, unused; 3. **reserve**, in one transaction under the user lock: refuse with `409 GITHUB_ACCOUNT_IN_USE` when
+a `users` row with `auth0_id = <secondary sub>` exists (that student logged into Gradfolio as
+GitHub-only; linking would orphan the row), else write the caller's row as `status = 'linking'` with
+`external_user_id`; another Gradfolio user holding this GitHub id loses here on `UNIQUE
+(integration_type, external_user_id)` (1062 → the same 409), **before Auth0 is touched**; 4.
+`POST /api/v2/users/{callerSub}/identities` `{ link_with: idToken }` with the M2M token
+(`update:users`); a definite refusal (4xx) deletes the reservation and answers; 5. `'linking'` →
+`'connected'`, `external_login`, `verified`, in one transaction (§5.1). The id token is never logged
+and never stored.
+
+The two systems cannot share a transaction, so a half-commit is **settled, not prevented**. A row
+left in `'linking'` (step 4 timed out or answered 5xx with an unknown outcome, step 5 failed, the
+process died) is reconciled from Auth0's own record: `GET /api/v2/users/{callerSub}`, the call the
+token source already makes. GitHub identity present → finish step 5; absent → delete the
+reservation. It runs at the start of `GET /v1/me/integrations`, `connect` and `link` for that user,
+under the user lock, so it is idempotent and needs no scheduler. It touches only a reservation whose
+`updated_at` is older than twice the Management API timeout, so a link whose step 4 is still in
+flight is never settled under it. A `'linking'` row never counts as
+connected or toward `verified`, and every GitHub route treats it as not connected.
 
 `DELETE /v1/me/integrations/github`
 : 1. Revoke first: fetch the token through the token source and `DELETE /applications/{id}/grant`
@@ -604,7 +617,9 @@ Production keeps booting with none of them, like `STORAGE_BUCKET`.
 
 0008 (next free number is taken from `origin/main` on the day of the push; M8 may take one):
 
-- `integrations`: `external_login VARCHAR(100) NULL`, `UNIQUE (integration_type, external_user_id)`
+- `integrations`: `status` ENUM gains `'linking'`, appended last (§2.3; whether MySQL 8.4 does it
+  `ALGORITHM=INSTANT` is run in the PR); `external_login VARCHAR(100) NULL`, `UNIQUE
+(integration_type, external_user_id)`
   (NULLs never clash), `CHECK (access_token IS NULL AND refresh_token IS NULL AND token_expires_at IS
 NULL)`. The seed has no tokens; the previous revision never writes them.
 - `integration_nonces` (hash PK, `user_id` FK cascade, `expires_at`).
@@ -617,26 +632,27 @@ identical `db:schema` dump (checked in the PR); timed on the 3,000-project perf 
 
 ## 10. Security properties and their proof
 
-| Property                                          | Proof (guard removed, test fails)                                                                                                                                               |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| No token in any response, log or error            | sentinel `gho_SENTINEL…` through fake Auth0 and fake GitHub, every flow including failures; grep over responses and captured logs                                               |
-| Token never reaches MySQL                         | `CHECK` rejects an insert (3819); remove it, the test that inserts one passes, so the test is the guard                                                                         |
-| `GithubAccessToken` prints nothing                | `JSON.stringify`, template string and `util.inspect` all `[redacted]`                                                                                                           |
-| Link nonce is the caller's, single use, unexpired | second user's nonce 400; replay 400; expired 400; two concurrent links with one nonce: one wins (barrier)                                                                       |
-| Link id token                                     | `alg: none`, HS256, wrong issuer, wrong audience, expired, old `iat`, `sub` not `github                                                                                         | `, nonce mismatch: each 400/401 |
-| Account-in-use                                    | existing `users` row for the secondary sub → 409; second Gradfolio user with the same GitHub id → 409 (unique key removed: test fails)                                          |
-| Import: no user URL fetched                       | strict body (extra `url` key 400); fake GitHub records every request path; only `/user/repos`, `/repositories/<int>`, `/repositories/<int>/readme`                              |
-| Import: only own or push-permitted repos          | public repo of someone else → `skipped: not_owner`                                                                                                                              |
-| Dedupe under race                                 | barrier: two concurrent imports of one repo: one project; remove `lockUser` → `1062`/`1213` surface; remove unique key → still one (lock), so each removal is shown separately  |
-| Re-sync never overwrites an edit                  | table in §3.5, one test per row; `PATCH` committed during the sync's fetch survives (barrier)                                                                                   |
-| README safety                                     | §3.4 corpus; remove the pre-pass → relative `href` and `<img>` tests fail                                                                                                       |
-| ZIP guards                                        | corpus (§11); remove each limit, its fixture then parses or crashes                                                                                                             |
-| ZIP leaves nothing                                | bucket listing empty after every corpus case; `fs` write functions spied: never called                                                                                          |
-| Confirm atomic and deduped                        | injected failure on the 3rd section: nothing written; barrier: two concurrent confirms: one set of rows                                                                         |
-| Ownership                                         | every write: second user gets 404 (sync, uploadId, suggestion accept/dismiss); `GET /me/integrations` never shows another user's row                                            |
-| Disconnect revokes                                | fake GitHub records the grant delete; on its 5xx the row stays connected (`502`); its already-gone status still disconnects; remove the revoke-first order → the 5xx test fails |
-| Rate limits                                       | 6th import call in a window is 429 with `Retry-After`; separate counters per route                                                                                              |
-| GitHub error table                                | each class through the real fake server over HTTP (401, 403 with remaining 0, 429 + `retry-after`, 5xx, timeout)                                                                |
+| Property                                          | Proof (guard removed, test fails)                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No token in any response, log or error            | sentinel `gho_SENTINEL…` through fake Auth0 and fake GitHub, every flow including failures; grep over responses and captured logs                                                                                                                                                                                                                        |
+| Token never reaches MySQL                         | `CHECK` rejects an insert (3819); remove it, the test that inserts one passes, so the test is the guard                                                                                                                                                                                                                                                  |
+| `GithubAccessToken` prints nothing                | `JSON.stringify`, template string and `util.inspect` all `[redacted]`                                                                                                                                                                                                                                                                                    |
+| Link nonce is the caller's, single use, unexpired | second user's nonce 400; replay 400; expired 400; two concurrent links with one nonce: one wins (barrier)                                                                                                                                                                                                                                                |
+| Link id token                                     | `alg: none`, HS256, wrong issuer, wrong audience, expired, old `iat`, `sub` not `github                                                                                                                                                                                                                                                                  | `, nonce mismatch: each 400/401 |
+| Link half-commit settles                          | fake Auth0 links, then an injected failure in step 5: the row stays `'linking'`, the next `GET /me/integrations` makes it `'connected'`; Auth0 fake without the identity: the reservation is deleted; a reservation younger than the timeout is left alone while step 4 is held at a barrier; remove the reconciliation, or its age check → a test fails |
+| Account-in-use                                    | existing `users` row for the secondary sub → 409; second Gradfolio user with the same GitHub id → 409 (unique key removed: test fails)                                                                                                                                                                                                                   |
+| Import: no user URL fetched                       | strict body (extra `url` key 400); fake GitHub records every request path; only `/user/repos`, `/repositories/<int>`, `/repositories/<int>/readme`                                                                                                                                                                                                       |
+| Import: only own or push-permitted repos          | public repo of someone else → `skipped: not_owner`                                                                                                                                                                                                                                                                                                       |
+| Dedupe under race                                 | barrier: two concurrent imports of one repo: one project; remove `lockUser` → `1062`/`1213` surface; remove unique key → still one (lock), so each removal is shown separately                                                                                                                                                                           |
+| Re-sync never overwrites an edit                  | table in §3.5, one test per row; `PATCH` committed during the sync's fetch survives (barrier)                                                                                                                                                                                                                                                            |
+| README safety                                     | §3.4 corpus; remove the pre-pass → relative `href` and `<img>` tests fail                                                                                                                                                                                                                                                                                |
+| ZIP guards                                        | corpus (§11); remove each limit, its fixture then parses or crashes                                                                                                                                                                                                                                                                                      |
+| ZIP leaves nothing                                | bucket listing empty after every corpus case; `fs` write functions spied: never called                                                                                                                                                                                                                                                                   |
+| Confirm atomic and deduped                        | injected failure on the 3rd section: nothing written; barrier: two concurrent confirms: one set of rows                                                                                                                                                                                                                                                  |
+| Ownership                                         | every write: second user gets 404 (sync, uploadId, suggestion accept/dismiss); `GET /me/integrations` never shows another user's row                                                                                                                                                                                                                     |
+| Disconnect revokes                                | fake GitHub records the grant delete; on its 5xx the row stays connected (`502`); its already-gone status still disconnects; remove the revoke-first order → the 5xx test fails                                                                                                                                                                          |
+| Rate limits                                       | 6th import call in a window is 429 with `Retry-After`; separate counters per route                                                                                                                                                                                                                                                                       |
+| GitHub error table                                | each class through the real fake server over HTTP (401, 403 with remaining 0, 429 + `retry-after`, 5xx, timeout)                                                                                                                                                                                                                                         |
 
 ## 11. Final test matrix (the brief's, made concrete)
 
