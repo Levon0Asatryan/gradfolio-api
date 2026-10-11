@@ -119,6 +119,32 @@ describe('connect', () => {
     expect(await githubRow(s.id)).toBeUndefined();
   });
 
+  it('a flag whose identity is gone at Auth0 is cleared, and a link nonce issued', async () => {
+    const http = await start();
+    const s = await student('auth0|stale-flag');
+    await db
+      .insertInto('integrations')
+      .values({
+        id: newId(),
+        userId: s.id,
+        integrationType: 'github',
+        status: 'connected',
+        externalUserId: '584',
+        externalLogin: 'gone',
+      })
+      .execute();
+    await db.updateTable('users').set({ verified: true }).where('id', '=', s.id).execute();
+
+    const res = await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(200);
+    expect(res.body.state).toBe('link_required');
+    expect(await githubRow(s.id)).toMatchObject({
+      status: 'not_connected',
+      externalUserId: null,
+      externalLogin: null,
+    });
+    expect(await verifiedOf(s.id)).toBe(false);
+  });
+
   it('a token GitHub refuses is 409 GITHUB_NOT_LINKED, and the cached token is dropped', async () => {
     const http = await start();
     const s = await student('github|9001');

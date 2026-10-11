@@ -98,15 +98,20 @@ export class GithubConnectionService {
    * `POST /v1/me/integrations/github/connect`. Auth0 is asked whether a GitHub
    * identity is linked (the token's `identities` claim can be an hour stale);
    * if so, GitHub confirms the token and the flag is set. Otherwise a link
-   * nonce is issued.
+   * nonce is issued, and a flag left from an identity that is gone at Auth0 is
+   * cleared (plan §2.3: a token fetch that finds no identity clears it).
    */
-  async connect(user: UserRow): Promise<ConnectResponse> {
+  async connect(user: UserRow, identity: AccessTokenIdentity): Promise<ConnectResponse> {
     const gh = this.required();
     await this.reconcile(gh, user);
-    if ((await this.githubRow(user.id))?.status === 'linking') throw linkInProgress();
+    const row = await this.githubRow(user.id);
+    if (row?.status === 'linking') throw linkInProgress();
 
     const found = await gh.tokens.tokenFor(user.auth0Id);
-    if (found === null) return this.issueNonce(user.id);
+    if (found === null) {
+      if (row?.status === 'connected') await this.markDisconnected(user.id, identity);
+      return this.issueNonce(user.id);
+    }
     const ghUser = await this.githubUser(gh, user.auth0Id, found);
     await this.markConnected(user.id, ghUser);
     this.logger.info({ userId: user.id }, 'github connected');
@@ -204,21 +209,7 @@ export class GithubConnectionService {
     if (row?.status === 'linking') throw linkInProgress();
     if (row?.status === 'connected') await this.revoke(gh, user.auth0Id);
 
-    await inTransaction(this.dbs.db, async (trx) => {
-      await lockUser(trx, user.id);
-      const locked = await lockGithubRow(trx, user.id);
-      if (locked) {
-        await writeGithubRow(
-          trx,
-          user.id,
-          locked,
-          { status: 'not_connected', externalUserId: null, externalLogin: null },
-          { clearSynced: true },
-        );
-      }
-      // Back to the email alone (plan §5.1).
-      await setUserVerified(trx, user.id, identity.emailVerified);
-    });
+    await this.markDisconnected(user.id, identity);
     gh.tokens.forget(user.auth0Id);
     this.logger.info({ userId: user.id }, 'github disconnected');
     return { status: 'not_connected' };
@@ -296,6 +287,25 @@ export class GithubConnectionService {
         throw err;
       }
       await setUserVerified(trx, userId, true);
+    });
+  }
+
+  /** Clears the flag, the GitHub id and login, and puts `verified` back to the email, in one transaction. */
+  private async markDisconnected(userId: string, identity: AccessTokenIdentity): Promise<void> {
+    await inTransaction(this.dbs.db, async (trx) => {
+      await lockUser(trx, userId);
+      const locked = await lockGithubRow(trx, userId);
+      if (locked) {
+        await writeGithubRow(
+          trx,
+          userId,
+          locked,
+          { status: 'not_connected', externalUserId: null, externalLogin: null },
+          { clearSynced: true },
+        );
+      }
+      // Back to the email alone (plan §5.1).
+      await setUserVerified(trx, userId, identity.emailVerified);
     });
   }
 

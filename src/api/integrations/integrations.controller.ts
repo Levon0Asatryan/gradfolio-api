@@ -41,8 +41,11 @@ export class IntegrationsController {
 
   @Post('github/connect')
   @HttpCode(200)
-  connect(@CurrentUser() user: UserRow): Promise<ConnectResponse> {
-    return this.github.connect(user);
+  connect(
+    @CurrentUser() user: UserRow,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ConnectResponse> {
+    return this.github.connect(user, tokenOf(req));
   }
 
   @Post('github/link')
