@@ -13,18 +13,34 @@ type Executor = Database | Transaction<DB>;
 
 export type IntegrationRow = Pick<
   Selectable<Integrations>,
-  'id' | 'integrationType' | 'status' | 'externalUserId' | 'externalLogin' | 'lastSyncedAt'
+  | 'id'
+  | 'integrationType'
+  | 'status'
+  | 'generation'
+  | 'externalUserId'
+  | 'externalLogin'
+  | 'lastSyncedAt'
 >;
 
 const COLUMNS = [
   'id',
   'integrationType',
   'status',
+  'generation',
   'externalUserId',
   'externalLogin',
   'lastSyncedAt',
 ] as const;
 
+/**
+ * The version of the caller's GitHub row a transition read before its outside
+ * calls (GitHub, Auth0), or null when there was no row. Every write bumps the
+ * generation, so a write committed in between, even within the same second,
+ * shows as a different version under the lock.
+ */
+export function versionOf(row: IntegrationRow | undefined): number | null {
+  return row === undefined ? null : row.generation;
+}
 /** The caller's rows, one per type at most (`UNIQUE (user_id, integration_type)`). */
 export function integrationsOf(db: Executor, userId: string): Promise<IntegrationRow[]> {
   return db.selectFrom('integrations').select(COLUMNS).where('userId', '=', userId).execute();
@@ -61,7 +77,9 @@ export interface GithubRowValues {
  * 1062 the caller turns into 409 GITHUB_ACCOUNT_IN_USE.
  *
  * `updated_at` is set explicitly: a reservation's age is what reconciliation
- * reads, and MySQL refreshes it only when another column changes.
+ * reads, and MySQL refreshes it only when another column changes. The
+ * generation goes up by one with every write (`existing` is the locked row,
+ * so the number returned is the one stored).
  */
 export async function writeGithubRow(
   trx: Transaction<DB>,
@@ -69,7 +87,7 @@ export async function writeGithubRow(
   existing: IntegrationRow | undefined,
   values: GithubRowValues,
   { clearSynced = false }: { clearSynced?: boolean } = {},
-): Promise<void> {
+): Promise<number> {
   const row = {
     ...values,
     updatedAt: sql<Date>`UTC_TIMESTAMP()`,
@@ -78,16 +96,17 @@ export async function writeGithubRow(
   if (existing) {
     await trx
       .updateTable('integrations')
-      .set(row)
+      .set({ ...row, generation: sql<number>`generation + 1` })
       .where('id', '=', existing.id)
       .where('userId', '=', userId)
       .execute();
-    return;
+    return existing.generation + 1;
   }
   await trx
     .insertInto('integrations')
-    .values({ id: newId(), userId, integrationType: 'github', ...row })
+    .values({ id: newId(), userId, integrationType: 'github', generation: 1, ...row })
     .execute();
+  return 1;
 }
 
 /**

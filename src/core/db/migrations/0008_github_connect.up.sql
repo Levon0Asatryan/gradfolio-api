@@ -6,6 +6,9 @@
 --                              8.4.11): a link reserved here, not yet confirmed
 --                              by Auth0; never counts as connected
 --   integrations.external_login  the GitHub login, shown on the owner's card
+--   integrations.generation    bumped by every write of the row: a transition
+--                              (connect, disconnect, account deletion) writes
+--                              only if the row is still the version it read
 --   (integration_type, external_user_id)  one Gradfolio account per GitHub
 --                              account; NULLs never clash
 --   ck_integrations_no_tokens  no token is ever stored (D2): the token lives at
@@ -32,6 +35,7 @@ ALTER TABLE integrations
 -- skip-if: SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'integrations' AND column_name = 'external_login'
 ALTER TABLE integrations
   ADD COLUMN external_login VARCHAR(100) NULL AFTER external_user_id,
+  ADD COLUMN generation INT UNSIGNED NOT NULL DEFAULT 0 AFTER status,
   ALGORITHM=INSTANT;
 
 -- skip-if: SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'integrations' AND index_name = 'uq_integration_external'

@@ -45,6 +45,14 @@ export interface FakeGithub {
   grantHang: boolean;
   /** `x-ratelimit-reset` it sends, epoch seconds. */
   resetAt: number;
+  /**
+   * Holds the next `GET /user` answer, decided when the request arrived (as
+   * GitHub answered then), until released: the answer is in flight while the
+   * test changes the world.
+   */
+  holdNextUser(): { arrived: Promise<void>; release(): void };
+  /** The same for the next grant delete: the grant is gone, the 204 is in flight. */
+  holdNextGrant(): { arrived: Promise<void>; release(): void };
   close(): Promise<void>;
 }
 
@@ -65,6 +73,15 @@ function readBody(req: IncomingMessage): Promise<unknown> {
 
 export async function startFakeGithub(): Promise<FakeGithub> {
   const hanging = new Set<ServerResponse>();
+  let userGate: { arrived: () => void; released: Promise<void> } | undefined;
+  let grantGate: { arrived: () => void; released: Promise<void> } | undefined;
+  const gate = () => {
+    let arrived!: () => void;
+    let release!: () => void;
+    const arrivedP = new Promise<void>((r) => (arrived = r));
+    const released = new Promise<void>((r) => (release = r));
+    return { held: { arrived, released }, handle: { arrived: arrivedP, release } };
+  };
   const state = {
     tokens: new Map<string, { id: number; login: string }>(),
     revoked: [] as string[],
@@ -134,6 +151,12 @@ export async function startFakeGithub(): Promise<FakeGithub> {
           default: {
             const token = /^Bearer (.+)$/.exec(req.headers.authorization ?? '')?.[1];
             const user = token === undefined ? undefined : state.tokens.get(token);
+            if (userGate) {
+              const held = userGate;
+              userGate = undefined;
+              held.arrived();
+              await held.released;
+            }
             if (!user) return send(res, 401, { message: 'Bad credentials' });
             return send(res, 200, { ...user, type: 'User', site_admin: false, email: null });
           }
@@ -157,6 +180,12 @@ export async function startFakeGithub(): Promise<FakeGithub> {
         }
         state.tokens.delete(token);
         state.revoked.push(token);
+        if (grantGate) {
+          const held = grantGate;
+          grantGate = undefined;
+          held.arrived();
+          await held.released;
+        }
         return send(res, 204);
       }
 
@@ -202,6 +231,16 @@ export async function startFakeGithub(): Promise<FakeGithub> {
     },
     set resetAt(t: number) {
       state.resetAt = t;
+    },
+    holdNextUser() {
+      const g = gate();
+      userGate = g.held;
+      return g.handle;
+    },
+    holdNextGrant() {
+      const g = gate();
+      grantGate = g.held;
+      return g.handle;
     },
     async close() {
       for (const res of hanging) res.destroy();

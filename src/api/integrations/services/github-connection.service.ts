@@ -28,6 +28,7 @@ import {
   lockGithubRow,
   setUserVerified,
   staleReservation,
+  versionOf,
   writeGithubRow,
 } from '../repositories/integration.repository.js';
 import { consumeNonce, insertNonce } from '../repositories/nonce.repository.js';
@@ -46,6 +47,11 @@ const accountInUse = () =>
   );
 const linkInProgress = () =>
   new ConflictError('GITHUB_LINK_IN_PROGRESS', 'a GitHub link is still in progress; try again');
+export const stateChanged = () =>
+  new ConflictError(
+    'GITHUB_STATE_CHANGED',
+    'GitHub was connected or disconnected at the same moment; reload and try again',
+  );
 
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
 
@@ -109,11 +115,15 @@ export class GithubConnectionService {
 
     const found = await gh.tokens.tokenFor(user.auth0Id);
     if (found === null) {
-      if (row?.status === 'connected') await this.markDisconnected(user.id, identity);
+      if (row?.status === 'connected') {
+        await this.markDisconnected(user.id, identity, versionOf(row));
+      }
       return this.issueNonce(user.id);
     }
     const ghUser = await this.githubUser(gh, user.auth0Id, found);
-    await this.markConnected(user.id, ghUser);
+    // Only onto the row as it was read: a disconnect that revoked this token
+    // meanwhile must not be undone with it.
+    await this.markConnected(user.id, ghUser, versionOf(row));
     this.logger.info({ userId: user.id }, 'github connected');
     return { state: 'connected', login: ghUser.login };
   }
@@ -137,7 +147,7 @@ export class GithubConnectionService {
 
     // Step 3: reserve, before Auth0 is touched. Another Gradfolio user holding
     // this GitHub id loses here, on the unique key.
-    await inTransaction(this.dbs.db, async (trx) => {
+    const reserved = await inTransaction(this.dbs.db, async (trx) => {
       await lockUser(trx, user.id);
       const row = await lockGithubRow(trx, user.id);
       if (row?.status === 'connected') {
@@ -150,7 +160,7 @@ export class GithubConnectionService {
       // That GitHub login already is a Gradfolio account: linking would orphan it.
       if (await accountExists(trx, claims.sub)) throw accountInUse();
       try {
-        await writeGithubRow(trx, user.id, row, {
+        return await writeGithubRow(trx, user.id, row, {
           status: 'linking',
           externalUserId: claims.githubUserId,
           externalLogin: null,
@@ -192,7 +202,7 @@ export class GithubConnectionService {
     const found = await gh.tokens.tokenFor(user.auth0Id);
     if (found === null) throw new IntegrationUnavailableError('linked identity not visible yet');
     const ghUser = await this.githubUser(gh, user.auth0Id, found);
-    await this.markConnected(user.id, ghUser);
+    await this.markConnected(user.id, ghUser, reserved);
     this.logger.info({ userId: user.id }, 'github linked');
     return { state: 'connected', login: ghUser.login };
   }
@@ -209,7 +219,7 @@ export class GithubConnectionService {
     if (row?.status === 'linking') throw linkInProgress();
     if (row?.status === 'connected') await this.revoke(gh, user.auth0Id);
 
-    await this.markDisconnected(user.id, identity);
+    await this.markDisconnected(user.id, identity, versionOf(row));
     gh.tokens.forget(user.auth0Id);
     this.logger.info({ userId: user.id }, 'github disconnected');
     return { status: 'not_connected' };
@@ -271,11 +281,21 @@ export class GithubConnectionService {
     gh.tokens.forget(sub);
   }
 
-  /** Sets the flag, the GitHub id and login, and `verified`, in one transaction (plan §5.1). */
-  private async markConnected(userId: string, ghUser: GithubUser): Promise<void> {
+  /**
+   * Sets the flag, the GitHub id and login, and `verified`, in one transaction
+   * (plan §5.1), but only onto the version of the row the caller read
+   * (`expected`, null for no row): otherwise 409 GITHUB_STATE_CHANGED and
+   * nothing is written.
+   */
+  private async markConnected(
+    userId: string,
+    ghUser: GithubUser,
+    expected: number | null,
+  ): Promise<void> {
     await inTransaction(this.dbs.db, async (trx) => {
       await lockUser(trx, userId);
       const row = await lockGithubRow(trx, userId);
+      if (versionOf(row) !== expected) throw stateChanged();
       try {
         await writeGithubRow(trx, userId, row, {
           status: 'connected',
@@ -290,12 +310,26 @@ export class GithubConnectionService {
     });
   }
 
-  /** Clears the flag, the GitHub id and login, and puts `verified` back to the email, in one transaction. */
-  private async markDisconnected(userId: string, identity: AccessTokenIdentity): Promise<void> {
+  /**
+   * Clears the flag, the GitHub id and login, and puts `verified` back to the
+   * email, in one transaction. Only onto the version the caller read and
+   * revoked (`expected`): a connection made meanwhile, whose token was not
+   * revoked, is not cleared (409 GITHUB_STATE_CHANGED); one already gone needs
+   * nothing.
+   */
+  private async markDisconnected(
+    userId: string,
+    identity: AccessTokenIdentity,
+    expected: number | null,
+  ): Promise<void> {
     await inTransaction(this.dbs.db, async (trx) => {
       await lockUser(trx, userId);
       const locked = await lockGithubRow(trx, userId);
-      if (locked) {
+      const changed = versionOf(locked) !== expected;
+      if (changed && locked !== undefined && locked.status !== 'not_connected') {
+        throw stateChanged();
+      }
+      if (locked?.status === 'connected') {
         await writeGithubRow(
           trx,
           userId,
@@ -351,7 +385,7 @@ export class GithubConnectionService {
     await inTransaction(this.dbs.db, async (trx) => {
       await lockUser(trx, user.id);
       const still = await staleReservation(trx, user.id, olderThanS, { lock: true });
-      if (still?.externalUserId !== stale.externalUserId) return;
+      if (still?.generation !== stale.generation) return;
       if (confirmed) {
         await writeGithubRow(trx, user.id, still, {
           status: 'connected',

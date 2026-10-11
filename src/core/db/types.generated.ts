@@ -68,6 +68,7 @@ export interface Integrations {
   createdAt: Generated<Date>;
   externalLogin: string | null;
   externalUserId: string | null;
+  generation: Generated<number>;
   id: string;
   integrationType: "github" | "linkedin";
   lastSyncedAt: Date | null;

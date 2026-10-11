@@ -16,7 +16,8 @@ ALTER TABLE integrations
 
 -- skip-if: SELECT 1 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'integrations' AND column_name = 'external_login')
 ALTER TABLE integrations
-  DROP COLUMN external_login;
+  DROP COLUMN external_login,
+  DROP COLUMN generation;
 
 UPDATE integrations
    SET status = 'not_connected', external_user_id = NULL

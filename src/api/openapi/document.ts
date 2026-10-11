@@ -476,7 +476,10 @@ function integrationOperations(): Operation[] {
   // Each operation names its own 429 and 503.
   const { '401': unauthenticated } = authenticatedFailures;
   const failures = { '401': unauthenticated };
-  const inProgress = 'GITHUB_LINK_IN_PROGRESS: a link started moments ago is still running';
+  const inProgress =
+    'GITHUB_LINK_IN_PROGRESS: a link started moments ago is still running; ' +
+    'GITHUB_STATE_CHANGED: GitHub was connected or disconnected by another request at the same ' +
+    'moment (nothing was changed by this one; reload and retry)';
   return [
     {
       ...base,

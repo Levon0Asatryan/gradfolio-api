@@ -588,6 +588,60 @@ describe('disconnect (revoke first, D9)', () => {
     }
   });
 
+  it('a connect whose GitHub answer was in flight during a disconnect does not restore it (barrier)', async () => {
+    const http = await start();
+    const s = await connected(http, 'github|105', '105');
+    // A second connect has asked GitHub, which confirmed the token; the answer is in flight.
+    const gate = gh.holdNextUser();
+    const reconnect = http
+      .post('/v1/me/integrations/github/connect')
+      .set(s.auth)
+      .then((r) => r);
+    await gate.arrived;
+    // Meanwhile the student disconnects: the token is revoked and the flag cleared.
+    await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+    expect(gh.revoked).toEqual([auth0.githubTokenFor('105')]);
+    gate.release();
+
+    const res = await reconnect;
+    expect(res.status).toBe(409);
+    expect((res.body as { code: string }).code).toBe('GITHUB_STATE_CHANGED');
+    expect(await githubRow(s.id)).toMatchObject({ status: 'not_connected', externalUserId: null });
+    expect(await verifiedOf(s.id)).toBe(false);
+  });
+
+  it('a disconnect does not clear a connection made while its revocation was in flight (barrier)', async () => {
+    const http = await start();
+    const s = await connected(http, 'github|106', '106');
+    const first = auth0.githubTokenFor('106');
+    // The grant is deleted at GitHub; the 204 is in flight.
+    const gate = gh.holdNextGrant();
+    const disconnecting = http
+      .delete('/v1/me/integrations/github')
+      .set(s.auth)
+      .then((r) => r);
+    await gate.arrived;
+    // The student signs in with GitHub again (Auth0 now holds a new token) and connects.
+    auth0.githubTokenFor = (id) => `gho_SENTINEL_again_${id}`;
+    try {
+      linkedAtAuth0(s.sub, '106', '106-login');
+      // The token cached by the revocation is the dead one: GitHub refuses it, and it is dropped.
+      await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(409);
+      await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(200);
+    } finally {
+      auth0.githubTokenFor = (id) => `gho_SENTINEL_${id}`;
+    }
+    gate.release();
+
+    const res = await disconnecting;
+    expect(res.status).toBe(409);
+    expect((res.body as { code: string }).code).toBe('GITHUB_STATE_CHANGED');
+    // The new connection, whose token was never revoked, stands.
+    expect(gh.revoked).toEqual([first]);
+    expect(await githubRow(s.id)).toMatchObject({ status: 'connected', externalUserId: '106' });
+    expect(await verifiedOf(s.id)).toBe(true);
+  });
+
   it('a GitHub failure changes nothing: 502 GITHUB_REVOKE_FAILED, still connected', async () => {
     const http = await start();
     const s = await connected(http, 'github|101', '101');

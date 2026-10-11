@@ -3061,7 +3061,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: "GITHUB_NOT_LINKED: GitHub refused the token Auth0 holds (sign in with GitHub again); GITHUB_ACCOUNT_IN_USE: another Gradfolio account has this GitHub account; GITHUB_LINK_IN_PROGRESS: a link started moments ago is still running"
+          description: "GITHUB_NOT_LINKED: GitHub refused the token Auth0 holds (sign in with GitHub again); GITHUB_ACCOUNT_IN_USE: another Gradfolio account has this GitHub account; GITHUB_LINK_IN_PROGRESS: a link started moments ago is still running; GITHUB_STATE_CHANGED: GitHub was connected or disconnected by another request at the same moment (nothing was changed by this one; reload and retry)"
           content:
             application/json:
               schema:
@@ -3128,7 +3128,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: "GITHUB_ACCOUNT_IN_USE: that GitHub account is a Gradfolio account of its own, or another account holds it; GITHUB_ALREADY_CONNECTED; GITHUB_LINK_REFUSED: Auth0 refused the link; GITHUB_LINK_IN_PROGRESS: a link started moments ago is still running; GITHUB_NOT_LINKED"
+          description: "GITHUB_ACCOUNT_IN_USE: that GitHub account is a Gradfolio account of its own, or another account holds it; GITHUB_ALREADY_CONNECTED; GITHUB_LINK_REFUSED: Auth0 refused the link; GITHUB_LINK_IN_PROGRESS: a link started moments ago is still running; GITHUB_STATE_CHANGED: GitHub was connected or disconnected by another request at the same moment (nothing was changed by this one; reload and retry); GITHUB_NOT_LINKED"
           content:
             application/json:
               schema:
@@ -3182,7 +3182,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: "GITHUB_LINK_IN_PROGRESS: a link started moments ago is still running"
+          description: "GITHUB_LINK_IN_PROGRESS: a link started moments ago is still running; GITHUB_STATE_CHANGED: GitHub was connected or disconnected by another request at the same moment (nothing was changed by this one; reload and retry)"
           content:
             application/json:
               schema:
