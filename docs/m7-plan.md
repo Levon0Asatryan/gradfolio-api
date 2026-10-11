@@ -726,9 +726,11 @@ gs://gradfolio-files-1058577031182 --lifecycle-file=docker/gcs-lifecycle.json` (
 `imports/` only; the file arrives with PR (c)). Cost: $0.
 
 **M7-T8 (new).** After PR (a) merges: wire the Cloud Run service with `--update-secrets
-AUTH0_M2M_CLIENT_SECRET=gradfolio-auth0-m2m-secret:latest` and `--update-env-vars
-AUTH0_M2M_CLIENT_ID=…,AUTH0_CLIENT_ID=…`, and grant `secretAccessor` to `gradfolio-api-run`. A new
-secret is about $0.06 per month, inside the free tier.
+AUTH0_M2M_CLIENT_SECRET=gradfolio-auth0-m2m-secret:latest,GITHUB_CLIENT_SECRET=gradfolio-github-client-secret:latest`
+and `--update-env-vars AUTH0_M2M_CLIENT_ID=…,AUTH0_CLIENT_ID=…,GITHUB_CLIENT_ID=…`, and grant
+`secretAccessor` on **both** secrets to `gradfolio-api-run`. Without the GitHub pair every GitHub route
+answers 503 (D9), so the agent checks `GET /v1/me/integrations` on production after the deploy. Two
+new secrets are about $0.12 per month, inside the free tier.
 
 **M7-T9 (new, PR d).** Give the agent the NPUA mail domain list for `UNIVERSITY_DOMAINS`.
 
