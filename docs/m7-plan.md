@@ -25,6 +25,8 @@ connect in this session, so nothing was run against the tenant.
 
 D4 (fixtures) and D1 change the shape of PR (a) and (c). The rest do not block starting.
 
+Decided 2026-10-11: the recommendations, D1–D9.
+
 ## 1. Investigation
 
 ### 1.1 The code on `main`
