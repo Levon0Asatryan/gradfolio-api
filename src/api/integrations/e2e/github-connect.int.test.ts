@@ -603,16 +603,16 @@ describe('disconnect (revoke first, D9)', () => {
     expect(await githubRow(s.id)).toMatchObject({ status: 'connected' });
   });
 
-  it.each([404, 422])(
-    'a grant GitHub says is already gone (%i) still disconnects',
-    async (status) => {
-      const http = await start();
-      const s = await connected(http, `github|10${status}`, `10${status}`);
-      gh.grantStatus = status;
-      await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
-      expect(await githubRow(s.id)).toMatchObject({ status: 'not_connected' });
-    },
-  );
+  it('a grant GitHub says is already gone (422) still disconnects; a 404 changes nothing', async () => {
+    const http = await start();
+    const s = await connected(http, 'github|10422', '10422');
+    gh.grantStatus = 404;
+    await http.delete('/v1/me/integrations/github').set(s.auth).expect(502);
+    expect(await githubRow(s.id)).toMatchObject({ status: 'connected' });
+    gh.grantStatus = 422;
+    await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+    expect(await githubRow(s.id)).toMatchObject({ status: 'not_connected' });
+  });
 
   it('no GitHub identity left at Auth0 counts as revoked; a second disconnect revokes nothing', async () => {
     const http = await start();

@@ -56,13 +56,14 @@ const userResponse = z.object({
 });
 
 /**
- * The statuses GitHub gives a grant delete for a grant that no longer exists.
+ * The status GitHub gives a grant delete for a grant that no longer exists.
  * **Unverified** against the real service (docs/m7-plan.md §2.3, §2.1 step 6):
- * GitHub's documentation lists 422 for a token it cannot find; 404 is what its
- * REST API answers for a resource that is gone. The tenant spike records the
- * real one and this list is narrowed to it.
+ * GitHub's documentation lists 422. Nothing else counts as gone: a 404 could
+ * as well be a client id GitHub does not know, and reading that as "revoked"
+ * would report a disconnect while the token stays alive. The tenant spike
+ * records the real status, and this list follows it.
  */
-export const GRANT_ALREADY_GONE = [404, 422] as const;
+export const GRANT_ALREADY_GONE = [422] as const;
 
 export class GithubClient {
   constructor(private readonly settings: GithubClientSettings) {}

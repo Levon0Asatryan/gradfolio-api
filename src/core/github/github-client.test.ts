@@ -96,9 +96,16 @@ describe('GithubClient', () => {
       expect(gh.revoked).toEqual(['gho_SENTINEL_client']);
     });
 
-    it.each([404, 422])('counts %i as already gone', async (status) => {
-      gh.grantStatus = status;
+    it('counts 422 as already gone', async () => {
+      gh.grantStatus = 422;
       expect(await client.deleteGrant(gh.clientId, gh.clientSecret, token)).toBe('already_gone');
+    });
+
+    it('a 404 is not proof of anything: the revocation failed', async () => {
+      gh.grantStatus = 404;
+      await expect(client.deleteGrant(gh.clientId, gh.clientSecret, token)).rejects.toBeInstanceOf(
+        GithubRevokeFailedError,
+      );
     });
 
     it('a second delete of the same grant is already gone', async () => {
