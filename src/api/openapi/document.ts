@@ -608,13 +608,20 @@ export const OPERATIONS: readonly Operation[] = [
       'Removes the profile, every section, skills, projects (with attachments, tags and team ' +
       'rows), integrations and notifications. The caller’s name stays on other people’s ' +
       'projects as a plain team-member name, without a photo or a link to an account. ' +
-      'Irreversible. The Auth0 login is not deleted: sign the user out afterwards, because a ' +
-      'token that is still valid creates a new, empty account on its next request.',
+      'Irreversible. A connected GitHub account is revoked at GitHub first; if GitHub does ' +
+      'not confirm, nothing is deleted (502, retry). The Auth0 login is not deleted: sign the ' +
+      'user out afterwards, because a token that is still valid creates a new, empty account ' +
+      'on its next request.',
     bearer: true,
     responses: {
       '204': { description: 'Deleted' },
       '404': error('NOT_FOUND: the account no longer exists'),
+      '502': error('GITHUB_REVOKE_FAILED: GitHub did not confirm the revocation; nothing deleted'),
       ...authenticatedFailures,
+      '503': error(
+        'INTEGRATION_UNAVAILABLE: a connected GitHub cannot be revoked now (Auth0 unreachable, ' +
+          'or GitHub connect not configured); AUTH_UNAVAILABLE or DATABASE_UNAVAILABLE',
+      ),
     },
   },
   {

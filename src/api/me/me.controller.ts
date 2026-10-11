@@ -47,6 +47,6 @@ export class MeController {
   @Delete()
   @HttpCode(204)
   async deleteAccount(@CurrentUser() user: UserRow): Promise<void> {
-    await this.account.delete(user.id);
+    await this.account.delete(user);
   }
 }

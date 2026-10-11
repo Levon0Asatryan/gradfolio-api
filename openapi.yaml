@@ -158,7 +158,7 @@ paths:
       tags:
         - me
       summary: Delete the caller’s account and all its data
-      description: "Removes the profile, every section, skills, projects (with attachments, tags and team rows), integrations and notifications. The caller’s name stays on other people’s projects as a plain team-member name, without a photo or a link to an account. Irreversible. The Auth0 login is not deleted: sign the user out afterwards, because a token that is still valid creates a new, empty account on its next request."
+      description: "Removes the profile, every section, skills, projects (with attachments, tags and team rows), integrations and notifications. The caller’s name stays on other people’s projects as a plain team-member name, without a photo or a link to an account. Irreversible. A connected GitHub account is revoked at GitHub first; if GitHub does not confirm, nothing is deleted (502, retry). The Auth0 login is not deleted: sign the user out afterwards, because a token that is still valid creates a new, empty account on its next request."
       security:
         - bearerAuth: []
       responses:
@@ -182,8 +182,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: "GITHUB_REVOKE_FAILED: GitHub did not confirm the revocation; nothing deleted"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "503":
-          description: "AUTH_UNAVAILABLE: Auth0 signing keys unreachable, or DATABASE_UNAVAILABLE: MySQL unreachable"
+          description: "INTEGRATION_UNAVAILABLE: a connected GitHub cannot be revoked now (Auth0 unreachable, or GitHub connect not configured); AUTH_UNAVAILABLE or DATABASE_UNAVAILABLE"
           content:
             application/json:
               schema:

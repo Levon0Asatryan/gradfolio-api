@@ -5,6 +5,8 @@ import { inTransaction } from '../../../core/db/transaction.js';
 import { NotFoundError } from '../../../core/errors/app-error.js';
 import { lockUser } from '../../../core/db/user-lock.js';
 import { FileUrlService } from '../../files/services/file-url.service.js';
+import { GithubConnectionService } from '../../integrations/services/github-connection.service.js';
+import type { UserRow } from '../../users/repositories/user.repository.js';
 
 /** More than the per-user cap can ever hold (config max 5000). */
 const ACCOUNT_FILE_LIMIT = 10_000;
@@ -15,6 +17,7 @@ export class AccountService {
     private readonly dbs: DbService,
     @InjectPinoLogger(AccountService.name) private readonly logger: PinoLogger,
     private readonly files: FileUrlService,
+    private readonly github: GithubConnectionService,
   ) {}
 
   /**
@@ -31,11 +34,17 @@ export class AccountService {
    * recreates a blank account on its next request (Q7), so the frontend signs
    * the user out after this call.
    *
+   * A GitHub connection is revoked at GitHub first (docs/m7-plan.md D9): the
+   * token Auth0 holds dies with the account. A failed revocation stops the
+   * deletion before anything is deleted (502 GITHUB_REVOKE_FAILED).
+   *
    * The "started" line is written before the change, so the record of a
    * destructive action does not depend on the commit.
    */
-  async delete(userId: string): Promise<void> {
+  async delete(user: UserRow): Promise<void> {
+    const userId = user.id;
     this.logger.info({ userId }, 'account deletion started');
+    await this.github.revokeBeforeAccountDeletion(user);
     await inTransaction(this.dbs.db, async (trx) => {
       // The user row first, as everywhere (docs/m3-plan.md §1: user row, then
       // child rows). Without it this transaction locks the team rows first and

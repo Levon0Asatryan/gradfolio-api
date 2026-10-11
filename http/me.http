@@ -34,7 +34,8 @@ Authorization: Bearer {{accessToken}}
 
 ###
 # @name deleteMe
-# 204. Irreversible: the profile, sections, skills, projects, integrations and
+# 204. Irreversible: a connected GitHub is revoked at GitHub first (502
+# GITHUB_REVOKE_FAILED deletes nothing). Then the profile, sections, skills, projects, integrations and
 # notifications are gone; your name stays on other people's projects without a
 # photo. Sign out afterwards: a token that is still valid creates a new, empty
 # account on the next request.
