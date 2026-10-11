@@ -1,4 +1,7 @@
+import { createConnection } from 'mysql2/promise';
 import { describe, expect, it } from 'vitest';
+import { waitForLockWaiters } from '../../../testing/barrier.js';
+import { testDatabaseUrl } from '../../../testing/database.js';
 import { githubConnectHarness, githubRow } from '../../../testing/github-connect.js';
 import { db } from '../../../testing/team.js';
 
@@ -38,5 +41,44 @@ describe('account deletion revokes first', () => {
     await http.delete('/v1/me').set(s.auth).expect(204);
     expect(h.auth0.calls).toEqual([]);
     expect(h.gh.requests).toEqual([]);
+  });
+
+  it('a connect committed between the revocation check and the user lock stops the deletion (barrier)', async () => {
+    const http = await h.start();
+    const s = await h.student('github|112');
+    h.linkedAtAuth0(s.sub, '112', 'late');
+
+    const holder = await createConnection({ uri: testDatabaseUrl() });
+    try {
+      await holder.query('START TRANSACTION');
+      await holder.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [s.id]);
+      // The connect has GitHub's answer and waits for the user lock ...
+      const connecting = http
+        .post('/v1/me/integrations/github/connect')
+        .set(s.auth)
+        .then((r) => r);
+      await waitForLockWaiters(1);
+      // ... and the deletion's preflight saw nothing connected, so revoked nothing.
+      const deleting = http
+        .delete('/v1/me')
+        .set(s.auth)
+        .then((r) => r);
+      await waitForLockWaiters(2);
+      await holder.query('COMMIT');
+
+      expect((await connecting).status).toBe(200);
+      const res = await deleting;
+      expect(res.status).toBe(409);
+      expect((res.body as { code: string }).code).toBe('GITHUB_STATE_CHANGED');
+    } finally {
+      await holder.end();
+    }
+    // Nothing was deleted, and the grant made by that connect is not orphaned:
+    expect(await githubRow(s.id)).toMatchObject({ status: 'connected' });
+    expect(h.gh.revoked).toEqual([]);
+    // The retry revokes it, then deletes.
+    await http.delete('/v1/me').set(s.auth).expect(204);
+    expect(h.gh.revoked).toEqual([h.auth0.githubTokenFor('112')]);
+    expect(await db.selectFrom('users').select('id').where('id', '=', s.id).execute()).toEqual([]);
   });
 });

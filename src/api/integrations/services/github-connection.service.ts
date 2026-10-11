@@ -1,11 +1,13 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
+import type { Transaction } from 'kysely';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { AccessTokenIdentity } from '../../../core/auth/access-token.js';
 import { IntegrationUnavailableError } from '../../../core/auth0/errors.js';
 import { APP_CONFIG } from '../../../core/config/config.module.js';
 import type { AppConfig } from '../../../core/config/schema.js';
 import { DbService } from '../../../core/db/db.service.js';
+import type { DB } from '../../../core/db/types.generated.js';
 import { isMysqlError, MysqlErrno } from '../../../core/db/mysql-errors.js';
 import { inTransaction } from '../../../core/db/transaction.js';
 import { lockUser } from '../../../core/db/user-lock.js';
@@ -228,13 +230,33 @@ export class GithubConnectionService {
   /**
    * Before an account is deleted: a GitHub connection the student gave us is
    * revoked at GitHub first (D9), so deleting the account deletes the token.
-   * A failure stops the deletion; nothing is deleted.
+   * A failure stops the deletion; nothing is deleted. Returns the version of
+   * the row it read (and revoked), for `assertRevokedForDeletion`.
    */
-  async revokeBeforeAccountDeletion(user: UserRow): Promise<void> {
+  async revokeBeforeAccountDeletion(user: UserRow): Promise<number | null> {
     const row = await this.githubRow(user.id);
-    if (row === undefined || row.status === 'not_connected') return;
-    const gh = this.required();
-    await this.revoke(gh, user.auth0Id);
+    if (row !== undefined && row.status !== 'not_connected') {
+      await this.revoke(this.required(), user.auth0Id);
+    }
+    return versionOf(row);
+  }
+
+  /**
+   * Inside the deletion's transaction, under the user lock: the GitHub row is
+   * still the one the preflight read, or holds nothing to revoke. A connection
+   * made in between was never revoked; the cascade must not delete it silently,
+   * so the deletion is refused (409 GITHUB_STATE_CHANGED) and the student
+   * retries, which revokes it.
+   */
+  async assertRevokedForDeletion(
+    trx: Transaction<DB>,
+    userId: string,
+    revoked: number | null,
+  ): Promise<void> {
+    const row = await lockGithubRow(trx, userId);
+    if (versionOf(row) !== revoked && row !== undefined && row.status !== 'not_connected') {
+      throw stateChanged();
+    }
   }
 
   private required(): GithubConnect {

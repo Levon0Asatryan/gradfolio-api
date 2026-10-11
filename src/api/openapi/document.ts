@@ -798,6 +798,9 @@ export const OPERATIONS: readonly Operation[] = [
     responses: {
       '204': { description: 'Deleted' },
       '404': error('NOT_FOUND: the account no longer exists'),
+      '409': error(
+        'GITHUB_STATE_CHANGED: GitHub was connected at the same moment; nothing deleted, retry',
+      ),
       '502': error('GITHUB_REVOKE_FAILED: GitHub did not confirm the revocation; nothing deleted'),
       ...authenticatedFailures,
       '503': error(

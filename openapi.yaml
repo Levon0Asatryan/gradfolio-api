@@ -176,6 +176,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "GITHUB_STATE_CHANGED: GitHub was connected at the same moment; nothing deleted, retry"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "429":
           description: "RATE_LIMITED: over budget; see the Retry-After header"
           content:

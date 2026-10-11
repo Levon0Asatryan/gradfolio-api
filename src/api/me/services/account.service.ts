@@ -36,7 +36,9 @@ export class AccountService {
    *
    * A GitHub connection is revoked at GitHub first (docs/m7-plan.md D9): the
    * token Auth0 holds dies with the account. A failed revocation stops the
-   * deletion before anything is deleted (502 GITHUB_REVOKE_FAILED).
+   * deletion before anything is deleted (502 GITHUB_REVOKE_FAILED), and so
+   * does a connection made between the revocation and the user lock (409
+   * GITHUB_STATE_CHANGED): its grant was never revoked.
    *
    * The "started" line is written before the change, so the record of a
    * destructive action does not depend on the commit.
@@ -44,7 +46,7 @@ export class AccountService {
   async delete(user: UserRow): Promise<void> {
     const userId = user.id;
     this.logger.info({ userId }, 'account deletion started');
-    await this.github.revokeBeforeAccountDeletion(user);
+    const revoked = await this.github.revokeBeforeAccountDeletion(user);
     await inTransaction(this.dbs.db, async (trx) => {
       // The user row first, as everywhere (docs/m3-plan.md §1: user row, then
       // child rows). Without it this transaction locks the team rows first and
@@ -53,6 +55,7 @@ export class AccountService {
       // account.int.test.ts). It also queues behind writes in flight, and the
       // not-found case is a 404.
       await lockUser(trx, userId);
+      await this.github.assertRevokedForDeletion(trx, userId, revoked);
       await trx
         .updateTable('projectTeamMembers')
         .set({ avatarUrl: null })
