@@ -301,9 +301,12 @@ produced **two rows**. The user lock removes both.
    `GITHUB_README_MAX_BYTES` (default 400 KB) by `Content-Length` and by a streamed byte count.
 2. Rewrite pass with `sanitize-html` (the same library, a pre-pass), base = `https://github.com/
 <owner>/<repo>/blob/<default_branch>/` and the README's `path`:
-   - `<a href>` relative or root-relative: resolved with `URL` against the base, then required to be
-     `https://github.com/<owner>/<repo>/…`; anything that escapes (`../../x`) is dropped to a bare
-     `<a>`;
+   - `<a href>` relative: resolved with `URL` against the README's directory; root-relative
+     (`/CONTRIBUTING.md`): the leading `/` is stripped and the rest resolved against the repository
+     root `https://github.com/<owner>/<repo>/blob/<ref>/`. `URL` alone resolves a root-relative path
+     against the origin (run on Node 22, WHATWG `URL` as in the pinned 24: `/CONTRIBUTING.md` gives `https://github.com/CONTRIBUTING.md`).
+     The result must start with that repository root, `/blob/<ref>/` included; anything that escapes
+     (`../../x` gives `https://github.com/<owner>/<repo>/x`, run) is dropped to a bare `<a>`;
    - `#fragment`, `mailto:`, `javascript:`, `data:`, protocol-relative: dropped;
    - absolute `http(s)` kept;
    - every `<img>`, `<picture>`, `<svg>`: removed, **alt text kept as text** (D3 option 1).
@@ -311,7 +314,8 @@ produced **two rows**. The user lock removes both.
    `PROJECT_DESCRIPTION_MAX_BYTES`. Over the limit: description is `null`, the project is still
    created, the result carries `READMEs_TOO_LARGE`. Truncating HTML would risk a broken tree.
 4. Tests (the decision is what is tested): a corpus of GitHub-rendered fixtures (`camo` image,
-   relative image, relative and root-relative link, `../../` escape, `javascript:`, `data:` image,
+   relative image, relative link, root-relative link (`/CONTRIBUTING.md` → the repository root),
+   `../../` escape out of `blob/<ref>/`, `javascript:`, `data:` image,
    nested `picture`) expects no `<img`, rewritten links, and idempotence; plus the existing M4
    bypass corpus run on the pre-pass output.
 
