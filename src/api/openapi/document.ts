@@ -9,12 +9,28 @@ import {
 import { activityPageSchema, activityQuerySchema } from '../activities/dto/activity.dto.js';
 import { dashboardSchema } from '../dashboard/dto/dashboard.dto.js';
 import {
+  githubImportRequestSchema,
+  githubImportResponseSchema,
+  githubRepoPageSchema,
+  githubReposQuerySchema,
+  githubSyncQuerySchema,
+  githubSyncResponseSchema,
+} from '../integrations/dto/github-import.dto.js';
+import {
   connectResponseSchema,
   disconnectResponseSchema,
   integrationsResponseSchema,
   linkRequestSchema,
   linkResponseSchema,
 } from '../integrations/dto/integration.dto.js';
+import {
+  linkedinConfirmRequestSchema,
+  linkedinConfirmResponseSchema,
+  linkedinPreviewRequestSchema,
+  linkedinPreviewResponseSchema,
+  linkedinUploadRequestSchema,
+  linkedinUploadResponseSchema,
+} from '../integrations/dto/linkedin-import.dto.js';
 import {
   browseProjectsQuerySchema,
   browseUsersQuerySchema,
@@ -167,6 +183,13 @@ export interface Operation {
   responses: Record<string, { description: string; schema?: ZodType }>;
   /** Needs `Authorization: Bearer <Auth0 access token>`. Every route except `@Public()` ones. */
   bearer?: boolean;
+  /**
+   * A contract published before its route exists: the pull request that will
+   * serve it. Rendered with `x-gradfolio-planned` and a "not served yet" note;
+   * document.test.ts checks that no planned operation is served, so the flag
+   * is removed in the same change that adds the route.
+   */
+  planned?: string;
 }
 
 const error = (description: string) => ({ description, schema: errorResponseSchema });
@@ -555,6 +578,162 @@ function integrationOperations(): Operation[] {
         ),
         ...failures,
         '503': unavailable,
+      },
+    },
+  ];
+}
+
+/**
+ * GitHub import and the LinkedIn export import (docs/m7-plan.md §3, §4; §7
+ * items 5–10): the contract only, published with PR (a) so the frontend can
+ * build against it. Each is `planned`; the PR that serves it drops the flag.
+ */
+function plannedImportOperations(): Operation[] {
+  const base = { tag: 'integrations', bearer: true } as const;
+  const github = {
+    '409': error(
+      'GITHUB_NOT_CONNECTED: connect GitHub first; GITHUB_NOT_LINKED: GitHub refused the token ' +
+        '(sign in with GitHub again)',
+    ),
+    '429': error('RATE_LIMITED or GITHUB_RATE_LIMITED; see the Retry-After header'),
+    '502': error('GITHUB_UNAVAILABLE: GitHub failed or timed out'),
+    '401': authenticatedFailures['401'],
+    '503': error('INTEGRATION_UNAVAILABLE, AUTH_UNAVAILABLE or DATABASE_UNAVAILABLE'),
+  };
+  const importFailures = {
+    '401': authenticatedFailures['401'],
+    '429': error('RATE_LIMITED: over the `import` budget (5 per minute); see Retry-After'),
+    '503': error(
+      'STORAGE_UNAVAILABLE: uploads are off on this server; AUTH_UNAVAILABLE or ' +
+        'DATABASE_UNAVAILABLE',
+    ),
+  };
+  return [
+    {
+      ...base,
+      planned: 'M7 PR (b)',
+      method: 'get',
+      path: '/v1/me/github/repos',
+      operationId: 'listGithubRepos',
+      summary: 'The caller’s public GitHub repositories, paged',
+      description:
+        'Owned and collaborator repositories, public only (D6), most recently pushed first. ' +
+        '`imported` and `projectId` say which the caller already imported. GitHub’s remaining ' +
+        'rate limit is in `rateLimit`.',
+      query: githubReposQuerySchema,
+      responses: {
+        '200': { description: 'One page', schema: githubRepoPageSchema },
+        '400': validationFailed,
+        ...github,
+      },
+    },
+    {
+      ...base,
+      planned: 'M7 PR (b)',
+      method: 'post',
+      path: '/v1/me/github/import',
+      operationId: 'importGithubRepos',
+      summary: 'Import repositories as draft projects',
+      description:
+        'Each repository is read again from GitHub (stars, forks, language, README; the client’s ' +
+        'numbers are never trusted) and imported only when the caller owns it or may push to it. ' +
+        'Drafts: visible to the caller only until published. Deduplicated by repository id, also ' +
+        'under concurrent imports. The README becomes the description, sanitized, images dropped ' +
+        '(D3).',
+      body: githubImportRequestSchema,
+      responses: {
+        '200': { description: 'One result per repository', schema: githubImportResponseSchema },
+        '400': validationFailed,
+        ...github,
+        '429': error('RATE_LIMITED (the `import` budget) or GITHUB_RATE_LIMITED; see Retry-After'),
+      },
+    },
+    {
+      ...base,
+      planned: 'M7 PR (b)',
+      method: 'post',
+      path: '/v1/me/projects/{id}/github/sync',
+      operationId: 'syncGithubProject',
+      summary: 'Re-sync an imported project from GitHub, never overwriting an edit',
+      description:
+        'Per field: a value the caller edited is kept; one GitHub changed and the caller did not ' +
+        'is updated; both changed is a `conflict` (kept, GitHub’s value reported). Stars, forks, ' +
+        'language and README link always refresh (D8). `dryRun=true` reports without changing.',
+      params: projectIdParamSchema,
+      query: githubSyncQuerySchema,
+      responses: {
+        '200': { description: 'What changed, field by field', schema: githubSyncResponseSchema },
+        '400': validationFailed,
+        '404': notYours('project'),
+        ...github,
+        '409': error(
+          'NOT_GITHUB_PROJECT: the project was not imported; GITHUB_NOT_CONNECTED; GITHUB_NOT_LINKED',
+        ),
+        '429': error('RATE_LIMITED (the `import` budget) or GITHUB_RATE_LIMITED; see Retry-After'),
+      },
+    },
+    {
+      ...base,
+      planned: 'M7 PR (c)',
+      method: 'post',
+      path: '/v1/me/imports/linkedin/uploads',
+      operationId: 'createLinkedinUpload',
+      summary: 'Get a signed URL to upload a LinkedIn data export ZIP',
+      description:
+        'The browser PUTs the ZIP straight to the returned URL (never through the frontend’s ' +
+        'server: its body limit is 4.5 MB). At most IMPORT_MAX_PENDING uploads wait at once.',
+      body: linkedinUploadRequestSchema,
+      responses: {
+        '201': { description: 'The upload ticket', schema: linkedinUploadResponseSchema },
+        '400': validationFailed,
+        '409': error('LIMIT_REACHED: too many uploads waiting for a preview'),
+        '413': error('IMPORT_TOO_LARGE: over IMPORT_MAX_ZIP_BYTES'),
+        ...importFailures,
+      },
+    },
+    {
+      ...base,
+      planned: 'M7 PR (c)',
+      method: 'post',
+      path: '/v1/me/imports/linkedin/preview',
+      operationId: 'previewLinkedinImport',
+      summary: 'Read an uploaded export and propose entries; saves nothing',
+      description:
+        'Parses positions, education, skills and certifications; each item is `new`, ' +
+        '`duplicate` (already on the profile) or `invalid` (with `problems`). The upload is ' +
+        'deleted afterwards, whatever the outcome. Only the four datasets are ever opened.',
+      body: linkedinPreviewRequestSchema,
+      responses: {
+        '200': { description: 'The proposal', schema: linkedinPreviewResponseSchema },
+        '400': validationFailed,
+        '404': error('IMPORT_UPLOAD_MISSING: no such upload of the caller’s'),
+        '413': error('IMPORT_TOO_LARGE'),
+        '422': error(
+          'IMPORT_NOT_ZIP, IMPORT_TOO_MANY_ENTRIES, IMPORT_UNCOMPRESSED_TOO_LARGE, ' +
+            'IMPORT_RATIO_EXCEEDED, IMPORT_UNSAFE_PATH, IMPORT_ENCRYPTED, IMPORT_ENTRY_NOT_CSV, ' +
+            'IMPORT_EMPTY, IMPORT_COLUMNS_MISSING (see `details`), IMPORT_MALFORMED_CSV',
+        ),
+        ...importFailures,
+        '429': error('RATE_LIMITED, or IMPORT_BUSY: too many previews running; see Retry-After'),
+      },
+    },
+    {
+      ...base,
+      planned: 'M7 PR (c)',
+      method: 'post',
+      path: '/v1/me/imports/linkedin/confirm',
+      operationId: 'confirmLinkedinImport',
+      summary: 'Save the selected entries, in one transaction',
+      description:
+        'The items are validated again like manual entries. Entries equal to an existing one ' +
+        'are skipped; skills merge case-insensitively. Over a section cap nothing is saved. A ' +
+        'second identical confirm adds nothing.',
+      body: linkedinConfirmRequestSchema,
+      responses: {
+        '200': { description: 'Counts per section', schema: linkedinConfirmResponseSchema },
+        '400': validationFailed,
+        '409': error('LIMIT_REACHED: a section would exceed its cap; nothing was saved'),
+        ...importFailures,
       },
     },
   ];
@@ -1204,6 +1383,7 @@ export const OPERATIONS: readonly Operation[] = [
   },
   ...discoveryOperations(),
   ...integrationOperations(),
+  ...plannedImportOperations(),
   ...sectionOperations({
     path: 'education',
     name: 'Education',
@@ -1256,12 +1436,16 @@ export function buildOpenApiDocument(
       };
     }
 
+    const description = op.planned
+      ? `**Not served yet: arrives with ${op.planned}.** ${op.description ?? ''}`.trim()
+      : op.description;
     paths[op.path] ??= {};
     paths[op.path]![op.method] = {
       operationId: op.operationId,
       tags: [op.tag],
       summary: op.summary,
-      ...(op.description ? { description: op.description } : {}),
+      ...(description ? { description } : {}),
+      ...(op.planned ? { 'x-gradfolio-planned': op.planned } : {}),
       ...(op.bearer ? { security: [{ bearerAuth: [] }] } : {}),
       ...(op.params || op.query
         ? { parameters: [...pathParameters(op, components), ...queryParameters(op, components)] }
