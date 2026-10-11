@@ -11,16 +11,17 @@ connect in this session, so nothing was run against the tenant.
 
 ## 0. What Levon decides
 
-| ID  | Decision                        | Options                                                                                                                                | **Recommendation**                                                                                                                                                                                                                                                |
-| --- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | 7.1 token source                | A1 Auth0 IdP token via Management API; A2 Auth0 Token Vault; B GitHub OAuth App or GitHub App run by the API                           | **A (your direction), stored nowhere.** Build A1 behind one `GithubTokenSource` interface; a 20-minute tenant spike (§2.1) decides whether A2 replaces it. B is kept as the documented fallback (§1.3).                                                           |
-| D2  | Cache the token or not (7.2)    | fetch on demand, in memory 5 min; encrypted copy in MySQL                                                                              | **On demand, in memory only.** No token ever reaches MySQL, a log or a response. The AES-GCM/rotation machinery is not built (§2.4); a DB `CHECK` makes a stored token impossible.                                                                                |
-| D3  | README images (7.5)             | (1) drop every image, keep alt text; (2) allow `<img>` limited to GitHub hosts, relative ones rewritten to `raw.githubusercontent.com` | **(1).** No change to M4's allow-list or the frontend's sanitizer; works for private repos; no hot-linking. Relative **links** are rewritten to `github.com/<owner>/<repo>/blob/<ref>/<path>` (§3.4). Screenshots belong in M4 attachments.                       |
-| D4  | LinkedIn fixtures (7.6)         | F1 synthetic fixtures from header-only inspection of real exports; F2 wait for real files; F3 Levon pastes header lines himself        | **F1.** A script prints file names that match the four datasets and each one's first line only; I build synthetic CSVs with those headers. PR (c) does not merge until headers are verified (or you accept the risk in writing).                                  |
-| D5  | `verified` and GitHub (7.12)    | email verified **and** GitHub; email verified **or** GitHub                                                                            | **Or.** Spec §3 and §5: "email/phone confirmed, or LinkedIn/GitHub linked". Tracker 2.16's "+" is read as "or".                                                                                                                                                   |
-| D6  | GitHub scopes                   | public only (no extra scope); `repo` for private repos                                                                                 | **Public only in v1.** Auth0's GitHub connection is an OAuth App: `repo` is read **and write** to every private repo and cannot be narrowed (§1.3). Private repos wait for a GitHub App (follow-up). Spec §2 asked for a private-repo permission; this defers it. |
-| D7  | Suggestions (PR d)              | in v1; later                                                                                                                           | **Build, lazy polling** (on dashboard/integrations visit, 15 min floor). No scheduler, no new infra (§6). Webhooks are not possible under A.                                                                                                                      |
-| D8  | Stars/forks/language on re-sync | suggestion; refresh silently                                                                                                           | **Refresh silently.** They are system-owned columns the user cannot edit, so nothing of theirs is overwritten. Only user-editable fields (title, summary, description, technologies) go through suggestions or the 7.4 rules.                                     |
+| ID  | Decision                         | Options                                                                                                                                                                                  | **Recommendation**                                                                                                                                                                                                                                                |
+| --- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | 7.1 token source                 | A1 Auth0 IdP token via Management API; A2 Auth0 Token Vault; B GitHub OAuth App or GitHub App run by the API                                                                             | **A (your direction), stored nowhere.** Build A1 behind one `GithubTokenSource` interface; a 20-minute tenant spike (§2.1) decides whether A2 replaces it. B is kept as the documented fallback (§1.3).                                                           |
+| D2  | Cache the token or not (7.2)     | fetch on demand, in memory 5 min; encrypted copy in MySQL                                                                                                                                | **On demand, in memory only.** No token ever reaches MySQL, a log or a response. The AES-GCM/rotation machinery is not built (§2.4); a DB `CHECK` makes a stored token impossible.                                                                                |
+| D3  | README images (7.5)              | (1) drop every image, keep alt text; (2) allow `<img>` limited to GitHub hosts, relative ones rewritten to `raw.githubusercontent.com`                                                   | **(1).** No change to M4's allow-list or the frontend's sanitizer; works for private repos; no hot-linking. Relative **links** are rewritten to `github.com/<owner>/<repo>/blob/<ref>/<path>` (§3.4). Screenshots belong in M4 attachments.                       |
+| D4  | LinkedIn fixtures (7.6)          | F1 synthetic fixtures from header-only inspection of real exports; F2 wait for real files; F3 Levon pastes header lines himself                                                          | **F1.** A script prints file names that match the four datasets and each one's first line only; I build synthetic CSVs with those headers. PR (c) does not merge until headers are verified (or you accept the risk in writing).                                  |
+| D5  | `verified` and GitHub (7.12)     | email verified **and** GitHub; email verified **or** GitHub                                                                                                                              | **Or.** Spec §3 and §5: "email/phone confirmed, or LinkedIn/GitHub linked". Tracker 2.16's "+" is read as "or".                                                                                                                                                   |
+| D6  | GitHub scopes                    | public only (no extra scope); `repo` for private repos                                                                                                                                   | **Public only in v1.** Auth0's GitHub connection is an OAuth App: `repo` is read **and write** to every private repo and cannot be narrowed (§1.3). Private repos wait for a GitHub App (follow-up). Spec §2 asked for a private-repo permission; this defers it. |
+| D7  | Suggestions (PR d)               | in v1; later                                                                                                                                                                             | **Build, lazy polling** (on dashboard/integrations visit, 15 min floor). No scheduler, no new infra (§6). Webhooks are not possible under A.                                                                                                                      |
+| D8  | Stars/forks/language on re-sync  | suggestion; refresh silently                                                                                                                                                             | **Refresh silently.** They are system-owned columns the user cannot edit, so nothing of theirs is overwritten. Only user-editable fields (title, summary, description, technologies) go through suggestions or the 7.4 rules.                                     |
+| D9  | Disconnect and GitHub revocation | (1) revocation required: the OAuth App's client id and secret are required config, disconnect succeeds only once GitHub confirms; (2) best effort, and the tracker's M7 exit is reworded | **(1).** The M7 exit says "Disconnecting deletes the tokens". Under A the token lives in Auth0 and Auth0 cannot revoke it (§2.5), so only GitHub's grant delete removes it. (2) would need your sign-off on the tracker change.                                   |
 
 D4 (fixtures) and D1 change the shape of PR (a) and (c). The rest do not block starting.
 
@@ -125,6 +126,9 @@ Runs once on the real tenant, with the throwaway GitHub account Levon already us
 4. Token Vault: activate My Account API, toggle "Connected Accounts for Token Vault" on GitHub,
    connect from a test session, exchange. Free plan: allowed?
 5. Revoke at GitHub, then fetch the token again: Auth0 still returns the stale one (expected).
+6. Delete the same grant a second time and record GitHub's status (D9: it must count as revoked).
+   Then log in with GitHub again and fetch: Auth0 must now return a fresh, working token
+   (the reconnect path after a disconnect).
 
 Outcome table: (2)+(3) pass → A1. (2) passes, (3) blocked, (4) passes → A2 for email users. (4)
 passes alone → A2. Nothing passes for email users → GitHub-login users only, and B is reopened.
@@ -180,10 +184,17 @@ the M2M token (`update:users`); 5. flag, `external_user_id`, `external_login`, `
 one transaction (§5.1). The id token is never logged and never stored.
 
 `DELETE /v1/me/integrations/github`
-: In one transaction: flag off, `external_*` and `last_synced_at` cleared, open suggestions with
-source `github` deleted, token cache entry dropped. After the commit, best effort **and reported**:
-revoke the grant at GitHub (§2.5) and return `{ "status": "not_connected", "revokedAtGitHub":
-true|false }`. Projects already imported stay (`source = 'github'`); re-sync then answers
+: 1. Revoke first: fetch the token through the token source and `DELETE /applications/{id}/grant`
+(§2.5). `204` counts as revoked, and so does the status GitHub gives for a grant that is already
+gone (**unverified**: the docs list `422`; the §2.1 spike runs it and the code maps what it saw); no
+linked identity in Auth0 also counts. Anything else (5xx, timeout, `401` on our client
+credentials) answers `502 GITHUB_REVOKE_FAILED` and **changes nothing**, so the card still shows
+"connected" and the student retries. 2. Then, in one transaction: flag off, `external_*` and `last_synced_at` cleared, open
+suggestions with source `github` deleted, token cache entry dropped; `{ "status": "not_connected" }`.
+A crash between 1 and 2 leaves a connected row whose token is dead: the next GitHub call gets `401`,
+which already maps to `409 GITHUB_NOT_LINKED` (§3.1), and a repeated `DELETE` finds the grant gone
+and finishes. Reconnecting needs one fresh GitHub login, which replaces the dead token Auth0 holds
+(§2.1 step 6). Projects already imported stay (`source = 'github'`); re-sync then answers
 `409 GITHUB_NOT_CONNECTED`. The Auth0 identity is **not** unlinked (a GitHub-only user would lose
 their login; `update:users` is already a wide scope): the card says so.
 
@@ -201,9 +212,12 @@ Auth0 cannot revoke third-party tokens (**docs**), and the API has no client sec
 disconnect real, Levon would also give the API the GitHub OAuth App's client id and secret
 (`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, Secret Manager). `DELETE /applications/{id}/grant`
 (Basic auth, body `{access_token}`) then deletes the grant, which also kills the token Auth0 holds.
-Side effect: the user sees GitHub's consent screen at their next GitHub login. **Recommendation:
-yes**, optional config; unset, disconnect reports `revokedAtGitHub: false` and the card tells the
-student where to revoke (GitHub → Settings → Applications).
+Side effect: the user sees GitHub's consent screen at their next GitHub login. **Required (D9)**:
+the M7 exit says disconnecting deletes the tokens, and this is the only call that does. Without
+`GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` every GitHub route answers `503
+INTEGRATION_UNAVAILABLE`, so no student can connect an account the API could not disconnect. If you
+take D9 option (2) instead, disconnect becomes best effort with `revokedAtGitHub: true|false` and
+the tracker exit is reworded.
 
 ### 2.6 What is stored
 
@@ -581,7 +595,8 @@ takes the ZIP: that is replaced by items 8–10 because of the 4.5 MB body cap.
 `AUTH0_M2M_CLIENT_ID`, `AUTH0_M2M_CLIENT_SECRET` (Secret Manager), `AUTH0_CLIENT_ID` (the
 `Gradfolio` app, to check `aud` of the link id token), `GITHUB_API_BASE_URL`,
 `GITHUB_TOKEN_CACHE_S`, `GITHUB_PAGE_MAX`, `GITHUB_IMPORT_MAX_BATCH`, `GITHUB_README_MAX_BYTES`,
-`GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` (only for revocation, §2.5), `IMPORT_MAX_*` (§4.2),
+`GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` (required by every GitHub route, D9 and §2.5),
+`IMPORT_MAX_*` (§4.2),
 `SUGGESTIONS_*`, `UNIVERSITY_DOMAINS`. A refine requires the M2M pair to be set together.
 Production keeps booting with none of them, like `STORAGE_BUCKET`.
 
@@ -602,25 +617,26 @@ identical `db:schema` dump (checked in the PR); timed on the 3,000-project perf 
 
 ## 10. Security properties and their proof
 
-| Property                                          | Proof (guard removed, test fails)                                                                                                                                              |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| No token in any response, log or error            | sentinel `gho_SENTINEL…` through fake Auth0 and fake GitHub, every flow including failures; grep over responses and captured logs                                              |
-| Token never reaches MySQL                         | `CHECK` rejects an insert (3819); remove it, the test that inserts one passes, so the test is the guard                                                                        |
-| `GithubAccessToken` prints nothing                | `JSON.stringify`, template string and `util.inspect` all `[redacted]`                                                                                                          |
-| Link nonce is the caller's, single use, unexpired | second user's nonce 400; replay 400; expired 400; two concurrent links with one nonce: one wins (barrier)                                                                      |
-| Link id token                                     | `alg: none`, HS256, wrong issuer, wrong audience, expired, old `iat`, `sub` not `github                                                                                        | `, nonce mismatch: each 400/401 |
-| Account-in-use                                    | existing `users` row for the secondary sub → 409; second Gradfolio user with the same GitHub id → 409 (unique key removed: test fails)                                         |
-| Import: no user URL fetched                       | strict body (extra `url` key 400); fake GitHub records every request path; only `/user/repos`, `/repositories/<int>`, `/repositories/<int>/readme`                             |
-| Import: only own or push-permitted repos          | public repo of someone else → `skipped: not_owner`                                                                                                                             |
-| Dedupe under race                                 | barrier: two concurrent imports of one repo: one project; remove `lockUser` → `1062`/`1213` surface; remove unique key → still one (lock), so each removal is shown separately |
-| Re-sync never overwrites an edit                  | table in §3.5, one test per row; `PATCH` committed during the sync's fetch survives (barrier)                                                                                  |
-| README safety                                     | §3.4 corpus; remove the pre-pass → relative `href` and `<img>` tests fail                                                                                                      |
-| ZIP guards                                        | corpus (§11); remove each limit, its fixture then parses or crashes                                                                                                            |
-| ZIP leaves nothing                                | bucket listing empty after every corpus case; `fs` write functions spied: never called                                                                                         |
-| Confirm atomic and deduped                        | injected failure on the 3rd section: nothing written; barrier: two concurrent confirms: one set of rows                                                                        |
-| Ownership                                         | every write: second user gets 404 (sync, uploadId, suggestion accept/dismiss); `GET /me/integrations` never shows another user's row                                           |
-| Rate limits                                       | 6th import call in a window is 429 with `Retry-After`; separate counters per route                                                                                             |
-| GitHub error table                                | each class through the real fake server over HTTP (401, 403 with remaining 0, 429 + `retry-after`, 5xx, timeout)                                                               |
+| Property                                          | Proof (guard removed, test fails)                                                                                                                                               |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No token in any response, log or error            | sentinel `gho_SENTINEL…` through fake Auth0 and fake GitHub, every flow including failures; grep over responses and captured logs                                               |
+| Token never reaches MySQL                         | `CHECK` rejects an insert (3819); remove it, the test that inserts one passes, so the test is the guard                                                                         |
+| `GithubAccessToken` prints nothing                | `JSON.stringify`, template string and `util.inspect` all `[redacted]`                                                                                                           |
+| Link nonce is the caller's, single use, unexpired | second user's nonce 400; replay 400; expired 400; two concurrent links with one nonce: one wins (barrier)                                                                       |
+| Link id token                                     | `alg: none`, HS256, wrong issuer, wrong audience, expired, old `iat`, `sub` not `github                                                                                         | `, nonce mismatch: each 400/401 |
+| Account-in-use                                    | existing `users` row for the secondary sub → 409; second Gradfolio user with the same GitHub id → 409 (unique key removed: test fails)                                          |
+| Import: no user URL fetched                       | strict body (extra `url` key 400); fake GitHub records every request path; only `/user/repos`, `/repositories/<int>`, `/repositories/<int>/readme`                              |
+| Import: only own or push-permitted repos          | public repo of someone else → `skipped: not_owner`                                                                                                                              |
+| Dedupe under race                                 | barrier: two concurrent imports of one repo: one project; remove `lockUser` → `1062`/`1213` surface; remove unique key → still one (lock), so each removal is shown separately  |
+| Re-sync never overwrites an edit                  | table in §3.5, one test per row; `PATCH` committed during the sync's fetch survives (barrier)                                                                                   |
+| README safety                                     | §3.4 corpus; remove the pre-pass → relative `href` and `<img>` tests fail                                                                                                       |
+| ZIP guards                                        | corpus (§11); remove each limit, its fixture then parses or crashes                                                                                                             |
+| ZIP leaves nothing                                | bucket listing empty after every corpus case; `fs` write functions spied: never called                                                                                          |
+| Confirm atomic and deduped                        | injected failure on the 3rd section: nothing written; barrier: two concurrent confirms: one set of rows                                                                         |
+| Ownership                                         | every write: second user gets 404 (sync, uploadId, suggestion accept/dismiss); `GET /me/integrations` never shows another user's row                                            |
+| Disconnect revokes                                | fake GitHub records the grant delete; on its 5xx the row stays connected (`502`); its already-gone status still disconnects; remove the revoke-first order → the 5xx test fails |
+| Rate limits                                       | 6th import call in a window is 429 with `Retry-After`; separate counters per route                                                                                              |
+| GitHub error table                                | each class through the real fake server over HTTP (401, 403 with remaining 0, 429 + `retry-after`, 5xx, timeout)                                                                |
 
 ## 11. Final test matrix (the brief's, made concrete)
 
@@ -671,8 +687,9 @@ an extension count, nothing else."
 5. APIs → Auth0 Management API → Settings: read the **token lifetime** and tell the agent the number.
 6. Applications → `Gradfolio` → Allowed Callback URLs: add `http://localhost:3000/auth/github-link`
    (and the production URL later); the FE agent names the exact path.
-7. Optional (§2.5, to make disconnect revoke at GitHub): put the OAuth App's client secret into
-   `gradfolio-github-client-secret` the same way.
+7. Required (D9, §2.5: disconnect revokes at GitHub): put the OAuth App's client secret into
+   `gradfolio-github-client-secret` the same way, and its client id into `.env` as
+   `GITHUB_CLIENT_ID`.
    Then say "m7-t2 done". The agent runs the §2.1 spike with a throwaway test user.
 
 **M7-T3 (rewritten).** _Not needed under D1 = A with D2 = no cache._ Reinstated only if D2 is
