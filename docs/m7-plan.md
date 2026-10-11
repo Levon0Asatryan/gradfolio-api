@@ -537,23 +537,27 @@ as far as I know, approval-gated and limited to EEA members (**unverified**); no
 
 `suggestions`
 
-| Column                      | Type                                             | Note                                                                                                 |
-| --------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `id`                        | CHAR(36) PK                                      | backend-generated                                                                                    |
-| `user_id`                   | CHAR(36) FK `ON DELETE CASCADE`                  | every read and write is scoped to it                                                                 |
-| `kind`                      | VARCHAR(40)                                      | zod enum in code, not a MySQL ENUM (a new kind is not a migration)                                   |
-| `source`                    | ENUM('github','linkedin','auth0')                | disconnect deletes the open rows of its source                                                       |
-| `target_id`                 | CHAR(36) NULL                                    | the project, when the suggestion is about one                                                        |
-| `dedupe_key`                | VARCHAR(190)                                     | `repo:<id>:new`, `repo:<id>:field:<name>:<hash8>`, `skill:<name>`, `linkedin:reimport:2026-Q4`       |
-| `payload`                   | JSON                                             | proposed values + `baseHash`; written through `toJsonColumn`, size ≤ `PROJECT_DESCRIPTION_MAX_BYTES` |
-| `status`                    | ENUM('open','accepted','dismissed','superseded') |                                                                                                      |
-| `created_at`, `resolved_at` | DATETIME                                         |                                                                                                      |
+| Column                      | Type                                             | Note                                                                                                                                    |
+| --------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                        | CHAR(36) PK                                      | backend-generated                                                                                                                       |
+| `user_id`                   | CHAR(36) FK `ON DELETE CASCADE`                  | every read and write is scoped to it                                                                                                    |
+| `kind`                      | VARCHAR(40)                                      | zod enum in code, not a MySQL ENUM (a new kind is not a migration)                                                                      |
+| `source`                    | ENUM('github','linkedin','auth0')                | disconnect deletes the open rows of its source                                                                                          |
+| `target_id`                 | CHAR(36) NULL                                    | the project, when the suggestion is about one                                                                                           |
+| `dedupe_key`                | VARCHAR(190)                                     | `repo:<id>:new`, `repo:<id>:field:<name>:<hash8>`, `skill:<name>`, `linkedin:reimport:2026-Q4`                                          |
+| `payload`                   | JSON NULL                                        | proposed values + `baseHash`; written through `toJsonColumn`, size ≤ `PROJECT_DESCRIPTION_MAX_BYTES`; `NULL` only on a purged dismissal |
+| `status`                    | ENUM('open','accepted','dismissed','superseded') |                                                                                                                                         |
+| `created_at`, `resolved_at` | DATETIME                                         |                                                                                                                                         |
 
 `UNIQUE (user_id, dedupe_key)`: a poll is idempotent, and a **dismissed** suggestion with the same
 key never returns. A new upstream value has a new hash, hence a new key; the older open one for the
 same field becomes `superseded` in the same transaction. `INDEX (user_id, status, created_at)`.
-Caps: `SUGGESTIONS_MAX_OPEN` (50) per user (oldest superseded); resolved rows purged after 90 days
-(`npm run suggestions:purge`, same pattern as the sweep).
+Caps: `SUGGESTIONS_MAX_OPEN` (50) per user (oldest superseded). After 90 days (`npm run
+suggestions:purge`, same pattern as the sweep) `accepted` and `superseded` rows are deleted, but a
+`dismissed` row is only emptied (`payload = NULL`) and kept as a tombstone: its key is the only thing
+that stops the next poll from proposing it again. Tombstones are a key and two dates, a few hundred
+per user at most, and go with the account (`ON DELETE CASCADE`). A tombstone is never listed or
+restorable.
 
 `integrations` gets `poll_etag VARCHAR(255)`, `polled_at DATETIME`, `claims_hash CHAR(64)`.
 
@@ -655,6 +659,7 @@ identical `db:schema` dump (checked in the PR); timed on the 3,000-project perf 
 | Confirm atomic and deduped                        | injected failure on the 3rd section: nothing written; barrier: two concurrent confirms: one set of rows                                                                                                                                                                                                                                                  |
 | Ownership                                         | every write: second user gets 404 (sync, uploadId, suggestion accept/dismiss); `GET /me/integrations` never shows another user's row                                                                                                                                                                                                                     |
 | Disconnect revokes                                | fake GitHub records the grant delete; on its 5xx the row stays connected (`502`); its already-gone status still disconnects; remove the revoke-first order → the 5xx test fails                                                                                                                                                                          |
+| Dismissed never returns                           | dismiss, run the purge with the clock past 90 days, poll the same upstream state: no new row; make the purge delete dismissed rows → the poll inserts it again and the test fails                                                                                                                                                                        |
 | Rate limits                                       | 6th import call in a window is 429 with `Retry-After`; separate counters per route                                                                                                                                                                                                                                                                       |
 | GitHub error table                                | each class through the real fake server over HTTP (401, 403 with remaining 0, 429 + `retry-after`, 5xx, timeout)                                                                                                                                                                                                                                         |
 
