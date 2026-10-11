@@ -465,8 +465,8 @@ export const OPERATIONS: readonly Operation[] = [
     summary: 'The caller’s own account',
     description:
       'The first call after a login creates the account from the access token’s profile ' +
-      'claims (name, email, picture); later calls return the same id. `verified` follows ' +
-      'the token’s `email_verified`.',
+      'claims (name, email, picture); later calls return the same id. `verified` is the ' +
+      'token’s `email_verified`, or a connected GitHub account.',
     bearer: true,
     responses: {
       '200': { description: 'The caller’s account', schema: meResponseSchema },

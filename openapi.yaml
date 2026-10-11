@@ -84,7 +84,7 @@ paths:
       tags:
         - me
       summary: The caller’s own account
-      description: The first call after a login creates the account from the access token’s profile claims (name, email, picture); later calls return the same id. `verified` follows the token’s `email_verified`.
+      description: The first call after a login creates the account from the access token’s profile claims (name, email, picture); later calls return the same id. `verified` is the token’s `email_verified`, or a connected GitHub account.
       security:
         - bearerAuth: []
       responses:
@@ -111,7 +111,7 @@ paths:
                     type: string
                   verified:
                     type: boolean
-                    description: Email verified with Auth0 (GitHub from M7).
+                    description: Email verified with Auth0, or a connected GitHub account.
                   isPublic:
                     type: boolean
                   onboarded:

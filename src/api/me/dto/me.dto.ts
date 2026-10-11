@@ -7,7 +7,9 @@ export const meResponseSchema = z.object({
   email: z.string().nullable(),
   avatarUrl: z.string().nullable(),
   headline: z.string(),
-  verified: z.boolean().meta({ description: 'Email verified with Auth0 (GitHub from M7).' }),
+  verified: z
+    .boolean()
+    .meta({ description: 'Email verified with Auth0, or a connected GitHub account.' }),
   isPublic: z.boolean(),
   onboarded: z
     .boolean()
