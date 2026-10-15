@@ -176,13 +176,11 @@ This repository is its backend API.
 
 Absolute path: `/Users/levon/Dev/university/gradfolio-repos`.
 
-| Path             | What it is                                                                                                                                |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `gradfolio-api/` | This repo.                                                                                                                                |
-| `gradfolio/`     | Frontend: Next.js 16, MUI 7, Auth0 v4, on Vercel. All data is currently mock.                                                             |
-| `gradfolio-sql/` | MySQL 8.4 schema (11 tables), seed data, example queries, per-table docs.                                                                 |
-| `docs/`          | The product spec (`Student Portfolio Management System – Feature Specification.md`) and a competitor analysis. These are not in any repo. |
-| `issues.md`      | Known defects across all three repos.                                                                                                     |
+| Path             | What it is                                                                    |
+| ---------------- | ----------------------------------------------------------------------------- |
+| `gradfolio-api/` | This repo.                                                                    |
+| `gradfolio/`     | Frontend: Next.js 16, MUI 7, Auth0 v4, on Vercel. All data is currently mock. |
+| `gradfolio-sql/` | MySQL 8.4 schema (11 tables), seed data, example queries, per-table docs.     |
 
 Background for every milestone:
 [`docs/investigation.md`](docs/investigation.md), covering the schema facts verified

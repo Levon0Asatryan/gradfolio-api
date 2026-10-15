@@ -19,8 +19,8 @@ side merged (#15 plan, #17, #20). `main` is at `1116ba4`.
 
 - [investigation.md](investigation.md): schema facts verified on MySQL 8.4, gaps
   between frontend and schema, decisions Q1–Q10;
-- the feature spec, in the workspace `docs/`;
-- `issues.md`, in the workspace root: issue IDs S\* (gradfolio-sql), F\* (gradfolio)
+- the feature spec, in [spec/](spec/feature-specification.md);
+- [issues.md](issues.md): issue IDs S\* (gradfolio-sql), F\* (gradfolio)
   and P\* (spec vs schema);
 - a check of the live frontend on 2026-09-28.
 

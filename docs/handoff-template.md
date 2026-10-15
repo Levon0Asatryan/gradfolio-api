@@ -35,7 +35,7 @@ docs/investigation.md.
 
 ## Phase 1: Investigation (before any plan or code)
 - Every requirement in scope: the spec in
-  /Users/levon/Dev/university/gradfolio-repos/docs/, the schema in ../gradfolio-sql,
+  gradfolio-api `docs/spec/`, the schema in ../gradfolio-sql,
   and the frontend types in ../gradfolio/src. List any contradictions.
 - The code on main that this work touches, and the patterns to follow.
 - How comparable systems solve the problem, and their published bugs and

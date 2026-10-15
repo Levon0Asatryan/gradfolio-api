@@ -8,8 +8,9 @@ Sources read:
   `docker-compose.yml`, `docs/TABLES.md`, `docs/01…11-*.md`, the ERD image.
 - `gradfolio` (frontend) — `src/` (types, mocks, auth, pages), `CLAUDE.md`, `README.md`.
   It has no `docs/` folder.
-- Product spec — `gradfolio-repos/docs/Student Portfolio Management System – Feature
-Specification.md` and the competitor analysis next to it. They are not in any repo.
+- Product spec — [spec/feature-specification.md](spec/feature-specification.md) and
+  the [competitor analysis](spec/competitor-analysis.md) (moved into this repo on
+  2026-10-15; they were in the workspace `docs/` folder).
 
 Rows marked **run** were executed against MySQL 8.4.11 in a throwaway container,
 which was stopped and removed afterwards with no volumes left behind.
