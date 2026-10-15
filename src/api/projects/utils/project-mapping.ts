@@ -23,6 +23,7 @@ export function toSummary(
     isDraft: row.isDraft,
     isOwner: viewerId !== undefined && viewerId === row.userId,
     ownerId: row.userId,
+    source: row.source,
     metadata: {
       startDate: row.metaStartDate,
       endDate: row.metaEndDate,
@@ -90,7 +91,6 @@ export function toDetail(
       name: row.ownerName,
       avatarUrl: row.ownerIsPublic || isOwner ? row.ownerAvatarUrl : null,
     },
-    source: row.source,
   };
 }
 

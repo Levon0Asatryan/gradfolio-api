@@ -50,6 +50,63 @@ export async function insertProject(
     .execute();
 }
 
+/** What an import knows about the repository, stored beside the project (docs/m7-plan.md §3.3). */
+export interface RepoFacts {
+  githubRepoId: number;
+  stars: number;
+  forks: number;
+  language: string | null;
+  readmeUrl: string | null;
+}
+
+/**
+ * A project imported from GitHub: the validated input plus the repository
+ * columns no client can write. Always a draft (`input.isDraft`).
+ */
+export async function insertImportedProject(
+  trx: Transaction<DB>,
+  userId: string,
+  id: string,
+  input: ProjectInput,
+  facts: RepoFacts,
+): Promise<void> {
+  await trx
+    .insertInto('projects')
+    .values({
+      id,
+      userId,
+      ...toColumns(input),
+      source: 'github',
+      githubRepoId: facts.githubRepoId,
+      repoStars: facts.stars,
+      repoForks: facts.forks,
+      repoLanguage: facts.language,
+      repoReadmeUrl: facts.readmeUrl,
+    } as Insertable<Projects>)
+    .execute();
+}
+
+/** The repository facts a re-sync refreshes silently (D8); rows matched, scoped to the caller. */
+export async function updateRepoFacts(
+  trx: Transaction<DB>,
+  userId: string,
+  id: string,
+  facts: Omit<RepoFacts, 'githubRepoId'>,
+): Promise<number> {
+  const result = await trx
+    .updateTable('projects')
+    .set({
+      repoStars: facts.stars,
+      repoForks: facts.forks,
+      repoLanguage: facts.language,
+      repoReadmeUrl: facts.readmeUrl,
+    })
+    .where('id', '=', id)
+    .where('userId', '=', userId)
+    .executeTakeFirst();
+  return Number(result.numUpdatedRows);
+}
+
 /**
  * The caller's project, locked (`FOR UPDATE`) until the transaction ends, in
  * the shape the write schemas take. Someone else's id, a deleted one and an

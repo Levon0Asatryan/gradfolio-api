@@ -589,18 +589,33 @@ export const activities: SeedActivity[] = [
   },
 ];
 
-/** GitHub linked for the user who imported a repository; no tokens in seed data. */
+/**
+ * GitHub linked for the user who imported a repository; no tokens in seed data
+ * (none is ever stored, 0008). A connected row carries the GitHub id and login,
+ * as a real connect writes them.
+ */
 export const integrations: {
   user: UserId;
   type: 'github' | 'linkedin';
   status: 'connected' | 'not_connected';
+  externalUserId: string | null;
+  externalLogin: string | null;
   lastSyncedAt: string | null;
 }[] = [
   {
     user: SEED_USERS.dmitri,
     type: 'github',
     status: 'connected',
+    externalUserId: '5830021',
+    externalLogin: 'dmitri-volkov-demo',
     lastSyncedAt: '2026-09-22T17:40:00Z',
   },
-  { user: SEED_USERS.anahit, type: 'github', status: 'not_connected', lastSyncedAt: null },
+  {
+    user: SEED_USERS.anahit,
+    type: 'github',
+    status: 'not_connected',
+    externalUserId: null,
+    externalLogin: null,
+    lastSyncedAt: null,
+  },
 ];

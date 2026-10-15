@@ -61,10 +61,14 @@ export const githubImportResultSchema = z
   .object({
     repoId: z.number().int(),
     outcome: z.enum(['created', 'exists', 'skipped']),
-    reason: z.enum(['not_found', 'not_owner', 'LIMIT_REACHED']).nullable().meta({
-      description:
-        'Why it was skipped: `not_owner` when the caller neither owns it nor may push to it.',
-    }),
+    reason: z
+      .enum(['not_found', 'not_owner', 'invalid_repository', 'LIMIT_REACHED'])
+      .nullable()
+      .meta({
+        description:
+          'Why it was skipped: `not_owner` when the caller neither owns it nor may push to it; ' +
+          '`invalid_repository` when GitHub’s data cannot be stored as a project.',
+      }),
     projectId: z
       .string()
       .nullable()

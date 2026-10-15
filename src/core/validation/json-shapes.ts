@@ -49,3 +49,6 @@ export const notificationParams = z.strictObject({
   projectTitle: z.string().min(1).max(255),
   role: z.string().max(255).nullish(),
 });
+
+/** `GithubImportSnapshot`: project_github_imports.snapshot, a SHA-256 (hex) per synced field. */
+export const githubImportSnapshot = z.record(z.string(), z.string().regex(/^[0-9a-f]{64}$/));

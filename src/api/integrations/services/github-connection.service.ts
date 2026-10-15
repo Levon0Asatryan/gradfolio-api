@@ -14,6 +14,7 @@ import { lockUser } from '../../../core/db/user-lock.js';
 import { AppError, ConflictError } from '../../../core/errors/app-error.js';
 import { GithubNotLinkedError, GithubRevokeFailedError } from '../../../core/github/errors.js';
 import type { GithubUser } from '../../../core/github/github-client.js';
+import type { GithubAccessToken } from '../../../core/github/github-access-token.js';
 import type { GithubIdentity } from '../../../core/github/token-source.js';
 import type { UserRow } from '../../users/repositories/user.repository.js';
 import type {
@@ -101,6 +102,35 @@ export class GithubConnectionService {
         lastSyncedAt: linkedin?.lastSyncedAt?.toISOString() ?? null,
       },
     };
+  }
+
+  /**
+   * What a GitHub read or import needs: the connected flag is on, and Auth0
+   * still holds the identity (and a token) of the GitHub account that was
+   * connected. A flag whose identity is gone is cleared (plan §2.3) and answers
+   * 409 GITHUB_NOT_LINKED; a different GitHub account at Auth0 than the one
+   * connected is the same answer, without clearing (the student reconnects).
+   */
+  async requireConnected(
+    user: UserRow,
+    identity: AccessTokenIdentity,
+  ): Promise<{ gh: GithubConnect; token: GithubAccessToken; githubUserId: string }> {
+    const gh = this.required();
+    await this.reconcile(gh, user);
+    const row = await this.githubRow(user.id);
+    if (row?.status !== 'connected') {
+      throw new ConflictError('GITHUB_NOT_CONNECTED', 'connect GitHub first');
+    }
+    const found = await gh.tokens.tokenFor(user.auth0Id);
+    if (found === null) {
+      await this.markDisconnected(user.id, identity, versionOf(row));
+      throw new GithubNotLinkedError('no github identity at auth0');
+    }
+    if (found.githubUserId !== row.externalUserId) {
+      gh.tokens.forget(user.auth0Id);
+      throw new GithubNotLinkedError('a different github account is linked');
+    }
+    return { gh, token: found.token, githubUserId: found.githubUserId };
   }
 
   /**

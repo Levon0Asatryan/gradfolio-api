@@ -73,9 +73,9 @@ describe('openapi document', () => {
     const doc = buildOpenApiDocument() as {
       paths: Record<string, Record<string, Record<string, unknown>>>;
     };
-    const op = doc.paths['/v1/me/github/import']?.post;
-    expect(op?.['x-gradfolio-planned']).toBe('M7 PR (b)');
-    expect(op?.description).toMatch(/^\*\*Not served yet: arrives with M7 PR \(b\)\.\*\*/);
+    const op = doc.paths['/v1/me/imports/linkedin/preview']?.post;
+    expect(op?.['x-gradfolio-planned']).toBe('M7 PR (c)');
+    expect(op?.description).toMatch(/^\*\*Not served yet: arrives with M7 PR \(c\)\.\*\*/);
     expect(doc.paths['/v1/me/integrations']?.get).not.toHaveProperty('x-gradfolio-planned');
   });
 

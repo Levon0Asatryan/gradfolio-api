@@ -2,6 +2,7 @@ import { sql } from 'kysely';
 import { describe, expect, it } from 'vitest';
 import { testDatabase } from '../../../testing/database.js';
 import { createUser } from '../../../testing/factories.js';
+import { hashField } from '../../github/snapshot.js';
 import { SEED_PROJECTS, SEED_USERS } from './data.js';
 import { seed } from './seed.js';
 
@@ -21,6 +22,7 @@ describe('seed', () => {
       'project_attachments',
       'project_team_members',
       'integrations',
+      'project_github_imports',
       'activities',
       'notifications',
     ];
@@ -72,6 +74,7 @@ describe('seed', () => {
       project_attachments: 4,
       project_team_members: 6,
       integrations: 2,
+      project_github_imports: 1,
       activities: 5,
       notifications: 4,
     });
@@ -115,6 +118,39 @@ describe('seed', () => {
       SELECT COUNT(*) AS n FROM project_team_members m JOIN projects p ON p.id = m.project_id
        WHERE m.user_id = p.user_id`.execute(db);
     expect(Number(owners.rows[0]?.n)).toBe(0);
+  });
+
+  it('writes the imported draft as an import does: a connected row with its GitHub id, and a snapshot equal to the stored values', async () => {
+    await seed(db);
+    const connected = await db
+      .selectFrom('integrations')
+      .select(['status', 'externalUserId', 'externalLogin', 'accessToken'])
+      .where('userId', '=', SEED_USERS.dmitri)
+      .where('integrationType', '=', 'github')
+      .executeTakeFirstOrThrow();
+    expect(connected).toEqual({
+      status: 'connected',
+      externalUserId: '5830021',
+      externalLogin: 'dmitri-volkov-demo',
+      accessToken: null,
+    });
+    const p = await db
+      .selectFrom('projects')
+      .select(['title', 'summary', 'descriptionHtml', 'repoUrl'])
+      .where('id', '=', SEED_PROJECTS.importedCli)
+      .executeTakeFirstOrThrow();
+    const snap = await db
+      .selectFrom('projectGithubImports')
+      .select('snapshot')
+      .where('projectId', '=', SEED_PROJECTS.importedCli)
+      .executeTakeFirstOrThrow();
+    expect(snap.snapshot).toEqual({
+      title: hashField('title', p.title),
+      summary: hashField('summary', p.summary),
+      descriptionHtml: hashField('descriptionHtml', p.descriptionHtml),
+      repoUrl: hashField('repoUrl', p.repoUrl),
+      technologies: hashField('technologies', ['Go']),
+    });
   });
 
   it('includes a GitHub draft, a private project and a private profile', async () => {

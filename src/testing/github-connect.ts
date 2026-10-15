@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect } from 'vitest';
 import { buildApp, captureLogs } from './app.js';
 import { testConfig } from './database.js';
 import { installFakeAuth0, type FakeAuth0 } from './fake-auth0.js';
-import { startFakeGithub, type FakeGithub } from './fake-github.js';
+import { type FakeRepo, startFakeGithub, type FakeGithub } from './fake-github.js';
 import { createUser } from './factories.js';
 import { startTestTenant, type TestTenant } from './jwks.js';
 import { db } from './team.js';
@@ -59,6 +59,9 @@ export function githubConnectHarness() {
     gh.userMode = 'ok';
     gh.grantStatus = undefined;
     gh.grantHang = false;
+    gh.grantDropAfterProcessing = false;
+    gh.repos.clear();
+    gh.repoMode = 'ok';
   });
   afterEach(async () => {
     logs.clear();
@@ -127,6 +130,42 @@ export function githubConnectHarness() {
     linkedAtAuth0(sub: string, githubId: string, login: string): void {
       auth0.withGithub(sub, githubId);
       gh.tokens.set(auth0.githubTokenFor(githubId), { id: Number(githubId), login });
+    },
+
+    /** A repository GitHub knows (public, default branch `main`, a short README), owned by `ownerId`. */
+    addRepo(over: Partial<FakeRepo> & { id: number; ownerId: number }): FakeRepo {
+      const repo: FakeRepo = {
+        name: `repo-${over.id}`,
+        ownerLogin: `owner-${over.ownerId}`,
+        description: `Repo ${over.id}`,
+        language: 'TypeScript',
+        stars: 3,
+        forks: 1,
+        private: false,
+        fork: false,
+        archived: false,
+        defaultBranch: 'main',
+        pushedAt: new Date(Date.UTC(2026, 0, 1) + over.id * 60_000).toISOString(),
+        pushers: [],
+        readme: `<h1>Repo ${over.id}</h1><p>Hello.</p>`,
+        readmePath: 'README.md',
+        ...over,
+      };
+      gh.repos.set(repo.id, repo);
+      return repo;
+    },
+
+    /** A GitHub-connected student: user row, Auth0 identity, GitHub token, and `connect` done. */
+    async connectedStudent(
+      http: Http,
+      githubId: string,
+      login = `login-${githubId}`,
+    ): Promise<Student> {
+      const sub = `github|${githubId}`;
+      const s = await this.student(sub);
+      this.linkedAtAuth0(sub, githubId, login);
+      await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(200);
+      return s;
     },
 
     /** GitHub knows the token Auth0 will hold for `githubId` after a link. */

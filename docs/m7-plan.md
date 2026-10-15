@@ -296,10 +296,12 @@ strict body, positive safe integers, no duplicates).
    `github_repo_id`s; insert the missing ones with `source = 'github'`, `is_draft = 1`, `is_public =
 !repo.private`, `title = name`, `summary = description` cut to the column, `description_html` =
    sanitized README, `repo_*`, `repo_url = html_url`, `technologies = [language]`; insert the
-   `project_github_imports` snapshot (§3.5). The unique key is the backstop: a `1062` becomes
-   `exists`, a `1213` reruns (`inTransaction`).
+   `project_github_imports` snapshot (§3.5). The user lock is what makes two importers of one
+   repository safe; the unique key is the backstop (a `1213` reruns, `inTransaction`).
 3. Response: per repo `created | exists | skipped` with `reason` (`not_found`, `not_owner`,
-   `LIMIT_REACHED`, `README_TOO_LARGE` is a note on `created`, not a skip), `projectId`.
+   `invalid_repository`, `LIMIT_REACHED`; `README_TOO_LARGE` is a note on `created`, not a skip),
+   `projectId`. As built in PR (b): a repository that no longer exists or is no longer visible
+   answers re-sync with `409 GITHUB_REPO_UNAVAILABLE`.
 
 Run (§1.5): without the lock, two importers of one repo give `1062` to the loser and, when the
 winner rolls back, `1213` to a waiter; a natural-key check-then-insert (used by confirm, 7.8)
@@ -625,7 +627,7 @@ takes the ZIP: that is replaced by items 8–10 because of the 4.5 MB body cap.
 
 `AUTH0_M2M_CLIENT_ID`, `AUTH0_M2M_CLIENT_SECRET` (Secret Manager), `AUTH0_CLIENT_ID` (the
 `Gradfolio` app, to check `aud` of the link id token), `GITHUB_API_BASE_URL`,
-`GITHUB_TOKEN_CACHE_S`, `GITHUB_PAGE_MAX`, `GITHUB_IMPORT_MAX_BATCH`, `GITHUB_README_MAX_BYTES`,
+`GITHUB_TOKEN_CACHE_S`, `GITHUB_PAGE_MAX`, `GITHUB_IMPORT_MAX_BATCH`, `GITHUB_README_MAX_BYTES`, `GITHUB_IMPORT_CONCURRENCY`,
 `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` (required by every GitHub route, D9 and §2.5),
 `IMPORT_MAX_*` (§4.2),
 `SUGGESTIONS_*`, `UNIVERSITY_DOMAINS`. A refine requires the M2M pair to be set together.

@@ -29,6 +29,30 @@ export type UserMode =
   | 'huge'
   | 'bad-json';
 
+/** A repository GitHub knows, as the fake serves it. */
+export interface FakeRepo {
+  id: number;
+  name: string;
+  ownerId: number;
+  ownerLogin: string;
+  description: string | null;
+  language: string | null;
+  stars: number;
+  forks: number;
+  private: boolean;
+  fork: boolean;
+  archived: boolean;
+  defaultBranch: string;
+  pushedAt: string;
+  /** Collaborators (token user ids) who may push although they do not own it. */
+  pushers: number[];
+  /** GitHub-rendered README HTML; null: the repository has none. */
+  readme: string | null;
+  readmePath: string;
+}
+
+export type RepoMode = 'ok' | 'rate-limited' | 'status-500';
+
 export interface FakeGithub {
   /** `http://127.0.0.1:<port>/`. */
   readonly baseUrl: string;
@@ -47,6 +71,12 @@ export interface FakeGithub {
   grantDropAfterProcessing: boolean;
   /** `x-ratelimit-reset` it sends, epoch seconds. */
   resetAt: number;
+  /** Repositories by id; `GET /user/repos`, `/repositories/{id}` and its README read them. */
+  readonly repos: Map<number, FakeRepo>;
+  /** How the repository routes answer, whatever the token. */
+  repoMode: RepoMode;
+  /** Holds the next `GET /repositories/{id}` answer, decided at arrival, until released. */
+  holdNextRepo(): { arrived: Promise<void>; release(): void };
   /**
    * Holds the next `GET /user` answer, decided when the request arrived (as
    * GitHub answered then), until released: the answer is in flight while the
@@ -83,6 +113,7 @@ export async function startFakeGithub(): Promise<FakeGithub> {
   let userGate: { arrived: () => void; released: Promise<void> } | undefined;
   let grantGate: { arrived: () => void; released: Promise<void> } | undefined;
   let grantRequestGate: { arrived: () => void; released: Promise<void> } | undefined;
+  let repoGate: { arrived: () => void; released: Promise<void> } | undefined;
   const gate = () => {
     let arrived!: () => void;
     let release!: () => void;
@@ -99,6 +130,8 @@ export async function startFakeGithub(): Promise<FakeGithub> {
     grantHang: false,
     grantDropAfterProcessing: false,
     resetAt: Math.floor(Date.now() / 1000) + 120,
+    repos: new Map<number, FakeRepo>(),
+    repoMode: 'ok' as RepoMode,
   };
   const clientId = 'gh-oauth-client';
   const clientSecret = 'gh-SENTINEL-client-secret';
@@ -172,6 +205,92 @@ export async function startFakeGithub(): Promise<FakeGithub> {
         }
       }
 
+      const asUser = () => {
+        const token = /^Bearer (.+)$/.exec(req.headers.authorization ?? '')?.[1];
+        return token === undefined ? undefined : state.tokens.get(token);
+      };
+      const repoJson = (r: FakeRepo, me: { id: number }) => ({
+        id: r.id,
+        name: r.name,
+        full_name: `${r.ownerLogin}/${r.name}`,
+        description: r.description,
+        language: r.language,
+        stargazers_count: r.stars,
+        forks_count: r.forks,
+        html_url: `https://github.com/${r.ownerLogin}/${r.name}`,
+        private: r.private,
+        fork: r.fork,
+        archived: r.archived,
+        default_branch: r.defaultBranch,
+        pushed_at: r.pushedAt,
+        owner: { id: r.ownerId, login: r.ownerLogin },
+        permissions: { push: r.ownerId === me.id || r.pushers.includes(me.id) },
+      });
+      const visibleTo = (r: FakeRepo, me: { id: number }) =>
+        !r.private || r.ownerId === me.id || r.pushers.includes(me.id);
+      const repoFailure = () => {
+        if (state.repoMode === 'rate-limited') {
+          return send(
+            res,
+            403,
+            { message: 'API rate limit exceeded' },
+            { 'x-ratelimit-remaining': '0' },
+          );
+        }
+        if (state.repoMode === 'status-500') return send(res, 500, { message: 'boom' });
+        return undefined;
+      };
+
+      if (path === '/user/repos' && req.method === 'GET') {
+        const me = asUser();
+        if (!me) return send(res, 401, { message: 'Bad credentials' });
+        if (state.repoMode !== 'ok') return repoFailure();
+        const q = new URL(req.url ?? '/', 'http://fake').searchParams;
+        const perPage = Math.min(100, Math.max(1, Number(q.get('per_page') ?? 30)));
+        const page = Math.max(1, Number(q.get('page') ?? 1));
+        const mine = [...state.repos.values()]
+          .filter((r) => (r.ownerId === me.id || r.pushers.includes(me.id)) && !r.private)
+          .sort((a, b) => b.pushedAt.localeCompare(a.pushedAt) || a.id - b.id);
+        const slice = mine.slice((page - 1) * perPage, page * perPage);
+        const more = page * perPage < mine.length;
+        return send(
+          res,
+          200,
+          slice.map((r) => repoJson(r, me)),
+          more
+            ? { link: `<http://fake/user/repos?page=${page + 1}&per_page=${perPage}>; rel="next"` }
+            : {},
+        );
+      }
+
+      const repoPath = /^\/repositories\/(\d+)(\/readme)?$/.exec(path);
+      if (repoPath && req.method === 'GET') {
+        const me = asUser();
+        if (!me) return send(res, 401, { message: 'Bad credentials' });
+        if (repoGate && !repoPath[2]) {
+          const held = repoGate;
+          repoGate = undefined;
+          held.arrived();
+          await held.released;
+        }
+        if (state.repoMode !== 'ok') return repoFailure();
+        const repo = state.repos.get(Number(repoPath[1]));
+        if (repo === undefined || !visibleTo(repo, me)) {
+          return send(res, 404, { message: 'Not Found' });
+        }
+        if (!repoPath[2]) return send(res, 200, repoJson(repo, me));
+        if (repo.readme === null) return send(res, 404, { message: 'Not Found' });
+        res.writeHead(200, {
+          'content-type': 'application/vnd.github.html+json; charset=utf-8',
+          'x-ratelimit-remaining': '4990',
+          'x-ratelimit-reset': String(state.resetAt),
+        });
+        res.end(
+          `<div id="readme" class="" data-path="${repo.readmePath}"><article>${repo.readme}</article></div>`,
+        );
+        return;
+      }
+
       const grant = /^\/applications\/([^/]+)\/grant$/.exec(path);
       if (grant && req.method === 'DELETE') {
         if (state.grantHang) {
@@ -238,6 +357,18 @@ export async function startFakeGithub(): Promise<FakeGithub> {
     },
     set grantStatus(s: number | undefined) {
       state.grantStatus = s;
+    },
+    repos: state.repos,
+    get repoMode() {
+      return state.repoMode;
+    },
+    set repoMode(m: RepoMode) {
+      state.repoMode = m;
+    },
+    holdNextRepo() {
+      const g = gate();
+      repoGate = g.held;
+      return g.handle;
     },
     get grantDropAfterProcessing() {
       return state.grantDropAfterProcessing;
