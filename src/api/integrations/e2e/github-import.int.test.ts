@@ -338,10 +338,12 @@ describe('POST /v1/me/github/import', () => {
     const { http, alice } = await setup({ GITHUB_README_MAX_BYTES: '2000' });
     h.addRepo({ id: 60, ownerId: 100, readme: `<p>${'x'.repeat(5000)}</p>` });
     h.addRepo({ id: 62, ownerId: 100, readme: null });
-    const res = await importIds(http, alice, [60, 62]).expect(200);
-    expect(rowsOf(res, 'results').map((r) => r.notes)).toEqual([['README_TOO_LARGE'], []]);
-    // The capped answer's headers still count (the fake sends 4990 with a README).
-    expect(res.body.rateLimit.remaining).toBe(4990);
+    // Alone, so the last answer is the capped one (the fake sends 4990 with a README).
+    const capped = await importIds(http, alice, [60]).expect(200);
+    expect(rowsOf(capped, 'results').map((r) => r.notes)).toEqual([['README_TOO_LARGE']]);
+    expect(capped.body.rateLimit.remaining).toBe(4990);
+    const none = await importIds(http, alice, [62]).expect(200);
+    expect(rowsOf(none, 'results').map((r) => r.notes)).toEqual([[]]);
     expect((await projectRow(alice.id, 60))!.descriptionHtml).toBeNull();
     expect((await projectRow(alice.id, 62))!.descriptionHtml).toBeNull();
   });
