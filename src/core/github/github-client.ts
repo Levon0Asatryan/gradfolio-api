@@ -131,6 +131,16 @@ const userResponse = z.object({
  */
 export const GRANT_ALREADY_GONE = [422] as const;
 
+/** A 502 like any unavailable answer, but one whose headers are known (the body went over the cap). */
+class GithubBodyTooLargeError extends GithubUnavailableError {
+  constructor(
+    cause: string,
+    readonly upstreamHeaders: Headers,
+  ) {
+    super(cause);
+  }
+}
+
 export class GithubClient {
   constructor(private readonly settings: GithubClientSettings) {}
 
@@ -240,7 +250,7 @@ export class GithubClient {
   /**
    * `GET /repositories/{id}/readme` as GitHub-rendered HTML. `readme` is
    * `null` when the repository has none and `'too_large'` over `maxBytes` (the
-   * body is never read past it, so there are no headers: `rateLimit` null).
+   * body is never read past it; the headers of that answer still give the limit).
    */
   async getReadme(
     token: GithubAccessToken,
@@ -262,8 +272,9 @@ export class GithubClient {
         maxBytes,
       );
     } catch (err) {
-      if (err instanceof GithubUnavailableError && err.logDetail?.includes('too_large')) {
-        return { readme: 'too_large', rateLimit: null };
+      if (err instanceof GithubBodyTooLargeError) {
+        // The answer arrived; only its body was refused: its headers still count.
+        return { readme: 'too_large', rateLimit: rateLimitOf(err.upstreamHeaders) };
       }
       throw err;
     }
@@ -297,7 +308,11 @@ export class GithubClient {
       });
     } catch (err) {
       if (err instanceof UpstreamFailure) {
-        throw new GithubUnavailableError(`${req.method} ${err.kind}: ${err.source}`);
+        const detail = `${req.method} ${err.kind}: ${err.source}`;
+        if (err.kind === 'too_large' && err.headers !== undefined) {
+          throw new GithubBodyTooLargeError(detail, err.headers);
+        }
+        throw new GithubUnavailableError(detail);
       }
       throw err;
     }

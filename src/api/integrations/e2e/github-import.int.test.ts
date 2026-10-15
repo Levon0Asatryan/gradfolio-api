@@ -340,6 +340,8 @@ describe('POST /v1/me/github/import', () => {
     h.addRepo({ id: 62, ownerId: 100, readme: null });
     const res = await importIds(http, alice, [60, 62]).expect(200);
     expect(rowsOf(res, 'results').map((r) => r.notes)).toEqual([['README_TOO_LARGE'], []]);
+    // The capped answer's headers still count (the fake sends 4990 with a README).
+    expect(res.body.rateLimit.remaining).toBe(4990);
     expect((await projectRow(alice.id, 60))!.descriptionHtml).toBeNull();
     expect((await projectRow(alice.id, 62))!.descriptionHtml).toBeNull();
   });

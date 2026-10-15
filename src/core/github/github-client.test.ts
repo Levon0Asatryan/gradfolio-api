@@ -196,10 +196,10 @@ describe('GithubClient', () => {
       gh.repos.get(2)!.readme = null;
       expect((await client.getReadme(token, 2, 10_000)).readme).toBeNull();
       gh.repos.get(3)!.readme = `<p>${'x'.repeat(5000)}</p>`;
-      expect(await client.getReadme(token, 3, 1000)).toEqual({
-        readme: 'too_large',
-        rateLimit: null,
-      });
+      const capped = await client.getReadme(token, 3, 1000);
+      expect(capped.readme).toBe('too_large');
+      // The answer's own headers (the fake sends 4990 with a README), not none.
+      expect(capped.rateLimit?.remaining).toBe(4990);
     });
 
     it('parses Link and rate-limit headers strictly', () => {

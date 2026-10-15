@@ -39,6 +39,8 @@ export class UpstreamFailure extends Error {
   constructor(
     readonly kind: UpstreamFailureKind,
     readonly source: string,
+    /** The response headers, when a response had arrived (a body over the cap). */
+    readonly headers?: Headers,
   ) {
     super(`upstream request failed: ${kind}`);
     this.name = 'UpstreamFailure';
@@ -57,7 +59,7 @@ async function readCapped(res: Response, maxBytes: number): Promise<Uint8Array> 
   const declared = Number(res.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > maxBytes) {
     await res.body?.cancel();
-    throw new UpstreamFailure('too_large', `content-length ${declared}`);
+    throw new UpstreamFailure('too_large', `content-length ${declared}`, res.headers);
   }
   if (!res.body) return new Uint8Array();
   const reader = res.body.getReader();
@@ -69,7 +71,7 @@ async function readCapped(res: Response, maxBytes: number): Promise<Uint8Array> 
     total += value.byteLength;
     if (total > maxBytes) {
       await reader.cancel();
-      throw new UpstreamFailure('too_large', `over ${maxBytes} bytes`);
+      throw new UpstreamFailure('too_large', `over ${maxBytes} bytes`, res.headers);
     }
     chunks.push(value);
   }
