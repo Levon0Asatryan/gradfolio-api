@@ -14,15 +14,17 @@ request as the change that affects it.
 | [../openapi.yaml](../openapi.yaml)         | The API surface, generated from the zod schemas                               |
 | `mN-plan.md`                               | The investigation and plan each milestone was built from                      |
 | `mN-verification.md`                       | What was run to accept each milestone, and what it produced                   |
+| [spec/](spec/)                             | The product feature specification and the competitor analysis                 |
+| [issues.md](issues.md)                     | Known defects across all three repos (S\*, F\*, P\* IDs)                      |
+| [handoffs/](handoffs/README.md)            | The prompt each worker or lead chat was given, and its report, per milestone  |
+| [course/](course/)                         | Coursework: how the project is split between the three students (Armenian)    |
 
 ## What is not here
 
-| Looking for                          | Go to                                                                              |
-| ------------------------------------ | ---------------------------------------------------------------------------------- |
-| Product scope and features           | The feature specification, in the workspace `docs/` folder (not in any repository) |
-| Table definitions, per-column docs   | [gradfolio-sql](https://github.com/Levon0Asatryan/gradfolio-sql) `docs/`           |
-| Frontend pages and types             | [gradfolio](https://github.com/Levon0Asatryan/gradfolio) `CLAUDE.md`               |
-| Known defects across all three repos | `issues.md` in the workspace root                                                  |
+| Looking for                        | Go to                                                                    |
+| ---------------------------------- | ------------------------------------------------------------------------ |
+| Table definitions, per-column docs | [gradfolio-sql](https://github.com/Levon0Asatryan/gradfolio-sql) `docs/` |
+| Frontend pages and types           | [gradfolio](https://github.com/Levon0Asatryan/gradfolio) `CLAUDE.md`     |
 
 ## Adding a document here
 
