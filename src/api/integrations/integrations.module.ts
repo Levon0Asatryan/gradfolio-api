@@ -39,6 +39,7 @@ export function createGithubConnect(cfg: AppConfig): GithubConnect | null {
       maxAgeS: cfg.LINK_ID_TOKEN_MAX_AGE_S,
     }),
     linkDeadlineMs: 2 * cfg.AUTH0_MANAGEMENT_TIMEOUT_MS,
+    revokeDeadlineMs: 2 * cfg.AUTH0_MANAGEMENT_TIMEOUT_MS + cfg.GITHUB_TIMEOUT_MS,
   };
 }
 

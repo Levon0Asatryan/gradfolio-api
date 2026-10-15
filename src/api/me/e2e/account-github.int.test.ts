@@ -81,4 +81,75 @@ describe('account deletion revokes first', () => {
     expect(h.gh.revoked).toEqual([h.auth0.githubTokenFor('112')]);
     expect(await db.selectFrom('users').select('id').where('id', '=', s.id).execute()).toEqual([]);
   });
+
+  it('a link still in flight stops the deletion without revoking or deleting anything (barrier on Auth0’s link)', async () => {
+    const http = await h.start();
+    const s = await h.student('auth0|delete-linking');
+    h.githubKnows('113', 'inflight');
+    const token = await h.idToken('113', await h.nonceFor(http, s));
+    const gate = h.auth0.holdNextLink();
+    const linking = http
+      .post('/v1/me/integrations/github/link')
+      .set(s.auth)
+      .send({ idToken: token })
+      .then((r) => r);
+    await gate.arrived;
+    expect(await githubRow(s.id)).toMatchObject({ status: 'linking', externalUserId: '113' });
+
+    const asked = h.auth0.calls.length;
+    const res = await http.delete('/v1/me').set(s.auth);
+    expect(res.status).toBe(409);
+    expect((res.body as { code: string }).code).toBe('GITHUB_LINK_IN_PROGRESS');
+    // Nothing asked of Auth0 or GitHub for a revocation, and the account stands.
+    expect(h.auth0.calls.length).toBe(asked);
+    expect(h.gh.requests.filter((r) => r.method === 'DELETE')).toEqual([]);
+    expect(await db.selectFrom('users').select('id').where('id', '=', s.id).execute()).toHaveLength(
+      1,
+    );
+
+    // The link then completes, and the retry revokes what it made before deleting.
+    gate.release();
+    expect((await linking).status).toBe(200);
+    await http.delete('/v1/me').set(s.auth).expect(204);
+    expect(h.gh.revoked).toEqual([h.auth0.githubTokenFor('113')]);
+  });
+
+  it('a link that reserved after the preflight stops the deletion at the user lock (barrier)', async () => {
+    const http = await h.start();
+    const s = await h.student('auth0|delete-late-link');
+    h.githubKnows('114', 'late-link');
+    const token = await h.idToken('114', await h.nonceFor(http, s));
+    const gate = h.auth0.holdNextLink();
+
+    const holder = await createConnection({ uri: testDatabaseUrl() });
+    try {
+      await holder.query('START TRANSACTION');
+      await holder.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [s.id]);
+      // The link queues for the user lock first ...
+      const linking = http
+        .post('/v1/me/integrations/github/link')
+        .set(s.auth)
+        .send({ idToken: token })
+        .then((r) => r);
+      await waitForLockWaiters(1);
+      // ... then the deletion, whose preflight found no GitHub row to revoke.
+      const deleting = http
+        .delete('/v1/me')
+        .set(s.auth)
+        .then((r) => r);
+      await waitForLockWaiters(2);
+      await holder.query('COMMIT');
+
+      // The link reserved and is at Auth0 (held); the deletion got the lock behind it.
+      await gate.arrived;
+      const res = await deleting;
+      expect(res.status).toBe(409);
+      expect((res.body as { code: string }).code).toBe('GITHUB_LINK_IN_PROGRESS');
+      gate.release();
+      expect((await linking).status).toBe(200);
+    } finally {
+      await holder.end();
+    }
+    expect(await githubRow(s.id)).toMatchObject({ status: 'connected' });
+  });
 });

@@ -165,9 +165,9 @@ export const verifiedOf = async (userId: string) =>
     ?.verified;
 
 /** Ages a reservation past the stale threshold, as if its link were long over. */
-export const ageReservation = (userId: string) =>
+export const ageReservation = (userId: string, seconds = 3600) =>
   db
     .updateTable('integrations')
-    .set({ updatedAt: new Date(Date.now() - 3600_000) })
+    .set({ updatedAt: new Date(Date.now() - seconds * 1000) })
     .where('userId', '=', userId)
     .execute();

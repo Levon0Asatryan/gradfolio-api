@@ -53,6 +53,11 @@ export interface FakeGithub {
   holdNextUser(): { arrived: Promise<void>; release(): void };
   /** The same for the next grant delete: the grant is gone, the 204 is in flight. */
   holdNextGrant(): { arrived: Promise<void>; release(): void };
+  /**
+   * Holds the next grant delete **before** it is processed: the request has
+   * arrived, the token is still valid at GitHub, and revokes only on release.
+   */
+  holdNextGrantRequest(): { arrived: Promise<void>; release(): void };
   close(): Promise<void>;
 }
 
@@ -75,6 +80,7 @@ export async function startFakeGithub(): Promise<FakeGithub> {
   const hanging = new Set<ServerResponse>();
   let userGate: { arrived: () => void; released: Promise<void> } | undefined;
   let grantGate: { arrived: () => void; released: Promise<void> } | undefined;
+  let grantRequestGate: { arrived: () => void; released: Promise<void> } | undefined;
   const gate = () => {
     let arrived!: () => void;
     let release!: () => void;
@@ -169,6 +175,12 @@ export async function startFakeGithub(): Promise<FakeGithub> {
           hanging.add(res);
           return;
         }
+        if (grantRequestGate) {
+          const held = grantRequestGate;
+          grantRequestGate = undefined;
+          held.arrived();
+          await held.released;
+        }
         const basic = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
         if (decodeURIComponent(grant[1]!) !== clientId || req.headers.authorization !== basic) {
           return send(res, 401, { message: 'Requires authentication' });
@@ -240,6 +252,11 @@ export async function startFakeGithub(): Promise<FakeGithub> {
     holdNextGrant() {
       const g = gate();
       grantGate = g.held;
+      return g.handle;
+    },
+    holdNextGrantRequest() {
+      const g = gate();
+      grantRequestGate = g.held;
       return g.handle;
     },
     async close() {

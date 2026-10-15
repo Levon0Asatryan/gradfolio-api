@@ -110,14 +110,23 @@ export async function writeGithubRow(
 }
 
 /**
- * The caller's reservation when it is older than `olderThanS` seconds: a link
- * whose Auth0 call has certainly ended (plan §2.3). DB time on both sides:
- * `updated_at` is written by MySQL in the session's UTC.
+ * Whether a `linking` row is a revocation marker rather than a link's
+ * reservation: a disconnect sets it while GitHub is asked to delete the grant,
+ * on a row that was connected and so still has its GitHub login. A link's
+ * reservation has no login yet.
+ */
+export const isRevocationMarker = (row: IntegrationRow): boolean => row.externalLogin !== null;
+
+/**
+ * The caller's `linking` row when it is older than its operation can still be
+ * in flight (plan §2.3): `linkS` seconds for a link's reservation, `revokeS`
+ * for a revocation marker. DB time on both sides: `updated_at` is written by
+ * MySQL in the session's UTC.
  */
 export function staleReservation(
   db: Executor,
   userId: string,
-  olderThanS: number,
+  { linkS, revokeS }: { linkS: number; revokeS: number },
   { lock = false }: { lock?: boolean } = {},
 ): Promise<IntegrationRow | undefined> {
   const query = db
@@ -126,7 +135,9 @@ export function staleReservation(
     .where('userId', '=', userId)
     .where('integrationType', '=', 'github')
     .where('status', '=', 'linking')
-    .where('updatedAt', '<', sql<Date>`UTC_TIMESTAMP() - INTERVAL ${olderThanS} SECOND`);
+    .where(
+      sql<boolean>`updated_at < UTC_TIMESTAMP() - INTERVAL (CASE WHEN external_login IS NULL THEN ${linkS} ELSE ${revokeS} END) SECOND`,
+    );
   // Locked, the read sees the latest commit rather than the transaction's snapshot.
   return (lock ? query.forUpdate() : query).executeTakeFirst();
 }

@@ -688,7 +688,38 @@ describe('disconnect (revoke first, D9)', () => {
     expect(await verifiedOf(s.id)).toBe(false);
   });
 
-  it('a disconnect does not clear a connection made while its revocation was in flight (barrier)', async () => {
+  it('a connect while the grant delete is in flight is refused, not stamped onto the dying grant (barrier)', async () => {
+    const http = await start();
+    const s = await connected(http, 'github|107', '107');
+    const token = auth0.githubTokenFor('107');
+    // The DELETE has reached GitHub but is not processed: the token still works there.
+    const gate = gh.holdNextGrantRequest();
+    const disconnecting = http
+      .delete('/v1/me/integrations/github')
+      .set(s.auth)
+      .then((r) => r);
+    await gate.arrived;
+    expect(await githubRow(s.id)).toMatchObject({ status: 'linking', externalUserId: '107' });
+
+    const userReads = () => gh.requests.filter((r) => r.path === '/user').length;
+    const before = userReads();
+    const res = await http.post('/v1/me/integrations/github/connect').set(s.auth);
+    expect(res.status).toBe(409);
+    expect((res.body as { code: string }).code).toBe('GITHUB_LINK_IN_PROGRESS');
+    // It never asked GitHub to validate the token that is about to die.
+    expect(userReads()).toBe(before);
+    // The card does not claim a connection that is being revoked.
+    const card = await http.get('/v1/me/integrations').set(s.auth).expect(200);
+    expect(card.body.github.status).toBe('not_connected');
+
+    gate.release();
+    expect((await disconnecting).status).toBe(200);
+    expect(gh.revoked).toEqual([token]);
+    expect(await githubRow(s.id)).toMatchObject({ status: 'not_connected', externalUserId: null });
+    expect(await verifiedOf(s.id)).toBe(false);
+  });
+
+  it('a connect during a revocation waits; once it settled, the student connects with the new token', async () => {
     const http = await start();
     const s = await connected(http, 'github|106', '106');
     const first = auth0.githubTokenFor('106');
@@ -703,21 +734,62 @@ describe('disconnect (revoke first, D9)', () => {
     auth0.githubTokenFor = (id) => `gho_SENTINEL_again_${id}`;
     try {
       linkedAtAuth0(s.sub, '106', '106-login');
-      // The token cached by the revocation is the dead one: GitHub refuses it, and it is dropped.
-      await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(409);
+      const early = await http.post('/v1/me/integrations/github/connect').set(s.auth);
+      expect(early.status).toBe(409);
+      expect((early.body as { code: string }).code).toBe('GITHUB_LINK_IN_PROGRESS');
+      gate.release();
+      expect((await disconnecting).status).toBe(200);
+      expect(gh.revoked).toEqual([first]);
+
       await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(200);
     } finally {
       auth0.githubTokenFor = (id) => `gho_SENTINEL_${id}`;
     }
-    gate.release();
-
-    const res = await disconnecting;
-    expect(res.status).toBe(409);
-    expect((res.body as { code: string }).code).toBe('GITHUB_STATE_CHANGED');
     // The new connection, whose token was never revoked, stands.
-    expect(gh.revoked).toEqual([first]);
     expect(await githubRow(s.id)).toMatchObject({ status: 'connected', externalUserId: '106' });
     expect(await verifiedOf(s.id)).toBe(true);
+  });
+
+  it('a revocation marker is settled from GitHub’s word, later than a link reservation (age, then token state)', async () => {
+    const http = await start();
+    const s = await connected(http, 'github|108', '108');
+    await db.updateTable('integrations').set({ lastSyncedAt: new Date() }).execute();
+    // A disconnect that died after marking: the row is `linking` but keeps its login.
+    await db
+      .updateTable('integrations')
+      .set({ status: 'linking' })
+      .where('userId', '=', s.id)
+      .execute();
+
+    // Older than a link's deadline (10 s + margin) but younger than a revocation's
+    // (20 s + margin): its GitHub call may still be in flight, so it is left alone.
+    await ageReservation(s.id, 15);
+    const callsBefore = auth0.calls.length;
+    const young = await http.get('/v1/me/integrations').set(s.auth).expect(200);
+    expect(young.body.github.status).toBe('not_connected');
+    expect(auth0.calls.length).toBe(callsBefore);
+    expect(await githubRow(s.id)).toMatchObject({ status: 'linking' });
+
+    // Old enough, and the token still works at GitHub: the revocation never happened.
+    await ageReservation(s.id, 3600);
+    const back = await http.get('/v1/me/integrations').set(s.auth).expect(200);
+    expect(back.body.github).toMatchObject({ status: 'connected', login: '108-login' });
+
+    // The same marker, with the token dead at GitHub: it was revoked; sync time goes too.
+    await db
+      .updateTable('integrations')
+      .set({ status: 'linking' })
+      .where('userId', '=', s.id)
+      .execute();
+    await ageReservation(s.id, 3600);
+    gh.tokens.delete(auth0.githubTokenFor('108'));
+    const gone = await http.get('/v1/me/integrations').set(s.auth).expect(200);
+    expect(gone.body.github.status).toBe('not_connected');
+    expect(await githubRow(s.id)).toMatchObject({
+      status: 'not_connected',
+      externalUserId: null,
+      lastSyncedAt: null,
+    });
   });
 
   it('a GitHub failure changes nothing: 502 GITHUB_REVOKE_FAILED, still connected', async () => {

@@ -20,4 +20,10 @@ export interface GithubConnect {
    * margin) cannot have a call still in flight (docs/m7-plan.md §2.3).
    */
   linkDeadlineMs: number;
+  /**
+   * How long a revocation may take in all: the token read from Auth0 (the link
+   * deadline's allowance) and GitHub's grant delete (its own timeout). A
+   * revocation marker older than this (plus a margin) has no call in flight.
+   */
+  revokeDeadlineMs: number;
 }

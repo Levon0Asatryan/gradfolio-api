@@ -27,6 +27,7 @@ import {
   accountExists,
   integrationsOf,
   type IntegrationRow,
+  isRevocationMarker,
   lockGithubRow,
   setUserVerified,
   staleReservation,
@@ -219,9 +220,22 @@ export class GithubConnectionService {
     await this.reconcile(gh, user);
     const row = await this.githubRow(user.id);
     if (row?.status === 'linking') throw linkInProgress();
-    if (row?.status === 'connected') await this.revoke(gh, user.auth0Id);
 
-    await this.markDisconnected(user.id, identity, versionOf(row));
+    let expected = versionOf(row);
+    if (row?.status === 'connected') {
+      // The row says "in progress" for as long as GitHub may still delete the
+      // grant, so a connect cannot validate the token that is about to die
+      // and stamp `connected` onto a dead grant.
+      expected = await this.beginRevocation(user.id, row);
+      try {
+        await this.revoke(gh, user.auth0Id);
+      } catch (err) {
+        await this.abortRevocation(user.id, expected);
+        throw err;
+      }
+    }
+
+    await this.markDisconnected(user.id, identity, expected);
     gh.tokens.forget(user.auth0Id);
     this.logger.info({ userId: user.id }, 'github disconnected');
     return { status: 'not_connected' };
@@ -234,19 +248,27 @@ export class GithubConnectionService {
    * the row it read (and revoked), for `assertRevokedForDeletion`.
    */
   async revokeBeforeAccountDeletion(user: UserRow): Promise<number | null> {
+    const first = await this.githubRow(user.id);
+    if (first === undefined || first.status === 'not_connected') return versionOf(first);
+
+    const gh = this.required();
+    await this.reconcile(gh, user);
     const row = await this.githubRow(user.id);
-    if (row !== undefined && row.status !== 'not_connected') {
-      await this.revoke(this.required(), user.auth0Id);
-    }
+    // A link or a revocation in flight can still change what the grant is:
+    // revoking now, or deleting the row, would miss what it is about to make.
+    if (row?.status === 'linking') throw linkInProgress();
+    if (row?.status === 'connected') await this.revoke(gh, user.auth0Id);
     return versionOf(row);
   }
 
   /**
    * Inside the deletion's transaction, under the user lock: the GitHub row is
-   * still the one the preflight read, or holds nothing to revoke. A connection
-   * made in between was never revoked; the cascade must not delete it silently,
-   * so the deletion is refused (409 GITHUB_STATE_CHANGED) and the student
-   * retries, which revokes it.
+   * still exactly the connected one the preflight revoked, or holds nothing to
+   * revoke. Anything else was made after the revocation and never revoked: a
+   * connection (409 GITHUB_STATE_CHANGED), a link or revocation in flight (409
+   * GITHUB_LINK_IN_PROGRESS, whatever its version: a reservation whose Auth0
+   * call has not returned changes no row when it completes). The student
+   * retries, which settles it.
    */
   async assertRevokedForDeletion(
     trx: Transaction<DB>,
@@ -254,9 +276,9 @@ export class GithubConnectionService {
     revoked: number | null,
   ): Promise<void> {
     const row = await lockGithubRow(trx, userId);
-    if (versionOf(row) !== revoked && row !== undefined && row.status !== 'not_connected') {
-      throw stateChanged();
-    }
+    if (row === undefined || row.status === 'not_connected') return;
+    if (row.status === 'linking') throw linkInProgress();
+    if (versionOf(row) !== revoked) throw stateChanged();
   }
 
   private required(): GithubConnect {
@@ -351,7 +373,8 @@ export class GithubConnectionService {
       if (changed && locked !== undefined && locked.status !== 'not_connected') {
         throw stateChanged();
       }
-      if (locked?.status === 'connected') {
+      // Connected, or this disconnect's own revocation marker (unchanged since).
+      if (locked?.status === 'connected' || (locked?.status === 'linking' && !changed)) {
         await writeGithubRow(
           trx,
           userId,
@@ -363,6 +386,53 @@ export class GithubConnectionService {
       // Back to the email alone (plan §5.1).
       await setUserVerified(trx, userId, identity.emailVerified);
     });
+  }
+
+  /**
+   * Marks the connected row `linking` (keeping its GitHub id and login) for
+   * the time GitHub is asked to delete the grant, and returns the version
+   * written. Only onto the row as it was read (409 GITHUB_STATE_CHANGED).
+   */
+  private async beginRevocation(userId: string, read: IntegrationRow): Promise<number> {
+    return inTransaction(this.dbs.db, async (trx) => {
+      await lockUser(trx, userId);
+      const row = await lockGithubRow(trx, userId);
+      if (row?.status !== 'connected' || row.generation !== read.generation) {
+        throw stateChanged();
+      }
+      return writeGithubRow(trx, userId, row, {
+        status: 'linking',
+        externalUserId: row.externalUserId,
+        externalLogin: row.externalLogin,
+      });
+    });
+  }
+
+  /**
+   * A revocation that failed changed nothing at GitHub: the row goes back to
+   * connected, if it is still this disconnect's marker. A failure here is
+   * logged, not thrown: the revocation's own error is what the caller needs,
+   * and a marker left behind is settled from GitHub's word by `reconcile`.
+   */
+  private async abortRevocation(userId: string, generation: number): Promise<void> {
+    try {
+      await inTransaction(this.dbs.db, async (trx) => {
+        await lockUser(trx, userId);
+        const row = await lockGithubRow(trx, userId);
+        if (row?.status !== 'linking' || row.generation !== generation) return;
+        await writeGithubRow(trx, userId, row, {
+          status: 'connected',
+          externalUserId: row.externalUserId,
+          externalLogin: row.externalLogin,
+        });
+        await setUserVerified(trx, userId, true);
+      });
+    } catch (err) {
+      this.logger.warn(
+        { userId, err: err instanceof Error ? err.name : 'unknown' },
+        'abort failed',
+      );
+    }
   }
 
   /** Undoes this link's reservation, if it is still the one this request made. */
@@ -388,8 +458,11 @@ export class GithubConnectionService {
    * the write re-checks the row under the user lock, so two settlements agree.
    */
   private async reconcile(gh: GithubConnect, user: UserRow): Promise<void> {
-    const olderThanS = Math.ceil(gh.linkDeadlineMs / 1000) + RECONCILE_MARGIN_S;
-    const stale = await staleReservation(this.dbs.db, user.id, olderThanS);
+    const age = {
+      linkS: Math.ceil(gh.linkDeadlineMs / 1000) + RECONCILE_MARGIN_S,
+      revokeS: Math.ceil(gh.revokeDeadlineMs / 1000) + RECONCILE_MARGIN_S,
+    };
+    const stale = await staleReservation(this.dbs.db, user.id, age);
     if (stale === undefined) return;
 
     let confirmed: GithubUser | undefined;
@@ -406,7 +479,7 @@ export class GithubConnectionService {
 
     await inTransaction(this.dbs.db, async (trx) => {
       await lockUser(trx, user.id);
-      const still = await staleReservation(trx, user.id, olderThanS, { lock: true });
+      const still = await staleReservation(trx, user.id, age, { lock: true });
       if (still?.generation !== stale.generation) return;
       if (confirmed) {
         await writeGithubRow(trx, user.id, still, {
@@ -416,11 +489,14 @@ export class GithubConnectionService {
         });
         await setUserVerified(trx, user.id, true);
       } else {
-        await writeGithubRow(trx, user.id, still, {
-          status: 'not_connected',
-          externalUserId: null,
-          externalLogin: null,
-        });
+        // An abandoned revocation marker was a connection: its sync time goes with it.
+        await writeGithubRow(
+          trx,
+          user.id,
+          still,
+          { status: 'not_connected', externalUserId: null, externalLogin: null },
+          { clearSynced: isRevocationMarker(still) },
+        );
       }
     });
     this.logger.info(
