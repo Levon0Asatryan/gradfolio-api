@@ -44,7 +44,7 @@ export interface KeySetTiming {
  * The key source could not be consulted. Raised only from inside key
  * resolution, so it can never be confused with a verdict on the token.
  */
-class KeySourceUnavailable extends Error {
+export class KeySourceUnavailable extends Error {
   constructor(readonly source: string) {
     super('key source unavailable');
   }
@@ -141,6 +141,36 @@ export function rejectionReason(err: errors.JOSEError): RejectionReason {
 }
 
 /**
+ * The tenant's signing keys, fetched and cached by jose: refreshed after 10
+ * minutes, and on an unknown `kid` at most once per 30 seconds. Any failure to
+ * consult them, except "no key matches this token", becomes
+ * KeySourceUnavailable, so a verifier can tell an outage (503) from a bad token
+ * (401). Shared by the access-token and the link id-token verifiers.
+ */
+export function guardedKeySet(
+  cfg: Pick<VerifierConfig, 'AUTH0_ISSUER_BASE_URL' | 'AUTH0_JWKS_TIMEOUT_MS'>,
+  timing: KeySetTiming = {},
+): JWTVerifyGetKey {
+  const remote = createRemoteJWKSet(new URL('.well-known/jwks.json', cfg.AUTH0_ISSUER_BASE_URL), {
+    timeoutDuration: cfg.AUTH0_JWKS_TIMEOUT_MS,
+    ...timing,
+  });
+  return async (header, token) => {
+    try {
+      return await remote(header, token);
+    } catch (err) {
+      if (
+        err instanceof errors.JWKSNoMatchingKey ||
+        err instanceof errors.JWKSMultipleMatchingKeys
+      ) {
+        throw err;
+      }
+      throw new KeySourceUnavailable(sourceOf(err));
+    }
+  };
+}
+
+/**
  * Verifies Auth0 access tokens: RS256 only, signature against the tenant's
  * JWKS, fixed issuer and audience, `exp` required, `exp`/`nbf` within the
  * clock tolerance (docs/m2-plan.md §3.3).
@@ -159,24 +189,7 @@ export function createAccessTokenVerifier(
   cfg: VerifierConfig,
   timing: KeySetTiming = {},
 ): AccessTokenVerifier {
-  const remote = createRemoteJWKSet(new URL('.well-known/jwks.json', cfg.AUTH0_ISSUER_BASE_URL), {
-    timeoutDuration: cfg.AUTH0_JWKS_TIMEOUT_MS,
-    ...timing,
-  });
-
-  const getKey: JWTVerifyGetKey = async (header, token) => {
-    try {
-      return await remote(header, token);
-    } catch (err) {
-      if (
-        err instanceof errors.JWKSNoMatchingKey ||
-        err instanceof errors.JWKSMultipleMatchingKeys
-      ) {
-        throw err;
-      }
-      throw new KeySourceUnavailable(sourceOf(err));
-    }
-  };
+  const getKey = guardedKeySet(cfg, timing);
 
   const options = {
     issuer: cfg.AUTH0_ISSUER_BASE_URL,

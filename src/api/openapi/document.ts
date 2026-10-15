@@ -9,6 +9,29 @@ import {
 import { activityPageSchema, activityQuerySchema } from '../activities/dto/activity.dto.js';
 import { dashboardSchema } from '../dashboard/dto/dashboard.dto.js';
 import {
+  githubImportRequestSchema,
+  githubImportResponseSchema,
+  githubRepoPageSchema,
+  githubReposQuerySchema,
+  githubSyncQuerySchema,
+  githubSyncResponseSchema,
+} from '../integrations/dto/github-import.dto.js';
+import {
+  connectResponseSchema,
+  disconnectResponseSchema,
+  integrationsResponseSchema,
+  linkRequestSchema,
+  linkResponseSchema,
+} from '../integrations/dto/integration.dto.js';
+import {
+  linkedinConfirmRequestSchema,
+  linkedinConfirmResponseSchema,
+  linkedinPreviewRequestSchema,
+  linkedinPreviewResponseSchema,
+  linkedinUploadRequestSchema,
+  linkedinUploadResponseSchema,
+} from '../integrations/dto/linkedin-import.dto.js';
+import {
   browseProjectsQuerySchema,
   browseUsersQuerySchema,
   discoveryProjectPageSchema,
@@ -160,6 +183,13 @@ export interface Operation {
   responses: Record<string, { description: string; schema?: ZodType }>;
   /** Needs `Authorization: Bearer <Auth0 access token>`. Every route except `@Public()` ones. */
   bearer?: boolean;
+  /**
+   * A contract published before its route exists: the pull request that will
+   * serve it. Rendered with `x-gradfolio-planned` and a "not served yet" note;
+   * document.test.ts checks that no planned operation is served, so the flag
+   * is removed in the same change that adds the route.
+   */
+  planned?: string;
 }
 
 const error = (description: string) => ({ description, schema: errorResponseSchema });
@@ -435,6 +465,290 @@ function discoveryOperations(): Operation[] {
   ];
 }
 
+/** The caller's integrations: GitHub connect (docs/m7-plan.md §2.3, §7 items 1–4). */
+function integrationOperations(): Operation[] {
+  const base = { tag: 'integrations', bearer: true } as const;
+  const unavailable = error(
+    'INTEGRATION_UNAVAILABLE: GitHub connect is not configured on this server, or Auth0 could ' +
+      'not be used (see Retry-After when it is a rate limit); AUTH_UNAVAILABLE or ' +
+      'DATABASE_UNAVAILABLE as on every route',
+  );
+  // Each operation names its own 429 and 503.
+  const { '401': unauthenticated } = authenticatedFailures;
+  const failures = { '401': unauthenticated };
+  const inProgress =
+    'GITHUB_LINK_IN_PROGRESS: a link started moments ago is still running; ' +
+    'GITHUB_STATE_CHANGED: GitHub was connected or disconnected by another request at the same ' +
+    'moment (nothing was changed by this one; reload and retry)';
+  return [
+    {
+      ...base,
+      method: 'get',
+      path: '/v1/me/integrations',
+      operationId: 'getMyIntegrations',
+      summary: 'The caller’s GitHub and LinkedIn status',
+      description:
+        'Only the caller’s own state; never a token, a nonce or the GitHub numeric id. GitHub is ' +
+        '`connected` only once confirmed: a link still in progress reads `not_connected`. A link ' +
+        'left half-done (the server stopped between Auth0 and our database) is settled here from ' +
+        'Auth0’s record. LinkedIn is `connected` when the caller signs in with LinkedIn.',
+      responses: {
+        '200': { description: 'The integrations', schema: integrationsResponseSchema },
+        '409': error('GITHUB_NOT_LINKED: settling a half-done link found the GitHub token refused'),
+        '429': error(
+          'RATE_LIMITED (over budget) or GITHUB_RATE_LIMITED; see the Retry-After header',
+        ),
+        '502': error('GITHUB_UNAVAILABLE: GitHub failed while a half-done link was settled'),
+        ...failures,
+        '503': unavailable,
+      },
+    },
+    {
+      ...base,
+      method: 'post',
+      path: '/v1/me/integrations/github/connect',
+      operationId: 'connectGithub',
+      summary: 'Connect GitHub, or get a nonce to link it',
+      description:
+        'When Auth0 already holds a GitHub identity for the caller (they sign in with GitHub, or ' +
+        'linked it), GitHub confirms its token and the account is connected: `state: ' +
+        'connected`. Otherwise `state: link_required` with a single-use nonce for a secondary ' +
+        'GitHub sign-in (see `link`). Public repositories only (D6). A connected GitHub counts ' +
+        'toward `verified`.',
+      responses: {
+        '200': { description: 'Connected, or a link is required', schema: connectResponseSchema },
+        '409': error(
+          'GITHUB_NOT_LINKED: GitHub refused the token Auth0 holds (sign in with GitHub again); ' +
+            `GITHUB_ACCOUNT_IN_USE: another Gradfolio account has this GitHub account; ${inProgress}`,
+        ),
+        '429': error('RATE_LIMITED or GITHUB_RATE_LIMITED; see the Retry-After header'),
+        '502': error('GITHUB_UNAVAILABLE: GitHub failed or timed out'),
+        ...failures,
+        '503': unavailable,
+      },
+    },
+    {
+      ...base,
+      method: 'post',
+      path: '/v1/me/integrations/github/link',
+      operationId: 'linkGithub',
+      summary: 'Link a GitHub sign-in to the caller’s account',
+      description:
+        'Send the `id_token` of the secondary GitHub sign-in started with the nonce from ' +
+        '`connect`. It must be fresh (issued within 5 minutes), for this application, and carry ' +
+        'that nonce, which works once. The GitHub account is reserved first, so no other ' +
+        'account can take it, then Auth0 links it. When Auth0’s answer is lost, the reservation ' +
+        'is settled later from Auth0’s record (`GET /v1/me/integrations`).',
+      body: linkRequestSchema,
+      responses: {
+        '200': { description: 'Connected', schema: linkResponseSchema },
+        '400': error(
+          'INVALID_ID_TOKEN: the id token is not a valid, fresh GitHub sign-in for this ' +
+            'application; INVALID_NONCE: the nonce is unknown, expired, used, or another ' +
+            'user’s; VALIDATION_FAILED: the body',
+        ),
+        '409': error(
+          'GITHUB_ACCOUNT_IN_USE: that GitHub account is a Gradfolio account of its own, or ' +
+            'another account holds it; GITHUB_ALREADY_CONNECTED; GITHUB_LINK_REFUSED: Auth0 ' +
+            `refused the link; ${inProgress}; GITHUB_NOT_LINKED`,
+        ),
+        '429': error('RATE_LIMITED or GITHUB_RATE_LIMITED; see the Retry-After header'),
+        '502': error('GITHUB_UNAVAILABLE: GitHub failed while confirming the new link'),
+        ...failures,
+        '503': error(
+          'INTEGRATION_UNAVAILABLE: not configured, or Auth0 failed (when its answer was lost the ' +
+            'link is settled later); AUTH_UNAVAILABLE: the signing keys could not be fetched',
+        ),
+      },
+    },
+    {
+      ...base,
+      method: 'delete',
+      path: '/v1/me/integrations/github',
+      operationId: 'disconnectGithub',
+      summary: 'Disconnect GitHub, revoking access at GitHub first',
+      description:
+        'Revokes the GitHub app grant first (every token of it, including the one Auth0 holds); ' +
+        'only once GitHub confirms, or there is nothing left to revoke, is GitHub disconnected. ' +
+        'A revocation GitHub refuses changes nothing (502): retry. One whose outcome is unknown ' +
+        '(timeout, dropped connection, 5xx) also answers 502, but the grant may still be deleted: ' +
+        'the card then shows not_connected and a retry answers 409 GITHUB_LINK_IN_PROGRESS until ' +
+        'it settles, after a short delay. Idempotent. Imported projects stay. ' +
+        'The GitHub identity stays linked at Auth0 (a GitHub sign-in keeps working); ' +
+        'reconnecting needs one fresh GitHub sign-in. `verified` falls back to the email.',
+      responses: {
+        '200': { description: 'Disconnected', schema: disconnectResponseSchema },
+        '409': error(inProgress),
+        '502': error(
+          'GITHUB_REVOKE_FAILED: GitHub did not confirm the revocation. When GitHub refused, ' +
+            'nothing changed. When it timed out, dropped the connection or answered 5xx, the ' +
+            'grant may still be deleted: the card shows not_connected and a retry answers 409 ' +
+            'GITHUB_LINK_IN_PROGRESS until the outcome settles, after a short delay; retry ' +
+            'shortly, and the next request then shows the true state',
+        ),
+        ...failures,
+        '503': unavailable,
+      },
+    },
+  ];
+}
+
+/**
+ * GitHub import and the LinkedIn export import (docs/m7-plan.md §3, §4; §7
+ * items 5–10): the contract only, published with PR (a) so the frontend can
+ * build against it. Each is `planned`; the PR that serves it drops the flag.
+ */
+function plannedImportOperations(): Operation[] {
+  const base = { tag: 'integrations', bearer: true } as const;
+  const github = {
+    '409': error(
+      'GITHUB_NOT_CONNECTED: connect GitHub first; GITHUB_NOT_LINKED: GitHub refused the token ' +
+        '(sign in with GitHub again)',
+    ),
+    '429': error('RATE_LIMITED or GITHUB_RATE_LIMITED; see the Retry-After header'),
+    '502': error('GITHUB_UNAVAILABLE: GitHub failed or timed out'),
+    '401': authenticatedFailures['401'],
+    '503': error('INTEGRATION_UNAVAILABLE, AUTH_UNAVAILABLE or DATABASE_UNAVAILABLE'),
+  };
+  const importFailures = {
+    '401': authenticatedFailures['401'],
+    '429': error('RATE_LIMITED: over the `import` budget (5 per minute); see Retry-After'),
+    '503': error(
+      'STORAGE_UNAVAILABLE: uploads are off on this server; AUTH_UNAVAILABLE or ' +
+        'DATABASE_UNAVAILABLE',
+    ),
+  };
+  return [
+    {
+      ...base,
+      planned: 'M7 PR (b)',
+      method: 'get',
+      path: '/v1/me/github/repos',
+      operationId: 'listGithubRepos',
+      summary: 'The caller’s public GitHub repositories, paged',
+      description:
+        'Owned and collaborator repositories, public only (D6), most recently pushed first. ' +
+        '`imported` and `projectId` say which the caller already imported. GitHub’s remaining ' +
+        'rate limit is in `rateLimit`.',
+      query: githubReposQuerySchema,
+      responses: {
+        '200': { description: 'One page', schema: githubRepoPageSchema },
+        '400': validationFailed,
+        ...github,
+      },
+    },
+    {
+      ...base,
+      planned: 'M7 PR (b)',
+      method: 'post',
+      path: '/v1/me/github/import',
+      operationId: 'importGithubRepos',
+      summary: 'Import repositories as draft projects',
+      description:
+        'Each repository is read again from GitHub (stars, forks, language, README; the client’s ' +
+        'numbers are never trusted) and imported only when the caller owns it or may push to it. ' +
+        'Drafts: visible to the caller only until published. Deduplicated by repository id, also ' +
+        'under concurrent imports. The README becomes the description, sanitized, images dropped ' +
+        '(D3).',
+      body: githubImportRequestSchema,
+      responses: {
+        '200': { description: 'One result per repository', schema: githubImportResponseSchema },
+        '400': validationFailed,
+        ...github,
+        '429': error('RATE_LIMITED (the `import` budget) or GITHUB_RATE_LIMITED; see Retry-After'),
+      },
+    },
+    {
+      ...base,
+      planned: 'M7 PR (b)',
+      method: 'post',
+      path: '/v1/me/projects/{id}/github/sync',
+      operationId: 'syncGithubProject',
+      summary: 'Re-sync an imported project from GitHub, never overwriting an edit',
+      description:
+        'Per field: a value the caller edited is kept; one GitHub changed and the caller did not ' +
+        'is updated; both changed is a `conflict` (kept, GitHub’s value reported). Stars, forks, ' +
+        'language and README link always refresh (D8). `dryRun=true` reports without changing.',
+      params: projectIdParamSchema,
+      query: githubSyncQuerySchema,
+      responses: {
+        '200': { description: 'What changed, field by field', schema: githubSyncResponseSchema },
+        '400': validationFailed,
+        '404': notYours('project'),
+        ...github,
+        '409': error(
+          'NOT_GITHUB_PROJECT: the project was not imported; GITHUB_NOT_CONNECTED; GITHUB_NOT_LINKED',
+        ),
+        '429': error('RATE_LIMITED (the `import` budget) or GITHUB_RATE_LIMITED; see Retry-After'),
+      },
+    },
+    {
+      ...base,
+      planned: 'M7 PR (c)',
+      method: 'post',
+      path: '/v1/me/imports/linkedin/uploads',
+      operationId: 'createLinkedinUpload',
+      summary: 'Get a signed URL to upload a LinkedIn data export ZIP',
+      description:
+        'The browser PUTs the ZIP straight to the returned URL (never through the frontend’s ' +
+        'server: its body limit is 4.5 MB). At most IMPORT_MAX_PENDING uploads wait at once.',
+      body: linkedinUploadRequestSchema,
+      responses: {
+        '201': { description: 'The upload ticket', schema: linkedinUploadResponseSchema },
+        '400': validationFailed,
+        '409': error('LIMIT_REACHED: too many uploads waiting for a preview'),
+        '413': error('IMPORT_TOO_LARGE: over IMPORT_MAX_ZIP_BYTES'),
+        ...importFailures,
+      },
+    },
+    {
+      ...base,
+      planned: 'M7 PR (c)',
+      method: 'post',
+      path: '/v1/me/imports/linkedin/preview',
+      operationId: 'previewLinkedinImport',
+      summary: 'Read an uploaded export and propose entries; saves nothing',
+      description:
+        'Parses positions, education, skills and certifications; each item is `new`, ' +
+        '`duplicate` (already on the profile) or `invalid` (with `problems`). The upload is ' +
+        'deleted afterwards, whatever the outcome. Only the four datasets are ever opened.',
+      body: linkedinPreviewRequestSchema,
+      responses: {
+        '200': { description: 'The proposal', schema: linkedinPreviewResponseSchema },
+        '400': validationFailed,
+        '404': error('IMPORT_UPLOAD_MISSING: no such upload of the caller’s'),
+        '413': error('IMPORT_TOO_LARGE'),
+        '422': error(
+          'IMPORT_NOT_ZIP, IMPORT_TOO_MANY_ENTRIES, IMPORT_UNCOMPRESSED_TOO_LARGE, ' +
+            'IMPORT_RATIO_EXCEEDED, IMPORT_UNSAFE_PATH, IMPORT_ENCRYPTED, IMPORT_ENTRY_NOT_CSV, ' +
+            'IMPORT_EMPTY, IMPORT_COLUMNS_MISSING (see `details`), IMPORT_MALFORMED_CSV',
+        ),
+        ...importFailures,
+        '429': error('RATE_LIMITED, or IMPORT_BUSY: too many previews running; see Retry-After'),
+      },
+    },
+    {
+      ...base,
+      planned: 'M7 PR (c)',
+      method: 'post',
+      path: '/v1/me/imports/linkedin/confirm',
+      operationId: 'confirmLinkedinImport',
+      summary: 'Save the selected entries, in one transaction',
+      description:
+        'The items are validated again like manual entries. Entries equal to an existing one ' +
+        'are skipped; skills merge case-insensitively. Over a section cap nothing is saved. A ' +
+        'second identical confirm adds nothing.',
+      body: linkedinConfirmRequestSchema,
+      responses: {
+        '200': { description: 'Counts per section', schema: linkedinConfirmResponseSchema },
+        '400': validationFailed,
+        '409': error('LIMIT_REACHED: a section would exceed its cap; nothing was saved'),
+        ...importFailures,
+      },
+    },
+  ];
+}
+
 export const OPERATIONS: readonly Operation[] = [
   {
     method: 'get',
@@ -465,8 +779,8 @@ export const OPERATIONS: readonly Operation[] = [
     summary: 'The caller’s own account',
     description:
       'The first call after a login creates the account from the access token’s profile ' +
-      'claims (name, email, picture); later calls return the same id. `verified` follows ' +
-      'the token’s `email_verified`.',
+      'claims (name, email, picture); later calls return the same id. `verified` is the ' +
+      'token’s `email_verified`, or a connected GitHub account.',
     bearer: true,
     responses: {
       '200': { description: 'The caller’s account', schema: meResponseSchema },
@@ -483,13 +797,23 @@ export const OPERATIONS: readonly Operation[] = [
       'Removes the profile, every section, skills, projects (with attachments, tags and team ' +
       'rows), integrations and notifications. The caller’s name stays on other people’s ' +
       'projects as a plain team-member name, without a photo or a link to an account. ' +
-      'Irreversible. The Auth0 login is not deleted: sign the user out afterwards, because a ' +
-      'token that is still valid creates a new, empty account on its next request.',
+      'Irreversible. A connected GitHub account is revoked at GitHub first; if GitHub does ' +
+      'not confirm, nothing is deleted (502, retry). The Auth0 login is not deleted: sign the ' +
+      'user out afterwards, because a token that is still valid creates a new, empty account ' +
+      'on its next request.',
     bearer: true,
     responses: {
       '204': { description: 'Deleted' },
       '404': error('NOT_FOUND: the account no longer exists'),
+      '409': error(
+        'GITHUB_STATE_CHANGED: GitHub was connected at the same moment; nothing deleted, retry',
+      ),
+      '502': error('GITHUB_REVOKE_FAILED: GitHub did not confirm the revocation; nothing deleted'),
       ...authenticatedFailures,
+      '503': error(
+        'INTEGRATION_UNAVAILABLE: a connected GitHub cannot be revoked now (Auth0 unreachable, ' +
+          'or GitHub connect not configured); AUTH_UNAVAILABLE or DATABASE_UNAVAILABLE',
+      ),
     },
   },
   {
@@ -1071,6 +1395,8 @@ export const OPERATIONS: readonly Operation[] = [
     },
   },
   ...discoveryOperations(),
+  ...integrationOperations(),
+  ...plannedImportOperations(),
   ...sectionOperations({
     path: 'education',
     name: 'Education',
@@ -1123,12 +1449,16 @@ export function buildOpenApiDocument(
       };
     }
 
+    const description = op.planned
+      ? `**Not served yet: arrives with ${op.planned}.** ${op.description ?? ''}`.trim()
+      : op.description;
     paths[op.path] ??= {};
     paths[op.path]![op.method] = {
       operationId: op.operationId,
       tags: [op.tag],
       summary: op.summary,
-      ...(op.description ? { description: op.description } : {}),
+      ...(description ? { description } : {}),
+      ...(op.planned ? { 'x-gradfolio-planned': op.planned } : {}),
       ...(op.bearer ? { security: [{ bearerAuth: [] }] } : {}),
       ...(op.params || op.query
         ? { parameters: [...pathParameters(op, components), ...queryParameters(op, components)] }
@@ -1174,6 +1504,10 @@ export function buildOpenApiDocument(
       { name: 'team', description: 'Project teams: invitations, answers, the owner’s view' },
       { name: 'notifications', description: 'The caller’s own notifications' },
       { name: 'activities', description: 'The caller’s own activity feed' },
+      {
+        name: 'integrations',
+        description: 'The caller’s GitHub and LinkedIn connections and imports',
+      },
       {
         name: 'discovery',
         description: 'Public search and tag pages: published work of public profiles only',

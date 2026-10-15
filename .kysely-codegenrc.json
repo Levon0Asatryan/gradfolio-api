@@ -1,5 +1,5 @@
 {
-  "$comment": "npm run db:types regenerates src/core/db/types.generated.ts from a migrated database; npm run db:types:check (CI) fails when it is stale. Overrides encode what the database cannot: ids are supplied by the application (never Generated), TINYINT(1) is boolean, JSON columns take validated JsonText, DATE is YYYY-MM-DD text.",
+  "$comment": "npm run db:types regenerates src/core/db/types.generated.ts from a migrated database; npm run db:types:check (CI) fails when it is stale. Overrides encode what the database cannot: ids are supplied by the application (never Generated), TINYINT(1) is boolean, JSON columns take validated JsonText, DATE is YYYY-MM-DD text, and the integrations token columns take only NULL (0008 CHECK, docs/m7-plan.md §2.6).",
   "dialect": "mysql",
   "camelCase": true,
   "outFile": "src/core/db/types.generated.ts",
@@ -10,6 +10,7 @@
     "JsonColumn": "./column-types.js",
     "LinkList": "./column-types.js",
     "NotificationParams": "./column-types.js",
+    "GithubImportSnapshot": "./column-types.js",
     "StringList": "./column-types.js",
     "TranslationParams": "./column-types.js"
   },
@@ -24,6 +25,9 @@
       "project_attachments.id": "string",
       "project_team_members.id": "string",
       "integrations.id": "string",
+      "integrations.access_token": "null",
+      "integrations.refresh_token": "null",
+      "integrations.token_expires_at": "null",
       "activities.id": "string",
       "notifications.id": "string",
       "users.verified": "Bool",
@@ -41,7 +45,8 @@
       "projects.links": "JsonColumn<LinkList>",
       "projects.files": "JsonColumn<LinkList>",
       "activities.translation_params": "JsonColumn<TranslationParams>",
-      "notifications.params": "JsonColumn<NotificationParams>"
+      "notifications.params": "JsonColumn<NotificationParams>",
+      "project_github_imports.snapshot": "JsonColumn<GithubImportSnapshot>"
     }
   }
 }

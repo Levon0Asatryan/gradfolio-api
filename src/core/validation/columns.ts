@@ -87,6 +87,12 @@ export const COLUMN_LIMITS = {
   'integrations.access_token': TEXT,
   'integrations.refresh_token': TEXT,
   'integrations.external_user_id': chars(255),
+  'integrations.external_login': chars(100),
+
+  'integration_nonces.hash': chars(64),
+  'integration_nonces.user_id': chars(36),
+
+  'project_github_imports.project_id': chars(36),
 
   'activities.id': chars(36),
   'activities.user_id': chars(36),

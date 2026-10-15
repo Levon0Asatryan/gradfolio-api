@@ -182,3 +182,88 @@ describe('teams and notifications schema (0006)', () => {
     expect(activities.Extra ?? '').not.toMatch(/filesort/i);
   });
 });
+
+/**
+ * What 0008 adds for GitHub connect (docs/m7-plan.md §2.6, §9, §10): no token
+ * can be stored, one Gradfolio account per GitHub account, nonces and import
+ * snapshots of the documented shape. Raw SQL, because the row types refuse a
+ * token at compile time.
+ */
+describe('GitHub connect schema (0008)', () => {
+  const db = testDatabase();
+  const errnoOf = (p: Promise<unknown>) => p.then(() => undefined, mysqlErrno);
+
+  it.each([
+    ['access_token', sql`'gho_SENTINEL'`],
+    ['refresh_token', sql`'ghr_SENTINEL'`],
+    ['token_expires_at', sql`UTC_TIMESTAMP()`],
+  ])('never stores %s: an insert and an update are refused with 3819', async (column, value) => {
+    const user = await createUser(db);
+    const id = newId();
+    expect(
+      await errnoOf(
+        sql`INSERT INTO integrations (id, user_id, integration_type, ${sql.ref(column)}) VALUES (${id}, ${user.id}, 'github', ${value})`.execute(
+          db,
+        ),
+      ),
+    ).toBe(MysqlErrno.CHECK_VIOLATED);
+    await sql`INSERT INTO integrations (id, user_id, integration_type) VALUES (${id}, ${user.id}, 'github')`.execute(
+      db,
+    );
+    expect(
+      await errnoOf(
+        sql`UPDATE integrations SET ${sql.ref(column)} = ${value} WHERE id = ${id}`.execute(db),
+      ),
+    ).toBe(MysqlErrno.CHECK_VIOLATED);
+  });
+
+  it('one Gradfolio account per GitHub account; rows without a GitHub id never clash', async () => {
+    const [a, b, c, d] = await Promise.all([1, 2, 3, 4].map(() => createUser(db)));
+    const insert = (userId: string, externalUserId: string | null, status = 'linking') =>
+      sql`INSERT INTO integrations (id, user_id, integration_type, status, external_user_id) VALUES (${newId()}, ${userId}, 'github', ${status}, ${externalUserId})`.execute(
+        db,
+      );
+    await insert(a!.id, '583231');
+    expect(await errnoOf(insert(b!.id, '583231', 'connected'))).toBe(MysqlErrno.DUPLICATE_KEY);
+    expect(await errnoOf(insert(c!.id, null, 'not_connected'))).toBeUndefined();
+    expect(await errnoOf(insert(d!.id, null, 'not_connected'))).toBeUndefined();
+    // The same id under the other type is a different account.
+    expect(
+      await errnoOf(
+        sql`INSERT INTO integrations (id, user_id, integration_type, external_user_id) VALUES (${newId()}, ${a!.id}, 'linkedin', '583231')`.execute(
+          db,
+        ),
+      ),
+    ).toBeUndefined();
+  });
+
+  it('a nonce is stored as a lowercase SHA-256 hex digest only', async () => {
+    const user = await createUser(db);
+    const insert = (hash: string) =>
+      sql`INSERT INTO integration_nonces (hash, user_id, expires_at) VALUES (${hash}, ${user.id}, UTC_TIMESTAMP())`.execute(
+        db,
+      );
+    expect(await errnoOf(insert('a'.repeat(64)))).toBeUndefined();
+    expect(await errnoOf(insert('A'.repeat(64)))).toBe(MysqlErrno.CHECK_VIOLATED);
+    expect(await errnoOf(insert('raw-nonce-value'))).toBe(MysqlErrno.CHECK_VIOLATED);
+  });
+
+  it('an import snapshot is an object of SHA-256 hex digests, and goes with its project', async () => {
+    const user = await createUser(db);
+    const projectId = newId();
+    await db
+      .insertInto('projects')
+      .values({ id: projectId, userId: user.id, title: 'p' })
+      .execute();
+    const insert = (snapshot: string) =>
+      sql`INSERT INTO project_github_imports (project_id, synced_at, snapshot) VALUES (${projectId}, UTC_TIMESTAMP(), ${snapshot})`.execute(
+        db,
+      );
+    expect(await errnoOf(insert('{"title":"Kept as text"}'))).toBe(MysqlErrno.CHECK_VIOLATED);
+    expect(await errnoOf(insert('["x"]'))).toBe(MysqlErrno.CHECK_VIOLATED);
+    expect(await errnoOf(insert(JSON.stringify({ title: 'f'.repeat(64) })))).toBeUndefined();
+    await db.deleteFrom('projects').where('id', '=', projectId).execute();
+    const left = await db.selectFrom('projectGithubImports').selectAll().execute();
+    expect(left).toEqual([]);
+  });
+});

@@ -25,6 +25,8 @@ connect in this session, so nothing was run against the tenant.
 
 D4 (fixtures) and D1 change the shape of PR (a) and (c). The rest do not block starting.
 
+Decided 2026-10-11: the recommendations, D1–D9.
+
 ## 1. Investigation
 
 ### 1.1 The code on `main`
@@ -204,7 +206,15 @@ linked identity in Auth0 also counts. Anything else (5xx, timeout, `401` on our 
 credentials) answers `502 GITHUB_REVOKE_FAILED` and **changes nothing**, so the card still shows
 "connected" and the student retries. 2. Then, in one transaction: flag off, `external_*` and `last_synced_at` cleared, open
 suggestions with source `github` deleted, token cache entry dropped; `{ "status": "not_connected" }`.
-A crash between 1 and 2 leaves a connected row whose token is dead: the next GitHub call gets `401`,
+Before the grant delete is sent, the row is marked `linking` (it keeps its GitHub login), so a
+connect or a second disconnect during the revocation answers `409 GITHUB_LINK_IN_PROGRESS` instead of
+validating a token that is about to die; a revocation GitHub refuses (a 4xx answer, or a request that never left) puts the row back to
+connected, while a timeout, a dropped connection or a 5xx, after which GitHub may still delete the
+grant, keeps the marker, and
+a marker whose call may still be in flight (older than the two Auth0 timeouts plus GitHub's) is settled
+from GitHub's word by the next GitHub route. Account deletion refuses (`409 GITHUB_LINK_IN_PROGRESS`)
+while a link or revocation is in flight. A crash between 1 and 2 leaves a marker, which reconciles; before
+the marker existed it left a connected row whose token is dead: the next GitHub call gets `401`,
 which already maps to `409 GITHUB_NOT_LINKED` (§3.1), and a repeated `DELETE` finds the grant gone
 and finishes. Reconnecting needs one fresh GitHub login, which replaces the dead token Auth0 holds
 (§2.1 step 6). Projects already imported stay (`source = 'github'`); re-sync then answers

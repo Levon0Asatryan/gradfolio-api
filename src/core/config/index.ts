@@ -6,8 +6,13 @@ import {
   databaseConfigSchema,
 } from './schema.js';
 
-export type { AppConfig, DatabaseConfig } from './schema.js';
-export { configSchema, databaseConfigSchema, parseByteSize } from './schema.js';
+export type { AppConfig, DatabaseConfig, GithubIntegrationSettings } from './schema.js';
+export {
+  configSchema,
+  databaseConfigSchema,
+  githubIntegrationSettings,
+  parseByteSize,
+} from './schema.js';
 
 function parse<T>(schema: ZodType<T>, env: NodeJS.ProcessEnv): T {
   const parsed = schema.safeParse(env);

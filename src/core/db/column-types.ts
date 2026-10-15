@@ -41,3 +41,9 @@ export interface NotificationParams {
   projectTitle: string;
   role?: string | null;
 }
+
+/**
+ * `project_github_imports.snapshot` (docs/m7-plan.md §3.5): per synced field, the
+ * SHA-256 (hex) of the value as last written by an import or re-sync.
+ */
+export type GithubImportSnapshot = Record<string, string>;

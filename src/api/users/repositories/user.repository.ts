@@ -14,6 +14,52 @@ export function findByAuth0Id(db: Executor, auth0Id: string): Promise<UserRow | 
 }
 
 /**
+ * The caller's row and whether their GitHub is connected, in one indexed read
+ * (docs/m7-plan.md §5.1): `verified` is "email verified or GitHub connected",
+ * so the per-request re-sync needs both. A reservation (`'linking'`) does not
+ * count.
+ */
+export async function findCaller(
+  db: Executor,
+  auth0Id: string,
+): Promise<{ user: UserRow; githubConnected: boolean } | undefined> {
+  const row = await db
+    .selectFrom('users')
+    .leftJoin('integrations as gh', (join) =>
+      join
+        .onRef('gh.userId', '=', 'users.id')
+        .on('gh.integrationType', '=', 'github')
+        .on('gh.status', '=', 'connected'),
+    )
+    .selectAll('users')
+    .select(sql<number>`gh.id IS NOT NULL`.as('githubConnected'))
+    .where('users.auth0Id', '=', auth0Id)
+    .executeTakeFirst();
+  if (row === undefined) return undefined;
+  const { githubConnected, ...user } = row;
+  return { user, githubConnected: Number(githubConnected) === 1 };
+}
+
+/**
+ * Whether another account has reserved or connected the GitHub account a
+ * `github|<id>` subject signs in as (docs/m7-plan.md §2.3). A locking read on
+ * the `(integration_type, external_user_id)` key: with the link's locking read
+ * of `users` by that subject, a provisioning and a link of the same GitHub
+ * account cannot both commit (one waits, or InnoDB picks a deadlock victim
+ * that `inTransaction` retries and that then sees the other's row).
+ */
+export async function githubIdTaken(trx: Transaction<DB>, githubId: string): Promise<boolean> {
+  const row = await trx
+    .selectFrom('integrations')
+    .select('userId')
+    .where('integrationType', '=', 'github')
+    .where('externalUserId', '=', githubId)
+    .forShare()
+    .executeTakeFirst();
+  return row !== undefined;
+}
+
+/**
  * Creates the row for `auth0Id` unless one exists, and returns the row,
  * whoever inserted it. Run inside `inTransaction` (it retries the deadlock a
  * competitor's rollback can cause).
@@ -51,14 +97,37 @@ export async function upsertByAuth0Id(
 }
 
 /**
- * Brings `verified` in line with the token. Idempotent: a concurrent sync to
- * the same value changes nothing, and the condition makes a no-op cheap.
+ * Sets `verified` to the email's word OR a connected GitHub (D5), deciding
+ * both under the user row lock: a connect or disconnect holds that lock for
+ * its whole transaction, so the connection read here is the committed one and
+ * this write cannot undo it. `undefined`: no such user (deleted meanwhile).
  */
-export async function setVerified(db: Executor, id: string, verified: boolean): Promise<void> {
-  await db
+export async function syncVerified(
+  trx: Transaction<DB>,
+  id: string,
+  emailVerified: boolean,
+): Promise<boolean | undefined> {
+  const locked = await trx
+    .selectFrom('users')
+    .select('id')
+    .where('id', '=', id)
+    .forUpdate()
+    .executeTakeFirst();
+  if (locked === undefined) return undefined;
+  const github = await trx
+    .selectFrom('integrations')
+    .select('id')
+    .where('userId', '=', id)
+    .where('integrationType', '=', 'github')
+    .where('status', '=', 'connected')
+    .forShare()
+    .executeTakeFirst();
+  const verified = emailVerified || github !== undefined;
+  await trx
     .updateTable('users')
     .set({ verified })
     .where('id', '=', id)
     .where('verified', '<>', verified)
     .execute();
+  return verified;
 }

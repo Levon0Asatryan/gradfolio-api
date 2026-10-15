@@ -191,7 +191,7 @@ jobs:
           docker compose logs migrate | grep -q 'migrations: applied 0004_project_source'
           tables=$(docker compose exec -T mysql mysql -ugradfolio -pgradfolio gradfolio -N -e \
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'gradfolio' AND table_name <> 'schema_migrations'")
-          [ "$tables" = "14" ] || { echo "::error::expected 14 tables, found $tables"; exit 1; }
+          [ "$tables" = "16" ] || { echo "::error::expected 16 tables, found $tables"; exit 1; }
           docker compose run --rm migrate | grep -qx 'migrations: nothing to apply'
 
       - name: Liveness, readiness, version prefix, JSON 404, docs

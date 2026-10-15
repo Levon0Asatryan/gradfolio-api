@@ -21,6 +21,9 @@ export const REDACT_PATHS = [
   '*.refresh_token',
   '*.idToken',
   '*.id_token',
+  // GitHub link (docs/m7-plan.md §2.6): a nonce, and an OAuth authorization code.
+  '*.nonce',
+  '*.code',
   '*.clientSecret',
   '*.client_secret',
   '*.phone',

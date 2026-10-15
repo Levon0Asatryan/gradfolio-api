@@ -21,6 +21,8 @@ export interface TokenClaims {
   /** Seconds from now; null omits the claim. */
   expIn?: number | null;
   nbfIn?: number;
+  /** Seconds from now (negative: in the past); null omits the claim. Default: now. */
+  iatIn?: number | null;
   /** Profile claims, written under the namespace. */
   profile?: Record<string, unknown>;
   /** Anything else, unnamespaced. */
@@ -44,10 +46,21 @@ export interface TestTenant {
   signRaw(header: Record<string, unknown>, payload: unknown): Promise<string>;
   /** The published key as PEM: the "secret" of an HS256 algorithm-confusion forgery. */
   publicKeyPem(): Promise<string>;
+  /**
+   * Serves more paths from the same origin (the fake Management API lives
+   * under the issuer, as Auth0's does). A handler returns true when it
+   * answered; anything no handler takes is the JWKS.
+   */
+  addRoute(handler: RouteHandler): void;
   /** Publishes a second key (`k2`) and returns a signer for it. */
   rotate(): Promise<(claims?: TokenClaims) => Promise<string>>;
   close(): Promise<void>;
 }
+
+export type RouteHandler = (
+  req: import('node:http').IncomingMessage,
+  res: import('node:http').ServerResponse,
+) => boolean;
 
 export const TEST_TENANT_AUDIENCE = 'https://api.gradfolio.test';
 
@@ -63,7 +76,9 @@ export async function startTestTenant(audience = TEST_TENANT_AUDIENCE): Promise<
   const hanging = new Set<import('node:http').ServerResponse>();
 
   const state = { mode: 'ok' as JwksMode };
-  const server: Server = createServer((_req, res) => {
+  const routes: RouteHandler[] = [];
+  const server: Server = createServer((req, res) => {
+    if (routes.some((route) => route(req, res))) return;
     fetches++;
     switch (state.mode) {
       case 'hang':
@@ -99,6 +114,7 @@ export async function startTestTenant(audience = TEST_TENANT_AUDIENCE): Promise<
         aud = audience,
         expIn = 600,
         nbfIn,
+        iatIn = 0,
         profile = {},
         extra = {},
       } = claims;
@@ -111,9 +127,9 @@ export async function startTestTenant(audience = TEST_TENANT_AUDIENCE): Promise<
       if (aud !== null) payload.aud = aud;
       if (expIn !== null) payload.exp = now + expIn;
       if (nbfIn !== undefined) payload.nbf = now + nbfIn;
+      if (iatIn !== null) payload.iat = now + iatIn;
       return new SignJWT(payload)
         .setProtectedHeader({ alg: 'RS256', typ: 'JWT', ...(kid ? { kid } : {}) })
-        .setIssuedAt()
         .sign(pair.privateKey);
     };
 
@@ -140,6 +156,9 @@ export async function startTestTenant(audience = TEST_TENANT_AUDIENCE): Promise<
         new TextEncoder().encode(input),
       );
       return `${input}.${Buffer.from(sig).toString('base64url')}`;
+    },
+    addRoute(handler) {
+      routes.push(handler);
     },
     publicKeyPem() {
       return exportSPKI(k1.publicKey);

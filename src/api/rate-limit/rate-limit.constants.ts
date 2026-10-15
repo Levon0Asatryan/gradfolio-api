@@ -7,6 +7,7 @@ export const RATE_BUDGETS = [
   'lookup',
   'browse',
   'suggest',
+  'integration',
 ] as const;
 export type RateBudgetName = (typeof RATE_BUDGETS)[number];
 

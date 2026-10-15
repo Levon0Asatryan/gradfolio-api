@@ -56,8 +56,27 @@ describe('openapi document', () => {
   });
 
   it('documents exactly the routes Nest serves -- nothing missing, nothing extra', () => {
-    const documented = OPERATIONS.map((op) => `${op.method} ${op.path}`).sort();
+    const documented = OPERATIONS.filter((op) => op.planned === undefined)
+      .map((op) => `${op.method} ${op.path}`)
+      .sort();
     expect(documented).toEqual(nestRoutes(app));
+  });
+
+  it('serves no planned operation: the PR that adds the route removes the flag', () => {
+    const served = new Set(nestRoutes(app));
+    const planned = OPERATIONS.filter((op) => op.planned !== undefined);
+    expect(planned.length).toBeGreaterThan(0);
+    expect(planned.filter((op) => served.has(`${op.method} ${op.path}`))).toEqual([]);
+  });
+
+  it('marks a planned operation as not served yet, in the document itself', () => {
+    const doc = buildOpenApiDocument() as {
+      paths: Record<string, Record<string, Record<string, unknown>>>;
+    };
+    const op = doc.paths['/v1/me/github/import']?.post;
+    expect(op?.['x-gradfolio-planned']).toBe('M7 PR (b)');
+    expect(op?.description).toMatch(/^\*\*Not served yet: arrives with M7 PR \(b\)\.\*\*/);
+    expect(doc.paths['/v1/me/integrations']?.get).not.toHaveProperty('x-gradfolio-planned');
   });
 
   it('has unique operation ids', () => {
