@@ -238,15 +238,15 @@ export class GithubClient {
   }
 
   /**
-   * `GET /repositories/{id}/readme` as GitHub-rendered HTML. `null`: the
-   * repository has none. `'too_large'`: over `maxBytes` (the body is never read
-   * past it).
+   * `GET /repositories/{id}/readme` as GitHub-rendered HTML. `readme` is
+   * `null` when the repository has none and `'too_large'` over `maxBytes` (the
+   * body is never read past it, so there are no headers: `rateLimit` null).
    */
   async getReadme(
     token: GithubAccessToken,
     repoId: number,
     maxBytes: number,
-  ): Promise<GithubReadme | null | 'too_large'> {
+  ): Promise<{ readme: GithubReadme | null | 'too_large'; rateLimit: GithubRateLimit | null }> {
     let res: UpstreamResponse;
     try {
       res = await this.send(
@@ -263,14 +263,18 @@ export class GithubClient {
       );
     } catch (err) {
       if (err instanceof GithubUnavailableError && err.logDetail?.includes('too_large')) {
-        return 'too_large';
+        return { readme: 'too_large', rateLimit: null };
       }
       throw err;
     }
-    if (res.status === 404) return null;
+    const rateLimit = rateLimitOf(res.headers);
+    if (res.status === 404) return { readme: null, rateLimit };
     if (res.status !== 200 || res.text === undefined) throw mapFailure(res);
     const path = /^\s*<div[^>]*\sdata-path="([^"]{1,255})"/.exec(res.text)?.[1] ?? 'README.md';
-    return { html: res.text, path: /^[A-Za-z0-9_./ -]+$/.test(path) ? path : 'README.md' };
+    return {
+      readme: { html: res.text, path: /^[A-Za-z0-9_./ -]+$/.test(path) ? path : 'README.md' },
+      rateLimit,
+    };
   }
 
   private async send(

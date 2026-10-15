@@ -88,7 +88,7 @@ export class GithubSyncService {
     const readme = await call(() =>
       gh.github.getReadme(token, meta.githubRepoId!, this.cfg.GITHUB_README_MAX_BYTES),
     );
-    const description = descriptionOf(repo, readme, this.cfg.PROJECT_DESCRIPTION_MAX_BYTES);
+    const description = descriptionOf(repo, readme.readme, this.cfg.PROJECT_DESCRIPTION_MAX_BYTES);
     // The candidate goes through the same schema as a manual write, so the
     // values compared are the values that would be stored.
     const parsed = this.schemas.create.safeParse({

@@ -146,7 +146,8 @@ describe('POST /v1/me/github/import', () => {
     expect(res.body.results).toEqual([
       expect.objectContaining({ repoId: 10, outcome: 'created', reason: null, notes: [] }),
     ]);
-    expect(res.body.rateLimit.remaining).not.toBeNull();
+    // The limit after the README call (the fake answers 4990 there, 4999 for the repository).
+    expect(res.body.rateLimit.remaining).toBe(4990);
 
     const row = (await projectRow(alice.id, 10))!;
     expect(row).toMatchObject({
@@ -188,6 +189,13 @@ describe('POST /v1/me/github/import', () => {
     // A draft: the owner reads it as a GitHub project; nobody else does.
     const own = await http.get(`/v1/projects/${row.id}`).set(alice.auth).expect(200);
     expect(own.body).toMatchObject({ source: 'github', isDraft: true });
+    // The list shape carries it too (the GitHub badge), and a manual project says manual.
+    await http.post('/v1/projects').set(alice.auth).send({ title: 'By hand' }).expect(201);
+    const mine = await http.get('/v1/me/projects').set(alice.auth).expect(200);
+    const bySource = Object.fromEntries(
+      (mine.body.items as { title: string; source: string }[]).map((p) => [p.title, p.source]),
+    );
+    expect(bySource).toEqual({ 'thesis-tracker': 'github', 'By hand': 'manual' });
     expect(own.body.repo).toMatchObject({ stars: 42, forks: 7, language: 'Python' });
   });
 
@@ -279,6 +287,43 @@ describe('POST /v1/me/github/import', () => {
     expect(
       await db.selectFrom('projects').select('id').where('githubRepoId', '=', 40).execute(),
     ).toHaveLength(1);
+  });
+
+  it('a project deleted between the look and the user lock is not reported as existing (barrier)', async () => {
+    const { http, alice } = await setup();
+    h.addRepo({ id: 80, ownerId: 100 });
+    const first = await importIds(http, alice, [80]).expect(200);
+    const oldId = first.body.results[0].projectId as string;
+
+    const holder = await createConnection({ uri: testDatabaseUrl() });
+    try {
+      await holder.query('START TRANSACTION');
+      await holder.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [alice.id]);
+      // The import has looked, found the project, and waits at the user lock ...
+      const again = importIds(http, alice, [80]).then((r) => r);
+      await waitForLockWaiters(1);
+      // ... when the project is deleted (a project delete takes only the project's lock).
+      await db.deleteFrom('projects').where('id', '=', oldId).execute();
+      await holder.query('COMMIT');
+
+      const res = await again;
+      expect(res.status).toBe(200);
+      const [result] = rowsOf(res, 'results');
+      expect(result).toMatchObject({ repoId: 80, outcome: 'created' });
+      expect(result!.projectId).not.toBe(oldId);
+      expect((await projectRow(alice.id, 80))!.id).toBe(result!.projectId);
+    } finally {
+      await holder.end();
+    }
+  });
+
+  it('an import with nothing read from GitHub reports no limit, not a stale one', async () => {
+    const { http, alice } = await setup();
+    h.addRepo({ id: 81, ownerId: 100 });
+    await importIds(http, alice, [81]).expect(200);
+    const again = await importIds(http, alice, [81]).expect(200);
+    expect(again.body.results[0].outcome).toBe('exists');
+    expect(again.body.rateLimit).toEqual({ remaining: null, resetsAt: null });
   });
 
   it('stops at the project cap with LIMIT_REACHED for the rest, creating those that fit', async () => {

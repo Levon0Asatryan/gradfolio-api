@@ -37,8 +37,15 @@ interface ImportResult {
   notes: ReadmeNote[];
 }
 
+interface StaleItem {
+  stale: true;
+  repoId: number;
+}
+
 type Prepared =
   | { kind: 'done'; result: ImportResult }
+  /** Found imported before the lock was taken; re-verified under it. */
+  | { kind: 'existing'; repoId: number }
   | { kind: 'create'; repo: GithubRepo; input: CreateProject; notes: ReadmeNote[] };
 
 const NO_LIMIT: GithubRateLimit = { remaining: null, resetsAt: null };
@@ -129,47 +136,61 @@ export class GithubImportService {
     let rateLimit = NO_LIMIT;
 
     // GitHub is asked outside any transaction; nothing here holds a lock.
+    const prepare = async (repoId: number): Promise<Prepared> => {
+      const read = await this.github(gh, user, () => gh.github.getRepo(token, repoId));
+      rateLimit = read.rateLimit;
+      const repo = read.repo;
+      if (repo === null) return { kind: 'done', result: done(repoId, 'skipped', 'not_found') };
+      // Anyone could otherwise import a famous repository as their own work.
+      if (repo.ownerId !== Number(githubUserId) && !repo.canPush) {
+        return { kind: 'done', result: done(repoId, 'skipped', 'not_owner') };
+      }
+      const got = await this.github(gh, user, () =>
+        gh.github.getReadme(token, repoId, this.cfg.GITHUB_README_MAX_BYTES),
+      );
+      // The limit as of the last call made: the README's, not the repository's.
+      if (got.rateLimit !== null) rateLimit = got.rateLimit;
+      const description = descriptionOf(repo, got.readme, this.cfg.PROJECT_DESCRIPTION_MAX_BYTES);
+      const parsed = this.schemas.create.safeParse({
+        ...fieldsOf(repo, description.html ?? null),
+        category: 'other',
+        status: 'ongoing',
+        isPublic: !repo.private,
+        isDraft: true,
+      });
+      if (!parsed.success) {
+        return { kind: 'done', result: done(repoId, 'skipped', 'invalid_repository') };
+      }
+      return {
+        kind: 'create',
+        repo,
+        input: parsed.data,
+        notes: description.note === undefined ? [] : [description.note],
+      };
+    };
+
     const prepared = await mapLimit(
       repoIds,
       this.cfg.GITHUB_IMPORT_CONCURRENCY,
-      async (repoId): Promise<Prepared> => {
-        const projectId = already.get(repoId);
-        if (projectId !== undefined) {
-          return { kind: 'done', result: done(repoId, 'exists', null, projectId) };
-        }
-        const read = await this.github(gh, user, () => gh.github.getRepo(token, repoId));
-        rateLimit = read.rateLimit;
-        const repo = read.repo;
-        if (repo === null) return { kind: 'done', result: done(repoId, 'skipped', 'not_found') };
-        // Anyone could otherwise import a famous repository as their own work.
-        if (repo.ownerId !== Number(githubUserId) && !repo.canPush) {
-          return { kind: 'done', result: done(repoId, 'skipped', 'not_owner') };
-        }
-        const readme = await this.github(gh, user, () =>
-          gh.github.getReadme(token, repoId, this.cfg.GITHUB_README_MAX_BYTES),
-        );
-        const description = descriptionOf(repo, readme, this.cfg.PROJECT_DESCRIPTION_MAX_BYTES);
-        const parsed = this.schemas.create.safeParse({
-          ...fieldsOf(repo, description.html ?? null),
-          category: 'other',
-          status: 'ongoing',
-          isPublic: !repo.private,
-          isDraft: true,
-        });
-        if (!parsed.success) {
-          return { kind: 'done', result: done(repoId, 'skipped', 'invalid_repository') };
-        }
-        return {
-          kind: 'create',
-          repo,
-          input: parsed.data,
-          notes: description.note === undefined ? [] : [description.note],
-        };
-      },
+      (repoId): Promise<Prepared> =>
+        already.has(repoId) ? Promise.resolve({ kind: 'existing', repoId }) : prepare(repoId),
     );
 
-    const results = await this.store(user.id, repoIds, prepared);
-    return { results, rateLimit };
+    const first = await this.store(user.id, repoIds, prepared);
+    // An "existing" project that was deleted between the look and the lock is
+    // no longer there: it is prepared like any other, and stored under the lock.
+    const stale = first.filter((r): r is StaleItem => 'stale' in r).map((r) => r.repoId);
+    const second =
+      stale.length === 0
+        ? []
+        : await this.store(
+            user.id,
+            stale,
+            await mapLimit(stale, this.cfg.GITHUB_IMPORT_CONCURRENCY, prepare),
+          );
+    const byId = new Map<number, ImportResult>();
+    for (const r of [...first, ...second]) if (!('stale' in r)) byId.set(r.repoId, r);
+    return { results: repoIds.map((id) => byId.get(id)!), rateLimit };
   }
 
   /**
@@ -182,16 +203,27 @@ export class GithubImportService {
     userId: string,
     repoIds: readonly number[],
     prepared: readonly Prepared[],
-  ): Promise<ImportResult[]> {
+  ): Promise<(ImportResult | StaleItem)[]> {
     return inTransaction(this.dbs.db, async (trx) => {
       await lockUser(trx, userId);
       let count = await countOwnedProjects(trx, userId);
       const have = await importedProjectIds(trx, userId, repoIds);
-      const results: ImportResult[] = [];
+      const results: (ImportResult | StaleItem)[] = [];
 
       for (const item of prepared) {
         if (item.kind === 'done') {
           results.push(item.result);
+          continue;
+        }
+        if (item.kind === 'existing') {
+          // Read again under the lock: a project deleted meanwhile (its delete
+          // takes only the project's lock) is not reported as existing.
+          const current = have.get(item.repoId);
+          results.push(
+            current === undefined
+              ? { stale: true, repoId: item.repoId }
+              : done(item.repoId, 'exists', null, current),
+          );
           continue;
         }
         const { repo, input, notes } = item;

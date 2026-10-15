@@ -187,14 +187,19 @@ describe('GithubClient', () => {
     });
 
     it('reads the README as HTML with its path; none is null; over the cap is too_large', async () => {
-      const readme = await client.getReadme(token, 1, 10_000);
-      expect(readme).toMatchObject({ path: 'docs/README.md' });
-      expect((readme as { html: string }).html).toContain('<p>hi</p>');
+      const got = await client.getReadme(token, 1, 10_000);
+      expect(got.readme).toMatchObject({ path: 'docs/README.md' });
+      expect((got.readme as { html: string }).html).toContain('<p>hi</p>');
+      // The README call's own headers, not the repository call's.
+      expect(got.rateLimit?.remaining).toBe(4990);
       expect(gh.requests.at(-1)!.path).toBe('/repositories/1/readme');
       gh.repos.get(2)!.readme = null;
-      expect(await client.getReadme(token, 2, 10_000)).toBeNull();
+      expect((await client.getReadme(token, 2, 10_000)).readme).toBeNull();
       gh.repos.get(3)!.readme = `<p>${'x'.repeat(5000)}</p>`;
-      expect(await client.getReadme(token, 3, 1000)).toBe('too_large');
+      expect(await client.getReadme(token, 3, 1000)).toEqual({
+        readme: 'too_large',
+        rateLimit: null,
+      });
     });
 
     it('parses Link and rate-limit headers strictly', () => {
