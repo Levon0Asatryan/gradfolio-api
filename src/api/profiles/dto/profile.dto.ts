@@ -81,6 +81,9 @@ export const profileProjectSchema = z
     }),
     isPublic: z.boolean(),
     isDraft: z.boolean(),
+    source: z.enum(['manual', 'github']).meta({
+      description: '`github`: imported from a GitHub repository (M7); shows the GitHub badge.',
+    }),
   })
   .meta({ id: 'ProfileProject' });
 

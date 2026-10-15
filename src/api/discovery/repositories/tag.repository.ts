@@ -80,6 +80,7 @@ export function projectsWithTerm(
       'projects.category',
       'projects.status',
       'projects.heroImageUrl',
+      'projects.source',
       'projects.createdAt',
       'projects.updatedAt',
       'owner.id as ownerId',

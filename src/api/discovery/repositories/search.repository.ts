@@ -182,6 +182,7 @@ export const CARD_COLUMNS = [
   'projects.category',
   'projects.status',
   'projects.heroImageUrl',
+  'projects.source',
   'projects.createdAt',
   'projects.updatedAt',
 ] as const;

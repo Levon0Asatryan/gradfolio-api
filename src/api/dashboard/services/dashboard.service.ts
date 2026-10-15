@@ -70,6 +70,7 @@ export class DashboardService {
         role: r.userId === userId ? ('owner' as const) : ('member' as const),
         isPublic: r.isPublic,
         isDraft: r.isDraft,
+        source: r.source,
         updatedAt: r.updatedAt.toISOString(),
       })),
       activities: feed.slice(0, this.cfg.DASHBOARD_FEED_SIZE).map(toActivity),

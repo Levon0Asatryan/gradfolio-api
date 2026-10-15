@@ -183,6 +183,7 @@ describe('GET /v1/me/dashboard', () => {
       'isDraft',
       'isPublic',
       'role',
+      'source',
       'status',
       'summary',
       'technologies',
