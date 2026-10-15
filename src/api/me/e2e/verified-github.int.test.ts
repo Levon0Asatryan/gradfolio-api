@@ -2,8 +2,10 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { newId } from '../../../core/db/ids.js';
+import { createConnection } from 'mysql2/promise';
 import { buildApp, captureLogs } from '../../../testing/app.js';
-import { testConfig } from '../../../testing/database.js';
+import { waitForLockWaiters } from '../../../testing/barrier.js';
+import { testConfig, testDatabaseUrl } from '../../../testing/database.js';
 import { createUser } from '../../../testing/factories.js';
 import { startTestTenant, type TestTenant } from '../../../testing/jwks.js';
 import { db } from '../../../testing/team.js';
@@ -103,5 +105,36 @@ describe('verified counts a connected GitHub', () => {
       .set({ Authorization: `Bearer ${token}` })
       .expect(200);
     expect(await stored(plain.id)).toBe(false);
+  });
+
+  it('a connect committed while the request decides cannot be overwritten with false (barrier)', async () => {
+    const http = await start();
+    // Stored verified from an older email-verified token; this token says false.
+    const s = await withGithub('not_connected', false);
+    const holder = await createConnection({ uri: testDatabaseUrl() });
+    try {
+      await holder.query('START TRANSACTION');
+      await holder.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [s.id]);
+      // The request read "not connected" and now waits to write false ...
+      const request = http
+        .get('/v1/me')
+        .set(s.auth)
+        .then((r) => r);
+      await waitForLockWaiters(1);
+      // ... while a connect, under the same lock, commits.
+      await holder.query(
+        "UPDATE integrations SET status = 'connected', generation = generation + 1 WHERE user_id = ?",
+        [s.id],
+      );
+      await holder.query('UPDATE users SET verified = 1 WHERE id = ?', [s.id]);
+      await holder.query('COMMIT');
+
+      const res = await request;
+      expect(res.status).toBe(200);
+      expect(res.body.verified).toBe(true);
+    } finally {
+      await holder.end();
+    }
+    expect(await stored(s.id)).toBe(true);
   });
 });

@@ -7,7 +7,7 @@ import { UnauthenticatedError } from '../../../core/auth/errors.js';
 import {
   findCaller,
   githubIdTaken,
-  setVerified,
+  syncVerified,
   type UserRow,
   upsertByAuth0Id,
 } from '../repositories/user.repository.js';
@@ -54,11 +54,14 @@ export class UsersService {
       });
     }
 
-    // A brand-new row has no integration yet.
-    const verified = prefill.verified || found?.githubConnected === true;
-    if (user.verified !== verified) {
-      await setVerified(db, user.id, verified);
-      user = { ...user, verified };
+    // A brand-new row has no integration yet. What was read above can be
+    // stale by now (a connect may have committed), so a change is decided
+    // again under the user lock, where connect and disconnect also write.
+    const expected = prefill.verified || found?.githubConnected === true;
+    if (user.verified !== expected) {
+      const { id } = user;
+      const settled = await inTransaction(db, (trx) => syncVerified(trx, id, prefill.verified));
+      if (settled !== undefined) user = { ...user, verified: settled };
     }
     return user;
   }

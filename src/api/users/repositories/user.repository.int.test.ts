@@ -5,7 +5,7 @@ import { inTransaction } from '../../../core/db/transaction.js';
 import { waitForLockWaiters } from '../../../testing/barrier.js';
 import { testDatabase, testDatabaseUrl } from '../../../testing/database.js';
 import type { UserPrefill } from '../utils/prefill.js';
-import { findByAuth0Id, setVerified, upsertByAuth0Id } from './user.repository.js';
+import { findByAuth0Id, syncVerified, upsertByAuth0Id } from './user.repository.js';
 
 /** First-login provisioning on MySQL 8.4 (docs/m2-plan.md §2.5, §3.4). */
 
@@ -112,10 +112,10 @@ describe('users repository', () => {
     );
     await inTransaction(db, (trx) => upsertByAuth0Id(trx, other, prefill({ verified: false })));
 
-    await setVerified(db, row.id, true);
+    await inTransaction(db, (trx) => syncVerified(trx, row.id, true));
     expect((await findByAuth0Id(db, sub))?.verified).toBe(true);
     expect((await findByAuth0Id(db, other))?.verified).toBe(false);
-    await setVerified(db, row.id, false);
+    await inTransaction(db, (trx) => syncVerified(trx, row.id, false));
     expect((await findByAuth0Id(db, sub))?.verified).toBe(false);
   });
 });
