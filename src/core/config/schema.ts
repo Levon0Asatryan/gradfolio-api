@@ -321,6 +321,14 @@ const integrations = {
   // turns the cache off. Never persisted (D2).
   GITHUB_TOKEN_CACHE_S: z.coerce.number().int().min(0).max(900).default(300),
   GITHUB_TOKEN_CACHE_MAX: z.coerce.number().int().min(1).max(100_000).default(1000),
+  // GitHub repository import (docs/m7-plan.md §3). Repositories per page the
+  // caller may ask for; repositories one import may name; the most README bytes
+  // read (over it the project is created without a description); and how many
+  // repositories are read from GitHub at once.
+  GITHUB_PAGE_MAX: z.coerce.number().int().min(1).max(100).default(30),
+  GITHUB_IMPORT_MAX_BATCH: z.coerce.number().int().min(1).max(10).default(10),
+  GITHUB_README_MAX_BYTES: z.coerce.number().int().min(1000).max(1_000_000).default(400_000),
+  GITHUB_IMPORT_CONCURRENCY: z.coerce.number().int().min(1).max(5).default(2),
   // A link nonce's lifetime, and the most an id token's `iat` may lie in the past.
   INTEGRATION_NONCE_TTL_S: z.coerce.number().int().min(60).max(3600).default(600),
   LINK_ID_TOKEN_MAX_AGE_S: z.coerce.number().int().min(30).max(3600).default(300),

@@ -14,6 +14,8 @@ export interface UpstreamRequest {
   signal: AbortSignal;
   /** The most response body bytes read; beyond it the call fails. */
   maxBytes: number;
+  /** Return the body as text (never JSON-parsed): for an HTML answer. */
+  asText?: boolean;
 }
 
 export interface UpstreamResponse {
@@ -21,6 +23,8 @@ export interface UpstreamResponse {
   headers: Headers;
   /** The parsed JSON body, or undefined when the body was empty or not JSON. */
   body: unknown;
+  /** The body as UTF-8 text, only when the request asked for `asText`. */
+  text?: string;
 }
 
 /** Why a request produced no response the caller can judge. */
@@ -87,6 +91,14 @@ export async function upstreamRequest(url: URL, req: UpstreamRequest): Promise<U
       signal: req.signal,
     });
     const bytes = await readCapped(res, req.maxBytes);
+    if (req.asText === true) {
+      return {
+        status: res.status,
+        headers: res.headers,
+        body: undefined,
+        text: Buffer.from(bytes).toString('utf8'),
+      };
+    }
     let body: unknown;
     if (bytes.byteLength > 0 && /\bjson\b/i.test(res.headers.get('content-type') ?? '')) {
       try {

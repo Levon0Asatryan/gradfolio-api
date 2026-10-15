@@ -1,7 +1,13 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { startFakeGithub, type FakeGithub, type UserMode } from '../../testing/fake-github.js';
 import { GithubAccessToken } from './github-access-token.js';
-import { GITHUB_API_VERSION, GithubClient, mapFailure } from './github-client.js';
+import {
+  GITHUB_API_VERSION,
+  GithubClient,
+  mapFailure,
+  nextPageOf,
+  rateLimitOf,
+} from './github-client.js';
 import {
   GithubNotLinkedError,
   GithubRateLimitedError,
@@ -127,6 +133,86 @@ describe('GithubClient', () => {
         GithubRevokeFailedError,
       );
       expect(gh.revoked).toEqual([]);
+    });
+  });
+
+  describe('repositories and README (docs/m7-plan.md §3.2–3.4)', () => {
+    const repo = (id: number, over = {}) => ({
+      id,
+      name: `r${id}`,
+      ownerId: 583231,
+      ownerLogin: 'ani-p',
+      description: 'd',
+      language: 'Go',
+      stars: 2,
+      forks: 1,
+      private: false,
+      fork: false,
+      archived: false,
+      defaultBranch: 'main',
+      pushedAt: '2026-01-01T00:00:00Z',
+      pushers: [],
+      readme: '<p>hi</p>',
+      readmePath: 'docs/README.md',
+      ...over,
+    });
+    beforeEach(() => {
+      gh.repos.clear();
+      gh.repoMode = 'ok';
+      for (const id of [1, 2, 3]) gh.repos.set(id, repo(id));
+    });
+
+    it('lists with the parameters it promises, pages by the Link header, and reads the limit', async () => {
+      const page = await client.listRepos(token, { page: 1, perPage: 2 });
+      expect(page.items).toHaveLength(2);
+      expect(page.items[0]).toMatchObject({ ownerLogin: 'ani-p', canPush: true, stars: 2 });
+      expect(page.nextPage).toBe(2);
+      expect(page.rateLimit.remaining).toBe(4999);
+      expect(page.rateLimit.resetsAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      const req = gh.requests.at(-1)!;
+      expect(req.path).toBe('/user/repos');
+      const last = await client.listRepos(token, { page: 2, perPage: 2 });
+      expect(last.nextPage).toBeNull();
+    });
+
+    it('reads a repository by integer id; 404 is null; a limit or failure is an error', async () => {
+      expect((await client.getRepo(token, 2)).repo).toMatchObject({ id: 2, defaultBranch: 'main' });
+      expect((await client.getRepo(token, 99)).repo).toBeNull();
+      gh.repoMode = 'rate-limited';
+      await expect(client.getRepo(token, 2)).rejects.toBeInstanceOf(GithubRateLimitedError);
+      gh.repoMode = 'status-500';
+      await expect(client.getRepo(token, 2)).rejects.toBeInstanceOf(GithubUnavailableError);
+      await expect(client.getRepo(token, 1.5)).rejects.toThrow(/integer/);
+      await expect(client.getRepo(token, -3)).rejects.toThrow(/integer/);
+    });
+
+    it('reads the README as HTML with its path; none is null; over the cap is too_large', async () => {
+      const readme = await client.getReadme(token, 1, 10_000);
+      expect(readme).toMatchObject({ path: 'docs/README.md' });
+      expect((readme as { html: string }).html).toContain('<p>hi</p>');
+      expect(gh.requests.at(-1)!.path).toBe('/repositories/1/readme');
+      gh.repos.get(2)!.readme = null;
+      expect(await client.getReadme(token, 2, 10_000)).toBeNull();
+      gh.repos.get(3)!.readme = `<p>${'x'.repeat(5000)}</p>`;
+      expect(await client.getReadme(token, 3, 1000)).toBe('too_large');
+    });
+
+    it('parses Link and rate-limit headers strictly', () => {
+      expect(
+        nextPageOf('<https://x/user/repos?page=3>; rel="next", <https://x?page=9>; rel="last"'),
+      ).toBe(3);
+      expect(nextPageOf('<https://x?page=9>; rel="last"')).toBeNull();
+      expect(nextPageOf('<https://x?page=abc>; rel="next"')).toBeNull();
+      expect(nextPageOf(null)).toBeNull();
+      expect(
+        rateLimitOf(
+          new Headers({ 'x-ratelimit-remaining': '12', 'x-ratelimit-reset': '1800000000' }),
+        ),
+      ).toEqual({ remaining: 12, resetsAt: new Date(1_800_000_000_000).toISOString() });
+      expect(rateLimitOf(new Headers({ 'x-ratelimit-remaining': 'x' }))).toEqual({
+        remaining: null,
+        resetsAt: null,
+      });
     });
   });
 });
