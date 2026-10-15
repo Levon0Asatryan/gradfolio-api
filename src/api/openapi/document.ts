@@ -570,7 +570,10 @@ function integrationOperations(): Operation[] {
       description:
         'Revokes the GitHub app grant first (every token of it, including the one Auth0 holds); ' +
         'only once GitHub confirms, or there is nothing left to revoke, is GitHub disconnected. ' +
-        'A failed revocation changes nothing (502): retry. Idempotent. Imported projects stay. ' +
+        'A revocation GitHub refuses changes nothing (502): retry. One whose outcome is unknown ' +
+        '(timeout, dropped connection, 5xx) also answers 502, but the grant may still be deleted: ' +
+        'the card then shows not_connected and a retry answers 409 GITHUB_LINK_IN_PROGRESS until ' +
+        'it settles, after a short delay. Idempotent. Imported projects stay. ' +
         'The GitHub identity stays linked at Auth0 (a GitHub sign-in keeps working); ' +
         'reconnecting needs one fresh GitHub sign-in. `verified` falls back to the email.',
       responses: {
@@ -580,8 +583,8 @@ function integrationOperations(): Operation[] {
           'GITHUB_REVOKE_FAILED: GitHub did not confirm the revocation. When GitHub refused, ' +
             'nothing changed. When it timed out, dropped the connection or answered 5xx, the ' +
             'grant may still be deleted: the card shows not_connected and a retry answers 409 ' +
-            'GITHUB_LINK_IN_PROGRESS until the outcome settles (under half a minute); the next ' +
-            'request then shows the true state',
+            'GITHUB_LINK_IN_PROGRESS until the outcome settles, after a short delay; retry ' +
+            'shortly, and the next request then shows the true state',
         ),
         ...failures,
         '503': unavailable,

@@ -48,7 +48,7 @@ export class GithubRevokeFailedError extends AppError {
       refused
         ? 'GitHub did not confirm the revocation; nothing was changed, try again'
         : 'GitHub did not confirm the revocation and may still be processing it; ' +
-            'the connection shows as disconnected until it settles, try again in a minute',
+            'the connection shows as disconnected until it settles, try again shortly',
       502,
     );
     this.refused = refused;
