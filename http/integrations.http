@@ -40,3 +40,32 @@ Content-Type: application/json
 # 502 GITHUB_REVOKE_FAILED changes nothing.
 DELETE {{baseUrl}}/v1/me/integrations/github
 Authorization: Bearer {{accessToken}}
+
+###
+# @name listGithubRepos
+# The caller's public repositories (owned or collaborated on), newest push first.
+# `imported` and `projectId` mark what the caller already imported; `rateLimit` is
+# GitHub's own. 409 GITHUB_NOT_CONNECTED / GITHUB_NOT_LINKED; 429 GITHUB_RATE_LIMITED
+# carries Retry-After. `cursor` is the previous page's `nextCursor`, nothing else.
+GET {{baseUrl}}/v1/me/github/repos?limit=10
+Authorization: Bearer {{accessToken}}
+
+###
+# @name importGithubRepos
+# One result per repository: created | exists | skipped (not_found, not_owner,
+# invalid_repository, LIMIT_REACHED). Stars, forks, language and README are read again
+# from GitHub; a client sends ids only (a `url` or `stars` key is a 400). Drafts.
+POST {{baseUrl}}/v1/me/github/import
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "repoIds": [812345678] }
+
+###
+# @name syncGithubProject
+# Per field: unchanged | updated | kept | conflict (the caller's value stands, GitHub's
+# is in `githubValue`). `systemUpdated` lists stars/forks/language/readmeUrl that
+# changed (refreshed silently). `?dryRun=true` writes nothing. 404 for a project that
+# is not the caller's; 409 NOT_GITHUB_PROJECT, GITHUB_REPO_UNAVAILABLE.
+POST {{baseUrl}}/v1/me/projects/{{projectId}}/github/sync?dryRun=true
+Authorization: Bearer {{accessToken}}

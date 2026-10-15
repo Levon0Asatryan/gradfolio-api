@@ -6,8 +6,11 @@ import { type AppConfig, githubIntegrationSettings } from '../../core/config/sch
 import { GithubClient } from '../../core/github/github-client.js';
 import { Auth0IdpTokenSource } from '../../core/github/token-source.js';
 import { GITHUB_CONNECT, type GithubConnect } from './integrations.constants.js';
+import { GithubImportController, GithubSyncController } from './github-import.controller.js';
 import { IntegrationsController } from './integrations.controller.js';
 import { GithubConnectionService } from './services/github-connection.service.js';
+import { GithubImportService } from './services/github-import.service.js';
+import { GithubSyncService } from './services/github-sync.service.js';
 
 /** GitHub connect's clients, or null when any of its five credentials is unset (D9). */
 export function createGithubConnect(cfg: AppConfig): GithubConnect | null {
@@ -44,9 +47,11 @@ export function createGithubConnect(cfg: AppConfig): GithubConnect | null {
 }
 
 @Module({
-  controllers: [IntegrationsController],
+  controllers: [IntegrationsController, GithubImportController, GithubSyncController],
   providers: [
     GithubConnectionService,
+    GithubImportService,
+    GithubSyncService,
     { provide: GITHUB_CONNECT, inject: [APP_CONFIG], useFactory: createGithubConnect },
   ],
   exports: [GithubConnectionService],

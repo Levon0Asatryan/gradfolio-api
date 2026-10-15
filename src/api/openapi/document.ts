@@ -595,8 +595,9 @@ function integrationOperations(): Operation[] {
 
 /**
  * GitHub import and the LinkedIn export import (docs/m7-plan.md §3, §4; §7
- * items 5–10): the contract only, published with PR (a) so the frontend can
- * build against it. Each is `planned`; the PR that serves it drops the flag.
+ * items 5–10): the contract, published with PR (a) so the frontend can build
+ * against it. Those of PR (c) are still `planned`; the PR that serves one
+ * drops the flag.
  */
 function plannedImportOperations(): Operation[] {
   const base = { tag: 'integrations', bearer: true } as const;
@@ -621,7 +622,6 @@ function plannedImportOperations(): Operation[] {
   return [
     {
       ...base,
-      planned: 'M7 PR (b)',
       method: 'get',
       path: '/v1/me/github/repos',
       operationId: 'listGithubRepos',
@@ -639,7 +639,6 @@ function plannedImportOperations(): Operation[] {
     },
     {
       ...base,
-      planned: 'M7 PR (b)',
       method: 'post',
       path: '/v1/me/github/import',
       operationId: 'importGithubRepos',
@@ -660,7 +659,6 @@ function plannedImportOperations(): Operation[] {
     },
     {
       ...base,
-      planned: 'M7 PR (b)',
       method: 'post',
       path: '/v1/me/projects/{id}/github/sync',
       operationId: 'syncGithubProject',
@@ -677,7 +675,8 @@ function plannedImportOperations(): Operation[] {
         '404': notYours('project'),
         ...github,
         '409': error(
-          'NOT_GITHUB_PROJECT: the project was not imported; GITHUB_NOT_CONNECTED; GITHUB_NOT_LINKED',
+          'NOT_GITHUB_PROJECT: the project was not imported; GITHUB_REPO_UNAVAILABLE: the repository ' +
+            'is gone or no longer visible; GITHUB_NOT_CONNECTED; GITHUB_NOT_LINKED',
         ),
         '429': error('RATE_LIMITED (the `import` budget) or GITHUB_RATE_LIMITED; see Retry-After'),
       },
