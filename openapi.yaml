@@ -6218,6 +6218,12 @@ components:
           description: The caller owns the project.
         ownerId:
           type: string
+        source:
+          type: string
+          enum:
+            - manual
+            - github
+          description: "`github`: imported from a GitHub repository (M7); shows the GitHub badge."
         metadata:
           $ref: "#/components/schemas/ProjectMetadata"
         createdAt:
@@ -6276,11 +6282,6 @@ components:
           description: Accepted team members. The owner is `owner`, not a member.
         owner:
           $ref: "#/components/schemas/ProjectOwner"
-        source:
-          type: string
-          enum:
-            - manual
-            - github
       required:
         - id
         - title
@@ -6295,6 +6296,7 @@ components:
         - isDraft
         - isOwner
         - ownerId
+        - source
         - metadata
         - createdAt
         - updatedAt
@@ -6307,7 +6309,6 @@ components:
         - attachments
         - team
         - owner
-        - source
       additionalProperties: false
     ProjectGroup:
       type: object
@@ -6467,6 +6468,12 @@ components:
           description: The caller owns the project.
         ownerId:
           type: string
+        source:
+          type: string
+          enum:
+            - manual
+            - github
+          description: "`github`: imported from a GitHub repository (M7); shows the GitHub badge."
         metadata:
           $ref: "#/components/schemas/ProjectMetadata"
         createdAt:
@@ -6489,6 +6496,7 @@ components:
         - isDraft
         - isOwner
         - ownerId
+        - source
         - metadata
         - createdAt
         - updatedAt

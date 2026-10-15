@@ -96,6 +96,9 @@ const summaryShape = {
   isDraft: z.boolean().meta({ description: 'A draft is readable by its owner only.' }),
   isOwner: z.boolean().meta({ description: 'The caller owns the project.' }),
   ownerId: z.string(),
+  source: z.enum(['manual', 'github']).meta({
+    description: '`github`: imported from a GitHub repository (M7); shows the GitHub badge.',
+  }),
   metadata: projectMetadataSchema,
   createdAt: z.string().meta({ description: 'ISO 8601, UTC.' }),
   updatedAt: z.string().meta({ description: 'ISO 8601, UTC.' }),
@@ -120,7 +123,6 @@ export const projectDetailSchema = z
       description: 'Accepted team members. The owner is `owner`, not a member.',
     }),
     owner: projectOwnerSchema,
-    source: z.enum(['manual', 'github']),
   })
   .meta({ id: 'ProjectDetail' });
 
