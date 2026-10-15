@@ -33,7 +33,7 @@ export class GithubUnavailableError extends AppError {
   }
 }
 
-/** 502: the grant could not be revoked at GitHub; nothing was changed (D9). */
+/** 502: GitHub did not confirm the revocation (D9); `refused` says whether nothing changed. */
 export class GithubRevokeFailedError extends AppError {
   /**
    * `true`: GitHub answered that the grant was **not** deleted (a 4xx), or the
@@ -45,7 +45,10 @@ export class GithubRevokeFailedError extends AppError {
   constructor(cause: string, refused = false) {
     super(
       'GITHUB_REVOKE_FAILED',
-      'GitHub did not confirm the revocation; nothing was changed, try again',
+      refused
+        ? 'GitHub did not confirm the revocation; nothing was changed, try again'
+        : 'GitHub did not confirm the revocation and may still be processing it; ' +
+            'the connection shows as disconnected until it settles, try again in a minute',
       502,
     );
     this.refused = refused;

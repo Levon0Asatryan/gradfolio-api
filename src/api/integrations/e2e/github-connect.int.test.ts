@@ -798,6 +798,8 @@ describe('disconnect (revoke first, D9)', () => {
     gh.grantStatus = 403;
     const res = await http.delete('/v1/me/integrations/github').set(s.auth).expect(502);
     expect(res.body.code).toBe('GITHUB_REVOKE_FAILED');
+    // The published contract: a refusal changed nothing.
+    expect(res.body.message).toContain('nothing was changed');
     expect(await githubRow(s.id)).toMatchObject({ status: 'connected', externalUserId: '101' });
     expect(await verifiedOf(s.id)).toBe(true);
   });
@@ -815,6 +817,9 @@ describe('disconnect (revoke first, D9)', () => {
       fail();
       const res = await http.delete('/v1/me/integrations/github').set(s.auth).expect(502);
       expect(res.body.code).toBe('GITHUB_REVOKE_FAILED');
+      // An unknown outcome does not claim "nothing changed".
+      expect(res.body.message).toContain('may still be processing');
+      expect(res.body.message).not.toContain('nothing was changed');
       expect(await githubRow(s.id)).toMatchObject({ status: 'linking', externalUserId: '109' });
       // GitHub did not process anything, so once the marker is old the token is
       // still good and the connection is restored by reconciliation.

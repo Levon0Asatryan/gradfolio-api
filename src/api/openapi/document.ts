@@ -577,7 +577,11 @@ function integrationOperations(): Operation[] {
         '200': { description: 'Disconnected', schema: disconnectResponseSchema },
         '409': error(inProgress),
         '502': error(
-          'GITHUB_REVOKE_FAILED: GitHub did not confirm the revocation; nothing changed',
+          'GITHUB_REVOKE_FAILED: GitHub did not confirm the revocation. When GitHub refused, ' +
+            'nothing changed. When it timed out, dropped the connection or answered 5xx, the ' +
+            'grant may still be deleted: the card shows not_connected and a retry answers 409 ' +
+            'GITHUB_LINK_IN_PROGRESS until the outcome settles (under half a minute); the next ' +
+            'request then shows the true state',
         ),
         ...failures,
         '503': unavailable,
