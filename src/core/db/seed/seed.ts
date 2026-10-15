@@ -1,9 +1,11 @@
 import type { Database } from '../database.js';
 import { newId } from '../ids.js';
 import { toJsonColumn } from '../json.js';
+import { hashField } from '../../github/snapshot.js';
 import { setProjectTerms, setUserSkills } from '../terms.js';
 import { inTransaction } from '../transaction.js';
 import {
+  githubImportSnapshot,
   linkList,
   notificationParams,
   stringList,
@@ -172,7 +174,30 @@ export async function seed(db: Database): Promise<void> {
           userId: i.user,
           integrationType: i.type,
           status: i.status,
+          generation: 1,
+          externalUserId: i.externalUserId,
+          externalLogin: i.externalLogin,
           lastSyncedAt: i.lastSyncedAt === null ? null : new Date(i.lastSyncedAt),
+        })
+        .execute();
+    }
+
+    // The imported draft's snapshot: what a re-sync compares edits against. As an
+    // import writes it, from the stored values (docs/m7-plan.md §3.5).
+    for (const p of projects) {
+      if (p.source !== 'github') continue;
+      await trx
+        .insertInto('projectGithubImports')
+        .values({
+          projectId: p.id,
+          syncedAt: new Date('2026-09-22T17:40:00Z'),
+          snapshot: toJsonColumn(githubImportSnapshot, {
+            title: hashField('title', p.title),
+            summary: hashField('summary', p.summary),
+            descriptionHtml: hashField('descriptionHtml', p.descriptionHtml),
+            repoUrl: hashField('repoUrl', p.repoUrl),
+            technologies: hashField('technologies', p.technologies),
+          }),
         })
         .execute();
     }
