@@ -47,6 +47,9 @@ export const projectCardSchema = z
     category: z.enum(PROJECT_CATEGORIES),
     status: z.enum(PROJECT_STATUSES),
     heroImageUrl: z.string().nullable(),
+    source: z.enum(['manual', 'github']).meta({
+      description: '`github`: imported from a GitHub repository (M7); shows the GitHub badge.',
+    }),
     technologies: z.array(z.string()).meta({ description: 'Up to 5.' }),
     tags: z.array(z.string()).meta({ description: 'Up to 5.' }),
     owner: projectCardOwnerSchema,
@@ -56,7 +59,7 @@ export const projectCardSchema = z
   .meta({
     id: 'ProjectCard',
     description:
-      'A published project of a public profile as a card. Never the description, links, files, visibility flags or repository data.',
+      'A published project of a public profile as a card. Never the description, links, files, visibility flags or repository facts (only whether it was imported from GitHub).',
   });
 
 const group = <T extends z.ZodType>(item: T, id: string) =>

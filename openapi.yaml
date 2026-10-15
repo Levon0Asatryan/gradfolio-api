@@ -4774,6 +4774,12 @@ components:
           type: boolean
         isDraft:
           type: boolean
+        source:
+          type: string
+          enum:
+            - manual
+            - github
+          description: "`github`: imported from a GitHub repository (M7); shows the GitHub badge."
         updatedAt:
           type: string
           description: ISO 8601, UTC.
@@ -4787,6 +4793,7 @@ components:
         - role
         - isPublic
         - isDraft
+        - source
         - updatedAt
       additionalProperties: false
     DashboardProjectCounts:
@@ -6045,6 +6052,12 @@ components:
           type: boolean
         isDraft:
           type: boolean
+        source:
+          type: string
+          enum:
+            - manual
+            - github
+          description: "`github`: imported from a GitHub repository (M7); shows the GitHub badge."
       required:
         - id
         - title
@@ -6056,6 +6069,7 @@ components:
         - role
         - isPublic
         - isDraft
+        - source
       additionalProperties: false
     ProjectAttachment:
       type: object
@@ -6118,6 +6132,12 @@ components:
         heroImageUrl:
           nullable: true
           type: string
+        source:
+          type: string
+          enum:
+            - manual
+            - github
+          description: "`github`: imported from a GitHub repository (M7); shows the GitHub badge."
         technologies:
           type: array
           items:
@@ -6143,13 +6163,14 @@ components:
         - category
         - status
         - heroImageUrl
+        - source
         - technologies
         - tags
         - owner
         - createdAt
         - updatedAt
       additionalProperties: false
-      description: A published project of a public profile as a card. Never the description, links, files, visibility flags or repository data.
+      description: A published project of a public profile as a card. Never the description, links, files, visibility flags or repository facts (only whether it was imported from GitHub).
     ProjectCardOwner:
       type: object
       properties:

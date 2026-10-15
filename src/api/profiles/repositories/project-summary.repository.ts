@@ -11,6 +11,7 @@ const SUMMARY_COLUMNS = [
   'projects.heroImageUrl',
   'projects.isPublic',
   'projects.isDraft',
+  'projects.source',
   'projects.createdAt',
 ] as const;
 

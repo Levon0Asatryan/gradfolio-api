@@ -16,6 +16,9 @@ export const dashboardProjectSchema = z
     }),
     isPublic: z.boolean(),
     isDraft: z.boolean(),
+    source: z.enum(['manual', 'github']).meta({
+      description: '`github`: imported from a GitHub repository (M7); shows the GitHub badge.',
+    }),
     updatedAt: z.string().meta({ description: 'ISO 8601, UTC.' }),
   })
   .meta({ id: 'DashboardProject' });

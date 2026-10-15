@@ -246,6 +246,7 @@ describe('GET /v1/search: the privacy matrix (X1-X4)', () => {
       'heroImageUrl',
       'id',
       'owner',
+      'source',
       'status',
       'summary',
       'tags',

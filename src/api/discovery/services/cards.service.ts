@@ -24,6 +24,7 @@ interface ProjectRow {
   category: ProjectCard['category'];
   status: ProjectCard['status'];
   heroImageUrl: string | null;
+  source: ProjectCard['source'];
   createdAt: Date;
   updatedAt: Date;
   ownerId: string;
@@ -87,6 +88,7 @@ export class CardsService {
       category: r.category,
       status: r.status,
       heroImageUrl: url(r.heroImageUrl),
+      source: r.source,
       technologies: (technologies.get(r.id) ?? []).slice(0, CARD_TERMS),
       tags: (tags.get(r.id) ?? []).slice(0, CARD_TERMS),
       owner: { id: r.ownerId, name: r.ownerName, avatarUrl: url(r.ownerAvatarUrl) },
