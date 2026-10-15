@@ -110,7 +110,8 @@ export class GithubClient {
     }
     if (res.status === 204) return 'revoked';
     if ((GRANT_ALREADY_GONE as readonly number[]).includes(res.status)) return 'already_gone';
-    throw new GithubRevokeFailedError(`DELETE grant ${res.status}`);
+    // A 5xx may have been processed; any other answer says the grant stands.
+    throw new GithubRevokeFailedError(`DELETE grant ${res.status}`, res.status < 500);
   }
 
   private async send(

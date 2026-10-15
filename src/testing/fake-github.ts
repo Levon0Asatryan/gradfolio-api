@@ -43,6 +43,8 @@ export interface FakeGithub {
   grantStatus?: number;
   /** Never answer a grant delete. */
   grantHang: boolean;
+  /** Process every grant delete (the token is revoked), then drop the connection unanswered. */
+  grantDropAfterProcessing: boolean;
   /** `x-ratelimit-reset` it sends, epoch seconds. */
   resetAt: number;
   /**
@@ -95,6 +97,7 @@ export async function startFakeGithub(): Promise<FakeGithub> {
     userMode: 'ok' as UserMode,
     grantStatus: undefined as number | undefined,
     grantHang: false,
+    grantDropAfterProcessing: false,
     resetAt: Math.floor(Date.now() / 1000) + 120,
   };
   const clientId = 'gh-oauth-client';
@@ -192,6 +195,10 @@ export async function startFakeGithub(): Promise<FakeGithub> {
         }
         state.tokens.delete(token);
         state.revoked.push(token);
+        if (state.grantDropAfterProcessing) {
+          req.socket.destroy();
+          return;
+        }
         if (grantGate) {
           const held = grantGate;
           grantGate = undefined;
@@ -231,6 +238,12 @@ export async function startFakeGithub(): Promise<FakeGithub> {
     },
     set grantStatus(s: number | undefined) {
       state.grantStatus = s;
+    },
+    get grantDropAfterProcessing() {
+      return state.grantDropAfterProcessing;
+    },
+    set grantDropAfterProcessing(d: boolean) {
+      state.grantDropAfterProcessing = d;
     },
     get grantHang() {
       return state.grantHang;

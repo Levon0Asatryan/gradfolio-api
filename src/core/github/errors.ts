@@ -35,12 +35,20 @@ export class GithubUnavailableError extends AppError {
 
 /** 502: the grant could not be revoked at GitHub; nothing was changed (D9). */
 export class GithubRevokeFailedError extends AppError {
-  constructor(cause: string) {
+  /**
+   * `true`: GitHub answered that the grant was **not** deleted (a 4xx), or the
+   * request never left. `false`: a timeout, a dropped connection or a 5xx, after
+   * which GitHub may still delete it: the outcome is unknown.
+   */
+  readonly refused: boolean;
+
+  constructor(cause: string, refused = false) {
     super(
       'GITHUB_REVOKE_FAILED',
       'GitHub did not confirm the revocation; nothing was changed, try again',
       502,
     );
+    this.refused = refused;
     this.logDetail = `github revoke failed: ${cause}`;
   }
 }

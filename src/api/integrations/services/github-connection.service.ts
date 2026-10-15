@@ -12,7 +12,7 @@ import { isMysqlError, MysqlErrno } from '../../../core/db/mysql-errors.js';
 import { inTransaction } from '../../../core/db/transaction.js';
 import { lockUser } from '../../../core/db/user-lock.js';
 import { AppError, ConflictError } from '../../../core/errors/app-error.js';
-import { GithubNotLinkedError } from '../../../core/github/errors.js';
+import { GithubNotLinkedError, GithubRevokeFailedError } from '../../../core/github/errors.js';
 import type { GithubUser } from '../../../core/github/github-client.js';
 import type { GithubIdentity } from '../../../core/github/token-source.js';
 import type { UserRow } from '../../users/repositories/user.repository.js';
@@ -230,7 +230,13 @@ export class GithubConnectionService {
       try {
         await this.revoke(gh, user.auth0Id);
       } catch (err) {
-        await this.abortRevocation(user.id, expected);
+        // Back to connected only when the grant certainly stands: GitHub said
+        // so, or the request never went out. After a timeout, a dropped
+        // connection or a 5xx it may still be deleted, so the marker stays and
+        // is settled from GitHub's word once nothing can be in flight.
+        if (!(err instanceof GithubRevokeFailedError) || err.refused) {
+          await this.abortRevocation(user.id, expected);
+        }
         throw err;
       }
     }

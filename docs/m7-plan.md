@@ -208,7 +208,9 @@ credentials) answers `502 GITHUB_REVOKE_FAILED` and **changes nothing**, so the 
 suggestions with source `github` deleted, token cache entry dropped; `{ "status": "not_connected" }`.
 Before the grant delete is sent, the row is marked `linking` (it keeps its GitHub login), so a
 connect or a second disconnect during the revocation answers `409 GITHUB_LINK_IN_PROGRESS` instead of
-validating a token that is about to die; a revocation GitHub refuses puts the row back to connected, and
+validating a token that is about to die; a revocation GitHub refuses (a 4xx answer, or a request that never left) puts the row back to
+connected, while a timeout, a dropped connection or a 5xx, after which GitHub may still delete the
+grant, keeps the marker, and
 a marker whose call may still be in flight (older than the two Auth0 timeouts plus GitHub's) is settled
 from GitHub's word by the next GitHub route. Account deletion refuses (`409 GITHUB_LINK_IN_PROGRESS`)
 while a link or revocation is in flight. A crash between 1 and 2 leaves a marker, which reconciles; before

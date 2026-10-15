@@ -792,19 +792,73 @@ describe('disconnect (revoke first, D9)', () => {
     });
   });
 
-  it('a GitHub failure changes nothing: 502 GITHUB_REVOKE_FAILED, still connected', async () => {
+  it('a refusal from GitHub changes nothing: 502 GITHUB_REVOKE_FAILED, still connected', async () => {
     const http = await start();
     const s = await connected(http, 'github|101', '101');
-    gh.grantStatus = 500;
+    gh.grantStatus = 403;
     const res = await http.delete('/v1/me/integrations/github').set(s.auth).expect(502);
     expect(res.body.code).toBe('GITHUB_REVOKE_FAILED');
     expect(await githubRow(s.id)).toMatchObject({ status: 'connected', externalUserId: '101' });
     expect(await verifiedOf(s.id)).toBe(true);
+  });
 
-    gh.grantStatus = undefined;
-    gh.grantHang = true;
-    await http.delete('/v1/me/integrations/github').set(s.auth).expect(502);
-    expect(await githubRow(s.id)).toMatchObject({ status: 'connected' });
+  it('an unknown outcome (5xx, no answer) keeps the marker; it settles later from GitHub’s word', async () => {
+    const http = await start();
+    const s = await connected(http, 'github|109', '109');
+    for (const fail of [
+      () => (gh.grantStatus = 500),
+      () => {
+        gh.grantStatus = undefined;
+        gh.grantHang = true;
+      },
+    ]) {
+      fail();
+      const res = await http.delete('/v1/me/integrations/github').set(s.auth).expect(502);
+      expect(res.body.code).toBe('GITHUB_REVOKE_FAILED');
+      expect(await githubRow(s.id)).toMatchObject({ status: 'linking', externalUserId: '109' });
+      // GitHub did not process anything, so once the marker is old the token is
+      // still good and the connection is restored by reconciliation.
+      await ageReservation(s.id);
+      const card = await http.get('/v1/me/integrations').set(s.auth).expect(200);
+      expect(card.body.github.status).toBe('connected');
+    }
+  });
+
+  it('a delete GitHub processed but never answered: a connect racing in is refused, then the revoked grant settles to disconnected (barrier)', async () => {
+    const http = await start();
+    const s = await connected(http, 'github|110', '110');
+    const token = auth0.githubTokenFor('110');
+    const gate = gh.holdNextGrantRequest();
+    gh.grantDropAfterProcessing = true;
+    const disconnecting = http
+      .delete('/v1/me/integrations/github')
+      .set(s.auth)
+      .then((r) => r);
+    await gate.arrived;
+    // The connect that could stamp `connected` on the grant being deleted:
+    const during = await http.post('/v1/me/integrations/github/connect').set(s.auth);
+    expect(during.status).toBe(409);
+    expect((during.body as { code: string }).code).toBe('GITHUB_LINK_IN_PROGRESS');
+
+    gate.release();
+    // GitHub deleted the grant and dropped the connection: the outcome is unknown.
+    const res = await disconnecting;
+    expect(res.status).toBe(502);
+    expect(gh.revoked).toEqual([token]);
+    expect(await githubRow(s.id)).toMatchObject({ status: 'linking', externalUserId: '110' });
+
+    // A connect after the failure still finds the marker, and never validates the dead token.
+    const userReads = () => gh.requests.filter((r) => r.path === '/user').length;
+    const before = userReads();
+    await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(409);
+    expect(userReads()).toBe(before);
+
+    // Nothing can be in flight any more: GitHub's word is "revoked".
+    gh.grantDropAfterProcessing = false;
+    await ageReservation(s.id);
+    const card = await http.get('/v1/me/integrations').set(s.auth).expect(200);
+    expect(card.body.github.status).toBe('not_connected');
+    expect(await githubRow(s.id)).toMatchObject({ status: 'not_connected', externalUserId: null });
   });
 
   it('a grant GitHub says is already gone (422) still disconnects; a 404 changes nothing', async () => {
