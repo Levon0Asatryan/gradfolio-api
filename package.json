@@ -45,7 +45,7 @@
     ]
   },
   "dependencies": {
-    "@google-cloud/storage": "~8.3.0",
+    "@google-cloud/storage": "~8.4.0",
     "@nestjs/common": "^12.1.2",
     "@nestjs/core": "^12.1.2",
     "@nestjs/platform-express": "^12.1.2",
@@ -60,7 +60,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "sanitize-html": "~2.18.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
