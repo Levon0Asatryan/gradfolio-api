@@ -1,0 +1,30 @@
+# Suggestions (docs/m7-plan.md §6): what GitHub and the sign-in claims suggest for
+# the caller's profile. Nothing changes the profile except an accept.
+
+###
+# @name refreshSuggestions
+# Reads GitHub's public profile (at most once per SUGGESTIONS_MIN_INTERVAL_S, by ETag)
+# and recomputes. {"github":"refreshed|unchanged|throttled|not_connected",
+# "nextAllowedAt":…,"created":n,"openCount":n}. 409 GITHUB_NOT_LINKED, 429, 502.
+POST {{baseUrl}}/v1/me/suggestions/refresh
+Authorization: Bearer {{accessToken}}
+
+###
+# @name listSuggestions
+# Open ones; status=all adds the answered. `field`, `current`, `proposed`, `mode`
+# (fill | replace) for a profile suggestion; `lastSyncedAt` for the LinkedIn reminder.
+GET {{baseUrl}}/v1/me/suggestions?limit=20
+Authorization: Bearer {{accessToken}}
+
+###
+# @name acceptSuggestion
+# Writes that one field through the profile's own rules; idempotent when accepted.
+# 404 for another user's id; 409 SUGGESTION_RESOLVED / SUGGESTION_INVALID.
+POST {{baseUrl}}/v1/me/suggestions/{{suggestionId}}/accept
+Authorization: Bearer {{accessToken}}
+
+###
+# @name dismissSuggestion
+# Remembered by its key (a hash of the value) until the value changes.
+POST {{baseUrl}}/v1/me/suggestions/{{suggestionId}}/dismiss
+Authorization: Bearer {{accessToken}}

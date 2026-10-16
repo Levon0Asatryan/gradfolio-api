@@ -597,6 +597,29 @@ not create rows people must also clear.
 - Disconnect deletes open GitHub suggestions; account deletion cascades; resolved rows expire.
 - Logs: counts and kinds only.
 
+### 6.6a As built in PR (d1)
+
+Profile and LinkedIn suggestions; project suggestions are (d2). Differences from §6.2 to §6.5:
+
+- **Migration 0009:** `suggestions` as §6.4, plus `integrations.suggestions_polled_at`,
+  `profile_etag`, `profile_snapshot` (GitHub's public profile fields as last read: not a token).
+- **Fields offered from GitHub:** `bio`, `location`, `avatarUrl`, `links.github` (profile URL),
+  `links.website` (`blog`, with `https://` added when it has no scheme) and, **only to an empty
+  headline**, `company` as `headline` (a company is not a headline: it is a starting point to edit).
+  A value the profile's own write rules refuse is never offered.
+- **Offered only when the field is empty or differs.** The key is
+  `profile:<field>:<source>:<hash of the value>`: an answered key is never reopened, a new value is a
+  new key, and a returning dismissed value stays dismissed.
+- **Refresh** is `POST /v1/me/suggestions/refresh`, not `GET /v1/me/integrations` (which the
+  frontend polls). The floor is claimed in one UPDATE, so two refreshes at once read GitHub once; a
+  failed read gives its claim back. A 304 recomputes from the stored profile snapshot.
+- **Accept** changes the field and the suggestion in one transaction under the user lock, through
+  the profile service's own write (`applyHeaderIn`), so an avatar goes through the same file rules.
+- **LinkedIn:** a LinkedIn sign-in's name and photo when they differ from the profile (never the
+  prefill's placeholder name), and the quarterly re-import reminder (acknowledged by an accept).
+- **Not built:** `education.add` from `UNIVERSITY_DOMAINS` (the setting is parsed and empty until
+  M7-T10; an accept would need a degree, field and years from the student), `experience.add`.
+
 ### 6.7 Cost
 
 One PR, migration 0009, about 35 tests, roughly the size of (b). **Needs:** PR (b) merged (the diff

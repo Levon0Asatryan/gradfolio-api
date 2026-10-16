@@ -419,6 +419,13 @@ export class GithubConnectionService {
           { clearSynced: true },
         );
       }
+      // What GitHub offered is not the student's to answer any more (plan §6.6).
+      await trx
+        .deleteFrom('suggestions')
+        .where('userId', '=', userId)
+        .where('source', '=', 'github')
+        .where('status', '=', 'open')
+        .execute();
       // Back to the email alone (plan §5.1).
       await setUserVerified(trx, userId, identity.emailVerified);
     });

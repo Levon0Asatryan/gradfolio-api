@@ -57,6 +57,13 @@ import {
 } from '../notifications/dto/notification.dto.js';
 import { myTeamsQuerySchema, myTeamsSchema } from '../team/dto/my-teams.dto.js';
 import {
+  refreshResponseSchema,
+  resolveResponseSchema,
+  suggestionIdParamSchema,
+  suggestionPageSchema,
+  suggestionQuerySchema,
+} from '../suggestions/dto/suggestion.dto.js';
+import {
   addExternalMemberSchema,
   inviteMemberSchema,
   lookupQuerySchema,
@@ -588,6 +595,93 @@ function integrationOperations(): Operation[] {
         ),
         ...failures,
         '503': unavailable,
+      },
+    },
+  ];
+}
+
+/**
+ * Suggestions (docs/m7-plan.md §6): proposals from GitHub and the sign-in
+ * claims that the caller accepts or dismisses. Nothing changes the profile
+ * except an accept.
+ */
+function suggestionOperations(): Operation[] {
+  const base = { tag: 'suggestions', bearer: true } as const;
+  const resolved = error(
+    'SUGGESTION_RESOLVED: it was already dismissed, superseded or accepted; ' +
+      'SUGGESTION_INVALID: the value can no longer be written (it is superseded)',
+  );
+  return [
+    {
+      ...base,
+      method: 'get',
+      path: '/v1/me/suggestions',
+      operationId: 'listSuggestions',
+      summary: 'The caller’s suggestions, newest first',
+      description:
+        'Open ones by default (`status=all` adds the answered). A `profile.*` suggestion names ' +
+        'the `field`, what it holds now (`current`) and what an accept would write (`proposed`). ' +
+        '`openCount` is the caller’s open suggestions in all.',
+      query: suggestionQuerySchema,
+      responses: {
+        '200': { description: 'One page', schema: suggestionPageSchema },
+        '400': validationFailed,
+        ...authenticatedFailures,
+      },
+    },
+    {
+      ...base,
+      method: 'post',
+      path: '/v1/me/suggestions/refresh',
+      operationId: 'refreshSuggestions',
+      summary: 'Read GitHub’s public profile and recompute the suggestions',
+      description:
+        'Reads GitHub at most once per SUGGESTIONS_MIN_INTERVAL_S (conditionally by ETag; a ' +
+        'refresh inside the floor uses the stored profile and says `throttled`), then opens ' +
+        'what is new, supersedes what GitHub no longer says, and never reopens an answered ' +
+        'suggestion with the same value. LinkedIn: a sign-in’s name and photo, and a re-import ' +
+        'reminder. Without GitHub connected only the LinkedIn rules run.',
+      responses: {
+        '200': { description: 'What was done', schema: refreshResponseSchema },
+        '409': error('GITHUB_NOT_LINKED: GitHub refused the token (sign in with GitHub again)'),
+        '429': error('RATE_LIMITED (the `import` budget) or GITHUB_RATE_LIMITED; see Retry-After'),
+        '502': error('GITHUB_UNAVAILABLE: GitHub failed or timed out'),
+        '401': authenticatedFailures['401'],
+        '503': error('INTEGRATION_UNAVAILABLE, AUTH_UNAVAILABLE or DATABASE_UNAVAILABLE'),
+      },
+    },
+    {
+      ...base,
+      method: 'post',
+      path: '/v1/me/suggestions/{id}/accept',
+      operationId: 'acceptSuggestion',
+      summary: 'Apply a suggestion: write the one field it names',
+      description:
+        'Writes that field through the profile’s own rules and marks the suggestion accepted, in ' +
+        'one transaction. Idempotent for an accepted one. A reminder is only acknowledged.',
+      params: suggestionIdParamSchema,
+      responses: {
+        '200': { description: 'Accepted', schema: resolveResponseSchema },
+        '404': notYours('suggestion'),
+        '409': resolved,
+        ...authenticatedFailures,
+      },
+    },
+    {
+      ...base,
+      method: 'post',
+      path: '/v1/me/suggestions/{id}/dismiss',
+      operationId: 'dismissSuggestion',
+      summary: 'Dismiss a suggestion; it is not offered again until the value changes',
+      description:
+        'Remembered by its key, which carries a hash of the proposed value: GitHub saying ' +
+        'something else is a new suggestion. Idempotent for a dismissed one.',
+      params: suggestionIdParamSchema,
+      responses: {
+        '200': { description: 'Dismissed', schema: resolveResponseSchema },
+        '404': notYours('suggestion'),
+        '409': resolved,
+        ...authenticatedFailures,
       },
     },
   ];
@@ -1396,6 +1490,7 @@ export const OPERATIONS: readonly Operation[] = [
   ...discoveryOperations(),
   ...integrationOperations(),
   ...plannedImportOperations(),
+  ...suggestionOperations(),
   ...sectionOperations({
     path: 'education',
     name: 'Education',
@@ -1506,6 +1601,10 @@ export function buildOpenApiDocument(
       {
         name: 'integrations',
         description: 'The caller’s GitHub and LinkedIn connections and imports',
+      },
+      {
+        name: 'suggestions',
+        description: 'What GitHub and the sign-in claims suggest for the caller’s profile',
       },
       {
         name: 'discovery',

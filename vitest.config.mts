@@ -116,6 +116,13 @@ export default defineConfig({
         'src/api/integrations/repositories/*.ts',
         'src/api/integrations/services/*.ts',
         'src/api/integrations/*.controller.ts',
+        // Suggestions: the claim of the refresh floor, the unique key that remembers
+        // an answer, supersession under the user lock, and accept/dismiss against
+        // each other are MySQL behaviour, proved by suggestions/e2e/suggestions.int.test.ts
+        // (barriers included). The rules are pure and unit tested (profile-rules.test.ts).
+        'src/api/suggestions/repositories/*.ts',
+        'src/api/suggestions/services/suggestions.service.ts',
+        'src/api/suggestions/*.controller.ts',
         // The Google client. Its calls were run against the real bucket as the
         // runtime service account (docs/m4-plan.md §3.3, PR (c) description).
         'src/core/storage/gcs-file-storage.ts',
