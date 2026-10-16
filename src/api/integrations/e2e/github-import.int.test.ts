@@ -607,6 +607,13 @@ describe('GET /v1/me/github/repos?q= (search)', () => {
     }
   });
 
+  it('searches the repository’s name, not the owner’s login in its full name', async () => {
+    const { http, alice } = await setup();
+    h.addRepo({ id: 7, ownerId: 100, ownerLogin: 'alice', name: 'widgets' });
+    expect(ids(await search(http, alice, 'q=alice').expect(200))).toEqual([]);
+    expect(ids(await search(http, alice, 'q=widg').expect(200))).toEqual([7]);
+  });
+
   it('reads at most GITHUB_SEARCH_SCAN_PAGES pages, then hands back a cursor that continues', async () => {
     const { http, alice } = await setup({ GITHUB_SEARCH_SCAN_PAGES: '2' });
     for (let id = 2; id <= 250; id++) h.addRepo({ id, ownerId: 100, name: `bulk-${id}` });

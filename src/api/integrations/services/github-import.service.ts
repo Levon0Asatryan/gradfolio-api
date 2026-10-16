@@ -142,7 +142,7 @@ export class GithubImportService {
       rateLimit = result.rateLimit;
       matches.push(
         ...result.items.filter((r) =>
-          [r.fullName, r.description ?? '', r.language ?? ''].some((v) =>
+          [r.name, r.description ?? '', r.language ?? ''].some((v) =>
             v.toLowerCase().includes(needle),
           ),
         ),
