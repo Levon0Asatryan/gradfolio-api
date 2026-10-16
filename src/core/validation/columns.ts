@@ -88,6 +88,7 @@ export const COLUMN_LIMITS = {
   'integrations.refresh_token': TEXT,
   'integrations.external_user_id': chars(255),
   'integrations.external_login': chars(100),
+  'integrations.profile_etag': chars(255),
 
   'integration_nonces.hash': chars(64),
   'integration_nonces.user_id': chars(36),
@@ -99,6 +100,11 @@ export const COLUMN_LIMITS = {
   'activities.translation_key': chars(255),
   'activities.details': TEXT,
 
+  'suggestions.id': chars(36),
+  'suggestions.user_id': chars(36),
+  'suggestions.kind': chars(40),
+  'suggestions.target_id': chars(36),
+  'suggestions.dedupe_key': chars(190),
   'notifications.id': chars(36),
   'notifications.user_id': chars(36),
   'notifications.title': chars(500),

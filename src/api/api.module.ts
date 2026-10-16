@@ -13,6 +13,7 @@ import { ErrorFilter } from './common/filters/error.filter.js';
 import { FilesModule } from './files/files.module.js';
 import { HealthModule } from './health/health.module.js';
 import { IntegrationsModule } from './integrations/integrations.module.js';
+import { SuggestionsModule } from './suggestions/suggestions.module.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
 import { DiscoveryModule } from './discovery/discovery.module.js';
 import { ActivitiesModule } from './activities/activities.module.js';
@@ -52,6 +53,7 @@ import { UsersModule } from './users/users.module.js';
     ActivitiesModule,
     DashboardModule,
     IntegrationsModule,
+    SuggestionsModule,
   ],
   providers: [
     ErrorFilter,

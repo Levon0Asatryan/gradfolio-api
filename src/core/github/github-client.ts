@@ -108,6 +108,31 @@ export interface GithubRepoPage {
   rateLimit: GithubRateLimit;
 }
 
+/** The public profile fields of a GitHub account (docs/m7-plan.md §6.3). Never a token, never an email. */
+export interface GithubProfile {
+  name: string | null;
+  bio: string | null;
+  location: string | null;
+  company: string | null;
+  avatarUrl: string | null;
+  blog: string | null;
+  htmlUrl: string | null;
+}
+
+export type GithubProfileRead =
+  | { notModified: true; rateLimit: GithubRateLimit }
+  | { notModified: false; profile: GithubProfile; etag: string | null; rateLimit: GithubRateLimit };
+
+const profileResponse = z.object({
+  name: z.string().max(2000).nullable().optional(),
+  bio: z.string().max(5000).nullable().optional(),
+  location: z.string().max(1000).nullable().optional(),
+  company: z.string().max(1000).nullable().optional(),
+  avatar_url: z.string().max(2000).nullable().optional(),
+  blog: z.string().max(2000).nullable().optional(),
+  html_url: z.string().max(2000).nullable().optional(),
+});
+
 /** A README as GitHub rendered it, with where it lives in the repository. */
 export interface GithubReadme {
   html: string;
@@ -154,6 +179,41 @@ export class GithubClient {
     const parsed = userResponse.safeParse(res.body);
     if (!parsed.success) throw new GithubUnavailableError('GET /user bad body');
     return { id: String(parsed.data.id), login: parsed.data.login };
+  }
+
+  /**
+   * `GET /user` again, for the public profile fields. With the `ETag` of the
+   * last read it is a conditional request: a `304` costs no rate limit
+   * (GitHub's REST best practices) and says nothing changed.
+   */
+  async getProfile(token: GithubAccessToken, etag: string | null): Promise<GithubProfileRead> {
+    const res = await this.send('user', {
+      method: 'GET',
+      headers: {
+        authorization: `Bearer ${token.reveal()}`,
+        ...(etag === null ? {} : { 'if-none-match': etag }),
+      },
+    });
+    const rateLimit = rateLimitOf(res.headers);
+    if (res.status === 304) return { notModified: true, rateLimit };
+    if (res.status !== 200) throw mapFailure(res);
+    const parsed = profileResponse.safeParse(res.body);
+    if (!parsed.success) throw new GithubUnavailableError('GET /user bad profile body');
+    const p = parsed.data;
+    return {
+      notModified: false,
+      etag: res.headers.get('etag'),
+      rateLimit,
+      profile: {
+        name: p.name ?? null,
+        bio: p.bio ?? null,
+        location: p.location ?? null,
+        company: p.company ?? null,
+        avatarUrl: p.avatar_url ?? null,
+        blog: p.blog ?? null,
+        htmlUrl: p.html_url ?? null,
+      },
+    };
   }
 
   /**

@@ -52,3 +52,14 @@ export const notificationParams = z.strictObject({
 
 /** `GithubImportSnapshot`: project_github_imports.snapshot, a SHA-256 (hex) per synced field. */
 export const githubImportSnapshot = z.record(z.string(), z.string().regex(/^[0-9a-f]{64}$/));
+
+/** `GithubProfileSnapshot`: integrations.profile_snapshot, GitHub's public profile fields as last read. */
+export const githubProfileSnapshotSchema = z.strictObject({
+  name: z.string().max(2000).nullable().optional(),
+  bio: z.string().max(70_000).nullable(),
+  location: z.string().max(2000).nullable(),
+  company: z.string().max(2000).nullable(),
+  avatarUrl: z.string().max(2000).nullable(),
+  blog: z.string().max(2000).nullable(),
+  htmlUrl: z.string().max(2000).nullable(),
+});
