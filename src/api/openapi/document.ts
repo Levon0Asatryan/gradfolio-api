@@ -11,6 +11,8 @@ import { dashboardSchema } from '../dashboard/dto/dashboard.dto.js';
 import {
   githubImportRequestSchema,
   githubImportResponseSchema,
+  githubPreviewRequestSchema,
+  githubPreviewResponseSchema,
   githubRepoPageSchema,
   githubReposQuerySchema,
   githubSyncQuerySchema,
@@ -722,6 +724,7 @@ function plannedImportOperations(): Operation[] {
       summary: 'The caller’s public GitHub repositories, paged',
       description:
         'Owned and collaborator repositories, public only (D6), most recently pushed first. ' +
+        '`q` searches name, description and language over up to GITHUB_SEARCH_SCAN_PAGES pages. ' +
         '`imported` and `projectId` say which the caller already imported. GitHub’s remaining ' +
         'rate limit is in `rateLimit`.',
       query: githubReposQuerySchema,
@@ -742,10 +745,32 @@ function plannedImportOperations(): Operation[] {
         'numbers are never trusted) and imported only when the caller owns it or may push to it. ' +
         'Drafts: visible to the caller only until published. Deduplicated by repository id, also ' +
         'under concurrent imports. The README becomes the description, sanitized, images dropped ' +
-        '(D3).',
+        '(D3). `overrides` (per repository id) are what the student edited in the review step: ' +
+        'title, summary, description, technologies, links, validated like a manual create ' +
+        '(a bad one is a 400 naming `overrides.<id>.<field>` and nothing is created). They ' +
+        'cannot set the source, the repository facts or the visibility, and the re-sync ' +
+        'snapshot records what GitHub gave, so a later re-sync keeps them.',
       body: githubImportRequestSchema,
       responses: {
         '200': { description: 'One result per repository', schema: githubImportResponseSchema },
+        '400': validationFailed,
+        ...github,
+        '429': error('RATE_LIMITED (the `import` budget) or GITHUB_RATE_LIMITED; see Retry-After'),
+      },
+    },
+    {
+      ...base,
+      method: 'post',
+      path: '/v1/me/github/import/preview',
+      operationId: 'previewGithubImport',
+      summary: 'The drafts an import would create, for the review step; saves nothing',
+      description:
+        'Read from GitHub exactly as the import does (ownership, README sanitized, the project ' +
+        'create rules). `draft` is what the student may edit; `exists` and `skipped` say why a ' +
+        'repository has none. The save re-reads GitHub: this answer is never trusted back.',
+      body: githubPreviewRequestSchema,
+      responses: {
+        '200': { description: 'One result per repository', schema: githubPreviewResponseSchema },
         '400': validationFailed,
         ...github,
         '429': error('RATE_LIMITED (the `import` budget) or GITHUB_RATE_LIMITED; see Retry-After'),

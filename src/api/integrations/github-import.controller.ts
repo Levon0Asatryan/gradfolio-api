@@ -7,10 +7,11 @@ import { CurrentUser } from '../users/decorators/current-user.decorator.js';
 import type { UserRow } from '../users/repositories/user.repository.js';
 import {
   githubImportRequestSchema,
+  githubPreviewRequestSchema,
   githubReposQuerySchema,
   githubSyncQuerySchema,
 } from './dto/github-import.dto.js';
-import { GithubImportService } from './services/github-import.service.js';
+import { type DraftOverrides, GithubImportService } from './services/github-import.service.js';
 import { GithubSyncService } from './services/github-sync.service.js';
 
 function tokenOf(req: AuthenticatedRequest): AccessTokenIdentity {
@@ -32,7 +33,7 @@ export class GithubImportController {
   repos(
     @CurrentUser() user: UserRow,
     @Req() req: AuthenticatedRequest,
-    @Query(zodQuery(githubReposQuerySchema)) query: { cursor?: string; limit?: number },
+    @Query(zodQuery(githubReposQuerySchema)) query: { q?: string; cursor?: string; limit?: number },
   ) {
     return this.imports.list(user, tokenOf(req), query);
   }
@@ -43,9 +44,21 @@ export class GithubImportController {
   import(
     @CurrentUser() user: UserRow,
     @Req() req: AuthenticatedRequest,
-    @Body(zodBody(githubImportRequestSchema)) body: { repoIds: number[] },
+    @Body(zodBody(githubImportRequestSchema))
+    body: { repoIds: number[]; overrides?: Record<string, DraftOverrides> },
   ) {
-    return this.imports.import(user, tokenOf(req), body.repoIds);
+    return this.imports.import(user, tokenOf(req), body.repoIds, body.overrides);
+  }
+
+  @Post('import/preview')
+  @HttpCode(200)
+  @RateBudget('import')
+  preview(
+    @CurrentUser() user: UserRow,
+    @Req() req: AuthenticatedRequest,
+    @Body(zodBody(githubPreviewRequestSchema)) body: { repoIds: number[] },
+  ) {
+    return this.imports.preview(user, tokenOf(req), body.repoIds);
   }
 }
 
