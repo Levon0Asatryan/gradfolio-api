@@ -61,6 +61,7 @@ export function githubConnectHarness() {
     gh.grantHang = false;
     gh.grantDropAfterProcessing = false;
     gh.repos.clear();
+    gh.profiles.clear();
     gh.repoMode = 'ok';
   });
   afterEach(async () => {

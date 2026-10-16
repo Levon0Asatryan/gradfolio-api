@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
@@ -14,6 +15,7 @@ export interface GithubRecord {
   authorization: string | undefined;
   apiVersion: string | undefined;
   userAgent: string | undefined;
+  ifNoneMatch: string | undefined;
   body: unknown;
 }
 
@@ -71,6 +73,8 @@ export interface FakeGithub {
   grantDropAfterProcessing: boolean;
   /** `x-ratelimit-reset` it sends, epoch seconds. */
   resetAt: number;
+  /** Public profile fields per GitHub user id (`bio`, `location`, `company`, `avatar_url`, `blog`, `html_url`). */
+  readonly profiles: Map<number, Record<string, string | null>>;
   /** Repositories by id; `GET /user/repos`, `/repositories/{id}` and its README read them. */
   readonly repos: Map<number, FakeRepo>;
   /** How the repository routes answer, whatever the token. */
@@ -131,6 +135,7 @@ export async function startFakeGithub(): Promise<FakeGithub> {
     grantDropAfterProcessing: false,
     resetAt: Math.floor(Date.now() / 1000) + 120,
     repos: new Map<number, FakeRepo>(),
+    profiles: new Map<number, Record<string, string | null>>(),
     repoMode: 'ok' as RepoMode,
   };
   const clientId = 'gh-oauth-client';
@@ -157,6 +162,7 @@ export async function startFakeGithub(): Promise<FakeGithub> {
         authorization: req.headers.authorization,
         apiVersion: req.headers['x-github-api-version'] as string | undefined,
         userAgent: req.headers['user-agent'],
+        ifNoneMatch: req.headers['if-none-match'],
         body,
       });
 
@@ -200,7 +206,26 @@ export async function startFakeGithub(): Promise<FakeGithub> {
               await held.released;
             }
             if (!user) return send(res, 401, { message: 'Bad credentials' });
-            return send(res, 200, { ...user, type: 'User', site_admin: false, email: null });
+            const profile = state.profiles.get(user.id) ?? {};
+            const etag = `W/"${createHash('sha1')
+              .update(JSON.stringify([user, profile]))
+              .digest('hex')}"`;
+            if (req.headers['if-none-match'] === etag) {
+              res.writeHead(304, {
+                etag,
+                'x-ratelimit-limit': '5000',
+                'x-ratelimit-remaining': '4999',
+                'x-ratelimit-reset': String(state.resetAt),
+              });
+              res.end();
+              return;
+            }
+            return send(
+              res,
+              200,
+              { ...user, type: 'User', site_admin: false, email: null, ...profile },
+              { etag },
+            );
           }
         }
       }
@@ -359,6 +384,7 @@ export async function startFakeGithub(): Promise<FakeGithub> {
       state.grantStatus = s;
     },
     repos: state.repos,
+    profiles: state.profiles,
     get repoMode() {
       return state.repoMode;
     },
