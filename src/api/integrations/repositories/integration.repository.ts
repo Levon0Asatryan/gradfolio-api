@@ -91,7 +91,11 @@ export async function writeGithubRow(
   const row = {
     ...values,
     updatedAt: sql<Date>`UTC_TIMESTAMP()`,
-    ...(clearSynced ? { lastSyncedAt: null } : {}),
+    // Forgetting the connection also forgets what was read through it: the next
+    // account must not be offered the last one's profile (docs/m7-plan.md §6.6a).
+    ...(clearSynced
+      ? { lastSyncedAt: null, suggestionsPolledAt: null, profileEtag: null, profileSnapshot: null }
+      : {}),
   };
   if (existing) {
     await trx

@@ -376,6 +376,109 @@ describe('reading GitHub: floor, ETag, failures, concurrency', () => {
   });
 });
 
+describe('a refresh and the world changing under it', () => {
+  it('a disconnect forgets what was read through the connection: the next account is not offered the last one’s profile', async () => {
+    const { http, alice } = await setup({ SUGGESTIONS_MIN_INTERVAL_S: '900' });
+    await refresh(http, alice).expect(200);
+    await http.delete('/v1/me/integrations/github').set(alice.auth).expect(200);
+    const row = await db
+      .selectFrom('integrations')
+      .select(['suggestionsPolledAt', 'profileEtag', 'profileSnapshot'])
+      .where('userId', '=', alice.id)
+      .where('integrationType', '=', 'github')
+      .executeTakeFirstOrThrow();
+    expect(row).toEqual({ suggestionsPolledAt: null, profileEtag: null, profileSnapshot: null });
+
+    // Connected again (another account, in effect) inside the floor: GitHub is read, not the cache.
+    h.linkedAtAuth0(alice.sub, '100', 'alice');
+    await http.post('/v1/me/integrations/github/connect').set(alice.auth).expect(200);
+    h.gh.profiles.set(100, { bio: 'The other account’s bio' });
+    const again = await refresh(http, alice).expect(200);
+    expect(again.body.github).toBe('refreshed');
+    expect((await open(http, alice)).map((i) => i.proposed)).toEqual(['The other account’s bio']);
+  });
+
+  it('a disconnect that completes while GitHub is being asked is not undone by the answer (barrier)', async () => {
+    const { http, alice } = await setup({ SUGGESTIONS_MIN_INTERVAL_S: '900' });
+    const gate = h.gh.holdNextUser();
+    const refreshing = refresh(http, alice).then((r) => r);
+    await gate.arrived;
+    await http.delete('/v1/me/integrations/github').set(alice.auth).expect(200);
+    gate.release();
+
+    const res = await refreshing;
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ github: 'not_connected', created: 0, openCount: 0 });
+    const rows = await db
+      .selectFrom('suggestions')
+      .select('id')
+      .where('userId', '=', alice.id)
+      .execute();
+    expect(rows).toEqual([]);
+    const state = await db
+      .selectFrom('integrations')
+      .select(['suggestionsPolledAt', 'profileSnapshot'])
+      .where('userId', '=', alice.id)
+      .where('integrationType', '=', 'github')
+      .executeTakeFirstOrThrow();
+    expect(state).toEqual({ suggestionsPolledAt: null, profileSnapshot: null });
+  });
+
+  it('a disconnect and a new connection while GitHub is being asked drop the answer too (barrier)', async () => {
+    const { http, alice } = await setup({ SUGGESTIONS_MIN_INTERVAL_S: '900' });
+    const gate = h.gh.holdNextUser();
+    const refreshing = refresh(http, alice).then((r) => r);
+    await gate.arrived;
+    await http.delete('/v1/me/integrations/github').set(alice.auth).expect(200);
+    h.linkedAtAuth0(alice.sub, '100', 'alice');
+    await http.post('/v1/me/integrations/github/connect').set(alice.auth).expect(200);
+    gate.release();
+
+    const res = await refreshing;
+    expect(res.body).toMatchObject({ github: 'unchanged', created: 0 });
+    const state = await db
+      .selectFrom('integrations')
+      .select(['suggestionsPolledAt', 'profileSnapshot'])
+      .where('userId', '=', alice.id)
+      .where('integrationType', '=', 'github')
+      .executeTakeFirstOrThrow();
+    expect(state).toEqual({ suggestionsPolledAt: null, profileSnapshot: null });
+    // The claim was given back: the next refresh reads GitHub.
+    expect((await refresh(http, alice).expect(200)).body.github).toBe('refreshed');
+  });
+
+  it('offers nothing from GitHub while a revocation is in flight, though a profile is stored', async () => {
+    const { http, alice } = await setup({ SUGGESTIONS_MIN_INTERVAL_S: '900' });
+    await refresh(http, alice).expect(200);
+    expect((await open(http, alice)).length).toBeGreaterThan(0);
+    await db
+      .updateTable('integrations')
+      .set({ status: 'linking' })
+      .where('userId', '=', alice.id)
+      .where('integrationType', '=', 'github')
+      .execute();
+    await refresh(http, alice).expect(200);
+    expect(await open(http, alice)).toEqual([]);
+  });
+
+  it('a field the student fills while GitHub is being asked is not offered as empty (barrier)', async () => {
+    const { http, alice } = await setup();
+    const gate = h.gh.holdNextUser();
+    const refreshing = refresh(http, alice).then((r) => r);
+    await gate.arrived;
+    await db
+      .updateTable('users')
+      .set({ headline: 'CS undergraduate' })
+      .where('id', '=', alice.id)
+      .execute();
+    gate.release();
+    expect((await refreshing).status).toBe(200);
+    const fields = (await open(http, alice)).map((i) => i.field);
+    expect(fields).not.toContain('headline');
+    expect(fields).toContain('bio');
+  });
+});
+
 describe('LinkedIn sign-in claims and the re-import reminder', () => {
   async function linkedin(claims: Record<string, unknown>) {
     const sub = 'linkedin|li-1';

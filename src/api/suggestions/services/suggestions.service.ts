@@ -23,6 +23,7 @@ import type {
 } from '../dto/suggestion.dto.js';
 import {
   claimRefresh,
+  currentProfile,
   insertOpen,
   linkedinLastSynced,
   listSuggestionRows,
@@ -120,7 +121,9 @@ export class SuggestionsService {
   /**
    * `POST /v1/me/suggestions/refresh`: read GitHub's public profile (at most
    * once per SUGGESTIONS_MIN_INTERVAL_S, conditionally by ETag) and recompute
-   * what is suggested from it and from the sign-in claims.
+   * what is suggested from it and from the sign-in claims. GitHub is asked
+   * outside any transaction; what the rules decide is decided afterwards, under
+   * the user lock, from the rows as they are then.
    */
   async refresh(user: UserRow, identity: AccessTokenIdentity): Promise<RefreshResponse> {
     const floor = this.cfg.SUGGESTIONS_MIN_INTERVAL_S;
@@ -156,64 +159,69 @@ export class SuggestionsService {
       }
     }
 
-    const snapshot: GithubProfile | null =
-      fresh?.profile ?? (state?.snapshot ? { name: null, ...state.snapshot } : null);
-    const lastSynced = await linkedinLastSynced(this.dbs.db, user.id);
-    const now = profileNow(user);
-    const wanted: Row[] = [
-      ...(snapshot !== null && state?.status === 'connected'
-        ? fromGithubProfile(snapshot, now)
-        : []),
-      ...fromLinkedinClaims(identity, now),
-    ].map((w) => ({
-      kind: w.kind,
-      source: w.source,
-      dedupeKey: w.dedupeKey,
-      payload: { field: w.field, value: w.value, mode: w.mode },
-    }));
-    const linkedinLinked =
-      identity.sub.startsWith('linkedin|') || identity.identities.includes('linkedin');
-    const nowMs = Date.now();
-    if (
-      linkedinLinked &&
-      (lastSynced === null ||
-        nowMs - lastSynced.getTime() > this.cfg.LINKEDIN_REIMPORT_DAYS * DAY_MS)
-    ) {
-      wanted.push({
-        kind: 'linkedin.reimport',
-        source: 'linkedin',
-        dedupeKey: `linkedin:reimport:${quarterOf(new Date(nowMs))}`,
-        payload: { lastSyncedAt: lastSynced?.toISOString() ?? null },
-      });
-    }
-
-    const created = await this.sync(user.id, wanted, fresh);
+    const outcome = await this.sync(user, identity, {
+      readGithub: github === 'refreshed' || github === 'unchanged',
+      startedGeneration: state?.generation ?? null,
+      previousPolledAt: state?.polledAt ?? null,
+      fresh,
+    });
+    if (outcome.githubDropped === 'gone') github = 'not_connected';
+    // Connected again, as another connection: nothing of this read was applied; try again.
+    if (outcome.githubDropped === 'replaced') github = 'unchanged';
     const polled = (await readPollState(this.dbs.db, user.id))?.polledAt ?? null;
     return {
       github,
       nextAllowedAt:
-        state?.status === 'connected' && polled !== null
+        github !== 'not_connected' && polled !== null
           ? new Date(polled.getTime() + floor * 1000).toISOString()
           : null,
-      created,
+      created: outcome.created,
       openCount: await openCount(this.dbs.db, user.id),
     };
   }
 
   /**
-   * One transaction under the user lock: the suggestions the rules want are
-   * opened unless the student already answered them (the key is the memory),
-   * and open ones the rules no longer want are superseded. The cap supersedes
-   * the oldest.
+   * One transaction under the user lock. Everything the rules depend on is read
+   * here, after the lock: the profile (a field the student filled meanwhile is
+   * not "empty"), and the GitHub row (a disconnect that completed while GitHub
+   * was being asked leaves nothing to write: its answer is dropped, and the
+   * claim given back). The suggestions the rules want are opened unless the
+   * student already answered them (the key is the memory); open ones the rules
+   * no longer want are superseded; the cap supersedes the oldest.
    */
   private sync(
-    userId: string,
-    wanted: readonly Row[],
-    fresh: { profile: GithubProfile; etag: string | null } | undefined,
-  ): Promise<number> {
+    user: UserRow,
+    identity: AccessTokenIdentity,
+    read: {
+      readGithub: boolean;
+      startedGeneration: number | null;
+      previousPolledAt: Date | null;
+      fresh: { profile: GithubProfile; etag: string | null } | undefined;
+    },
+  ): Promise<{ created: number; githubDropped: false | 'gone' | 'replaced' }> {
+    const userId = user.id;
     return inTransaction(this.dbs.db, async (trx) => {
       await lockUser(trx, userId);
-      if (fresh !== undefined) await writeProfileSnapshot(trx, userId, fresh.etag, fresh.profile);
+      const row = await readPollState(trx, userId, { lock: true });
+      const connected = row?.status === 'connected';
+      // A GitHub answer belongs to the connection it was asked for.
+      const sameConnection = !read.readGithub || row?.generation === read.startedGeneration;
+      const githubOk = connected && sameConnection;
+      const githubDropped =
+        read.readGithub && !githubOk ? (connected ? 'replaced' : 'gone') : false;
+      if (githubDropped !== false) {
+        await restorePolled(trx, userId, read.previousPolledAt);
+      } else if (githubOk && read.fresh !== undefined) {
+        await writeProfileSnapshot(trx, userId, read.fresh.etag, read.fresh.profile);
+      }
+
+      const profile = await currentProfile(trx, userId);
+      if (profile === undefined) return { created: 0, githubDropped };
+      const snapshot: GithubProfile | null = !githubOk
+        ? null
+        : (read.fresh?.profile ?? (row?.snapshot ? { name: null, ...row.snapshot } : null));
+      const lastSynced = await linkedinLastSynced(trx, userId);
+      const wanted = this.wanted(profile, snapshot, identity, lastSynced);
 
       const known = await statusesOfKeys(
         trx,
@@ -244,8 +252,42 @@ export class SuggestionsService {
           extra.map((r) => r.id),
         );
       }
-      return created;
+      return { created, githubDropped };
     });
+  }
+
+  /** What the rules want of this profile, GitHub's public profile and the sign-in claims. */
+  private wanted(
+    profile: ProfileNow,
+    snapshot: GithubProfile | null,
+    identity: AccessTokenIdentity,
+    lastSynced: Date | null,
+  ): Row[] {
+    const wanted: Row[] = [
+      ...(snapshot === null ? [] : fromGithubProfile(snapshot, profile)),
+      ...fromLinkedinClaims(identity, profile),
+    ].map((w) => ({
+      kind: w.kind,
+      source: w.source,
+      dedupeKey: w.dedupeKey,
+      payload: { field: w.field, value: w.value, mode: w.mode },
+    }));
+    const linkedinLinked =
+      identity.sub.startsWith('linkedin|') || identity.identities.includes('linkedin');
+    const nowMs = Date.now();
+    if (
+      linkedinLinked &&
+      (lastSynced === null ||
+        nowMs - lastSynced.getTime() > this.cfg.LINKEDIN_REIMPORT_DAYS * DAY_MS)
+    ) {
+      wanted.push({
+        kind: 'linkedin.reimport',
+        source: 'linkedin',
+        dedupeKey: `linkedin:reimport:${quarterOf(new Date(nowMs))}`,
+        payload: { lastSyncedAt: lastSynced?.toISOString() ?? null },
+      });
+    }
+    return wanted;
   }
 
   /** `POST /v1/me/suggestions/{id}/accept`. */

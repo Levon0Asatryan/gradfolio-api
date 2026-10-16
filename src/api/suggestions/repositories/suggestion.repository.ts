@@ -159,6 +159,7 @@ export async function resolve(
 /** What a refresh needs of the caller's GitHub row. */
 export interface GithubPollState {
   status: 'connected' | 'not_connected' | 'linking';
+  generation: number;
   polledAt: Date | null;
   etag: string | null;
   snapshot: GithubProfileSnapshot | null;
@@ -167,16 +168,19 @@ export interface GithubPollState {
 export async function readPollState(
   db: Executor,
   userId: string,
+  { lock = false }: { lock?: boolean } = {},
 ): Promise<GithubPollState | undefined> {
-  const row = await db
+  const query = db
     .selectFrom('integrations')
-    .select(['status', 'suggestionsPolledAt', 'profileEtag', 'profileSnapshot'])
+    .select(['status', 'generation', 'suggestionsPolledAt', 'profileEtag', 'profileSnapshot'])
     .where('userId', '=', userId)
-    .where('integrationType', '=', 'github')
-    .executeTakeFirst();
+    .where('integrationType', '=', 'github');
+  // Locked, the read is the latest commit, not the transaction's snapshot.
+  const row = await (lock ? query.forUpdate() : query).executeTakeFirst();
   if (row === undefined) return undefined;
   return {
     status: row.status,
+    generation: row.generation,
     polledAt: row.suggestionsPolledAt,
     etag: row.profileEtag,
     snapshot: row.profileSnapshot,
@@ -258,4 +262,14 @@ export async function oldestOpen(trx: Transaction<DB>, userId: string, extra: nu
     .orderBy('id', 'asc')
     .limit(extra)
     .execute();
+}
+
+/** The caller's profile fields as they are now (read under the lock, not at request start). */
+export async function currentProfile(trx: Transaction<DB>, userId: string) {
+  const u = await trx
+    .selectFrom('users')
+    .select(['name', 'headline', 'bio', 'location', 'avatarUrl', 'github', 'website'])
+    .where('id', '=', userId)
+    .executeTakeFirst();
+  return u;
 }
