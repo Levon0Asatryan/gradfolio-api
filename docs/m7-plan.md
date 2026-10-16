@@ -620,6 +620,25 @@ Profile and LinkedIn suggestions; project suggestions are (d2). Differences from
 - **Not built:** `education.add` from `UNIVERSITY_DOMAINS` (the setting is parsed and empty until
   M7-T10; an accept would need a degree, field and years from the student), `experience.add`.
 
+### 6.6b The import modal's API (PR b3)
+
+Levon's product decision (m7-import-addendum.md): after connecting GitHub, a modal offers the
+repositories and the profile data. Its API, on top of §3 and §6:
+
+- `GET /v1/me/github/repos?q=`: GitHub cannot search the list, so up to `GITHUB_SEARCH_SCAN_PAGES`
+  (5) pages of 100 are read and filtered here (name, description, language, case-insensitive);
+  `limit` does not apply, `nextCursor` continues after the last page read.
+- `POST /v1/me/github/import/preview {repoIds}`: the drafts an import would create (the review step's
+  content); writes nothing.
+- `POST /v1/me/github/import` gains optional `overrides`, keyed by repository id: `title`,
+  `summary`, `descriptionHtml`, `technologies`, `links`. Validated by the project create rules (a bad
+  one is a 400 naming `overrides.<id>.<field>` and nothing is created); the README stays GitHub's
+  unless `descriptionHtml` is given; `source`, the repository facts and visibility cannot be set.
+  **The snapshot records what GitHub gave**, so a later re-sync sees an override as an edit and keeps
+  it. Chosen over import-then-patch: one request, one transaction, no half-edited drafts.
+- The Profile data section is PR (d1)'s suggestions list; a company is offered only to an empty
+  headline.
+
 ### 6.7 Cost
 
 One PR, migration 0009, about 35 tests, roughly the size of (b). **Needs:** PR (b) merged (the diff

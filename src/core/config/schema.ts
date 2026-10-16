@@ -328,6 +328,9 @@ const integrations = {
   GITHUB_PAGE_MAX: z.coerce.number().int().min(1).max(100).default(30),
   GITHUB_IMPORT_MAX_BATCH: z.coerce.number().int().min(1).max(10).default(10),
   GITHUB_README_MAX_BYTES: z.coerce.number().int().min(1000).max(1_000_000).default(400_000),
+  // Repository search (`q`): GitHub has no search parameter on /user/repos, so up to
+  // this many pages of 100 are read and filtered here (docs/m7-plan.md §3.2).
+  GITHUB_SEARCH_SCAN_PAGES: z.coerce.number().int().min(1).max(10).default(5),
   GITHUB_IMPORT_CONCURRENCY: z.coerce.number().int().min(1).max(5).default(2),
   // A link nonce's lifetime, and the most an id token's `iat` may lie in the past.
   INTEGRATION_NONCE_TTL_S: z.coerce.number().int().min(60).max(3600).default(600),

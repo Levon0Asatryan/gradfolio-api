@@ -69,3 +69,35 @@ Content-Type: application/json
 # is not the caller's; 409 NOT_GITHUB_PROJECT, GITHUB_REPO_UNAVAILABLE.
 POST {{baseUrl}}/v1/me/projects/{{projectId}}/github/sync?dryRun=true
 Authorization: Bearer {{accessToken}}
+
+###
+# @name searchGithubRepos
+# q: case-insensitive substring of name, description or language; up to
+# GITHUB_SEARCH_SCAN_PAGES pages of 100 are read and every match returned (limit does not
+# apply); nextCursor continues after the last page read.
+GET {{baseUrl}}/v1/me/github/repos?q=thesis
+Authorization: Bearer {{accessToken}}
+
+###
+# @name previewGithubImport
+# The drafts an import would create (title, summary, sanitized README, technologies,
+# links); writes nothing. outcome: draft | exists | skipped.
+POST {{baseUrl}}/v1/me/github/import/preview
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "repoIds": [812345678] }
+
+###
+# @name importGithubReposWithOverrides
+# The review step's edits, per repository id (a key of repoIds): title, summary,
+# descriptionHtml, technologies, links. A bad one is a 400 naming overrides.<id>.<field>
+# and nothing is created. Cannot set source, stars or visibility.
+POST {{baseUrl}}/v1/me/github/import
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "repoIds": [812345678],
+  "overrides": { "812345678": { "title": "My thesis tracker", "technologies": ["Go", "SQL"] } }
+}

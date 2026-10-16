@@ -46,7 +46,21 @@ type Prepared =
   | { kind: 'done'; result: ImportResult }
   /** Found imported before the lock was taken; re-verified under it. */
   | { kind: 'existing'; repoId: number }
-  | { kind: 'create'; repo: GithubRepo; input: CreateProject; notes: ReadmeNote[] };
+  | {
+      kind: 'create';
+      repo: GithubRepo;
+      /** What is stored: GitHub's values with the student's overrides. */
+      input: CreateProject;
+      /** What GitHub gave, without overrides: what the re-sync snapshot records. */
+      github: CreateProject;
+      notes: ReadmeNote[];
+    };
+
+export type DraftOverrides = Partial<
+  Pick<CreateProject, 'title' | 'summary' | 'technologies' | 'links'> & {
+    descriptionHtml: string | null;
+  }
+>;
 
 const NO_LIMIT: GithubRateLimit = { remaining: null, resetsAt: null };
 
@@ -88,8 +102,9 @@ export class GithubImportService {
   async list(
     user: UserRow,
     identity: AccessTokenIdentity,
-    query: { cursor?: string | undefined; limit?: number | undefined },
+    query: { q?: string | undefined; cursor?: string | undefined; limit?: number | undefined },
   ) {
+    if (query.q !== undefined) return this.search(user, identity, query.q, query.cursor);
     const perPage = query.limit ?? this.cfg.GITHUB_PAGE_MAX;
     if (perPage > this.cfg.GITHUB_PAGE_MAX) {
       throw new ValidationError([
@@ -100,75 +115,83 @@ export class GithubImportService {
     const { gh, token } = await this.connection.requireConnected(user, identity);
     const result = await this.github(gh, user, () => gh.github.listRepos(token, { page, perPage }));
 
-    const known = await importedProjectIds(
-      this.dbs.db,
-      user.id,
-      result.items.map((r) => r.id),
-    );
     return {
-      items: result.items.map((r) => ({
-        repoId: r.id,
-        fullName: r.fullName,
-        description: r.description,
-        language: r.language,
-        stars: r.stars,
-        forks: r.forks,
-        fork: r.fork,
-        archived: r.archived,
-        pushedAt: r.pushedAt,
-        imported: known.has(r.id),
-        projectId: known.get(r.id) ?? null,
-      })),
+      items: await this.withImported(user.id, result.items),
       nextCursor: result.nextPage === null ? null : encodeCursor(result.nextPage),
       rateLimit: result.rateLimit,
     };
   }
 
-  /** `POST /v1/me/github/import`. */
-  async import(user: UserRow, identity: AccessTokenIdentity, repoIds: readonly number[]) {
-    if (repoIds.length > this.cfg.GITHUB_IMPORT_MAX_BATCH) {
-      throw new ValidationError([
-        { path: 'repoIds', message: `at most ${this.cfg.GITHUB_IMPORT_MAX_BATCH} at once` },
-      ]);
-    }
-    const { gh, token, githubUserId } = await this.connection.requireConnected(user, identity);
-    const already = await importedProjectIds(this.dbs.db, user.id, repoIds);
+  /**
+   * `q`: GitHub cannot search the caller's list, so up to GITHUB_SEARCH_SCAN_PAGES
+   * pages of 100 are read from the cursor and every match in them returned;
+   * the cursor continues after the last page read. At most that many GitHub
+   * calls, and the same `imported` marks.
+   */
+  private async search(user: UserRow, identity: AccessTokenIdentity, q: string, cursor?: string) {
+    let page: number | null = decodeCursor(cursor);
+    const { gh, token } = await this.connection.requireConnected(user, identity);
+    const needle = q.toLowerCase();
+    const matches: GithubRepo[] = [];
     let rateLimit = NO_LIMIT;
-
-    // GitHub is asked outside any transaction; nothing here holds a lock.
-    const prepare = async (repoId: number): Promise<Prepared> => {
-      const read = await this.github(gh, user, () => gh.github.getRepo(token, repoId));
-      rateLimit = read.rateLimit;
-      const repo = read.repo;
-      if (repo === null) return { kind: 'done', result: done(repoId, 'skipped', 'not_found') };
-      // Anyone could otherwise import a famous repository as their own work.
-      if (repo.ownerId !== Number(githubUserId) && !repo.canPush) {
-        return { kind: 'done', result: done(repoId, 'skipped', 'not_owner') };
-      }
-      const got = await this.github(gh, user, () =>
-        gh.github.getReadme(token, repoId, this.cfg.GITHUB_README_MAX_BYTES),
+    for (let read = 0; page !== null && read < this.cfg.GITHUB_SEARCH_SCAN_PAGES; read++) {
+      const current: number = page;
+      const result = await this.github(gh, user, () =>
+        gh.github.listRepos(token, { page: current, perPage: 100 }),
       );
-      // The limit as of the last call made: the README's, not the repository's.
-      if (got.rateLimit !== null) rateLimit = got.rateLimit;
-      const description = descriptionOf(repo, got.readme, this.cfg.PROJECT_DESCRIPTION_MAX_BYTES);
-      const parsed = this.schemas.create.safeParse({
-        ...fieldsOf(repo, description.html ?? null),
-        category: 'other',
-        status: 'ongoing',
-        isPublic: !repo.private,
-        isDraft: true,
-      });
-      if (!parsed.success) {
-        return { kind: 'done', result: done(repoId, 'skipped', 'invalid_repository') };
-      }
-      return {
-        kind: 'create',
-        repo,
-        input: parsed.data,
-        notes: description.note === undefined ? [] : [description.note],
-      };
+      rateLimit = result.rateLimit;
+      matches.push(
+        ...result.items.filter((r) =>
+          [r.fullName, r.description ?? '', r.language ?? ''].some((v) =>
+            v.toLowerCase().includes(needle),
+          ),
+        ),
+      );
+      page = result.nextPage;
+    }
+    return {
+      items: await this.withImported(user.id, matches),
+      nextCursor: page === null ? null : encodeCursor(page),
+      rateLimit,
     };
+  }
 
+  private async withImported(userId: string, repos: readonly GithubRepo[]) {
+    const known = await importedProjectIds(
+      this.dbs.db,
+      userId,
+      repos.map((r) => r.id),
+    );
+    return repos.map((r) => ({
+      repoId: r.id,
+      fullName: r.fullName,
+      description: r.description,
+      language: r.language,
+      stars: r.stars,
+      forks: r.forks,
+      fork: r.fork,
+      archived: r.archived,
+      pushedAt: r.pushedAt,
+      imported: known.has(r.id),
+      projectId: known.get(r.id) ?? null,
+    }));
+  }
+
+  /** `POST /v1/me/github/import`. */
+  async import(
+    user: UserRow,
+    identity: AccessTokenIdentity,
+    repoIds: readonly number[],
+    overrides: Readonly<Record<string, DraftOverrides>> = {},
+  ) {
+    this.checkBatch(repoIds);
+    const ctx = await this.context(user, identity);
+    const already = await importedProjectIds(this.dbs.db, user.id, repoIds);
+
+    // GitHub is asked outside any transaction; nothing here holds a lock. An
+    // override that fails the create rules throws before anything is written.
+    const prepare = (repoId: number): Promise<Prepared> =>
+      this.prepareRepo(ctx, repoId, overrides[String(repoId)]);
     const prepared = await mapLimit(
       repoIds,
       this.cfg.GITHUB_IMPORT_CONCURRENCY,
@@ -190,7 +213,144 @@ export class GithubImportService {
           );
     const byId = new Map<number, ImportResult>();
     for (const r of [...first, ...second]) if (!('stale' in r)) byId.set(r.repoId, r);
-    return { results: repoIds.map((id) => byId.get(id)!), rateLimit };
+    return { results: repoIds.map((id) => byId.get(id)!), rateLimit: ctx.rateLimit() };
+  }
+
+  /**
+   * `POST /v1/me/github/import/preview`: the drafts an import would create,
+   * read from GitHub the same way, with nothing written. The review step shows
+   * them for the student to edit; the save re-reads GitHub (a client's numbers
+   * and README are never trusted).
+   */
+  async preview(user: UserRow, identity: AccessTokenIdentity, repoIds: readonly number[]) {
+    this.checkBatch(repoIds);
+    const ctx = await this.context(user, identity);
+    const already = await importedProjectIds(this.dbs.db, user.id, repoIds);
+    const results = await mapLimit(repoIds, this.cfg.GITHUB_IMPORT_CONCURRENCY, async (repoId) => {
+      const projectId = already.get(repoId);
+      if (projectId !== undefined) {
+        return {
+          repoId,
+          outcome: 'exists' as const,
+          reason: null,
+          projectId,
+          draft: null,
+          notes: [],
+        };
+      }
+      const prepared = await this.prepareRepo(ctx, repoId, undefined);
+      if (prepared.kind !== 'create') {
+        const r = prepared.kind === 'done' ? prepared.result : undefined;
+        return {
+          repoId,
+          outcome: 'skipped' as const,
+          reason: (r?.reason ?? 'not_found') as 'not_found' | 'not_owner' | 'invalid_repository',
+          projectId: null,
+          draft: null,
+          notes: [],
+        };
+      }
+      const { input, repo } = prepared;
+      return {
+        repoId,
+        outcome: 'draft' as const,
+        reason: null,
+        projectId: null,
+        draft: {
+          title: input.title,
+          summary: input.summary,
+          descriptionHtml: input.descriptionHtml,
+          technologies: input.technologies,
+          links: input.links,
+          repoUrl: repo.htmlUrl,
+          isPublic: input.isPublic,
+        },
+        notes: prepared.notes,
+      };
+    });
+    return { results, rateLimit: ctx.rateLimit() };
+  }
+
+  private checkBatch(repoIds: readonly number[]): void {
+    if (repoIds.length > this.cfg.GITHUB_IMPORT_MAX_BATCH) {
+      throw new ValidationError([
+        { path: 'repoIds', message: `at most ${this.cfg.GITHUB_IMPORT_MAX_BATCH} at once` },
+      ]);
+    }
+  }
+
+  private async context(user: UserRow, identity: AccessTokenIdentity) {
+    const { gh, token, githubUserId } = await this.connection.requireConnected(user, identity);
+    let rateLimit = NO_LIMIT;
+    return {
+      gh,
+      token,
+      githubUserId,
+      user,
+      note: (r: GithubRateLimit) => {
+        rateLimit = r;
+      },
+      rateLimit: () => rateLimit,
+    };
+  }
+
+  /**
+   * One repository as the draft it would become: read again from GitHub, owned
+   * or pushable by the caller, README sanitized, validated by the project
+   * create rules. `overrides` are applied on top and validated the same way; one
+   * that fails is a 400 naming `overrides.<repoId>.<field>`.
+   */
+  private async prepareRepo(
+    ctx: Awaited<ReturnType<GithubImportService['context']>>,
+    repoId: number,
+    overrides: DraftOverrides | undefined,
+  ): Promise<Prepared> {
+    const { gh, token, user } = ctx;
+    const read = await this.github(gh, user, () => gh.github.getRepo(token, repoId));
+    ctx.note(read.rateLimit);
+    const repo = read.repo;
+    if (repo === null) return { kind: 'done', result: done(repoId, 'skipped', 'not_found') };
+    // Anyone could otherwise import a famous repository as their own work.
+    if (repo.ownerId !== Number(ctx.githubUserId) && !repo.canPush) {
+      return { kind: 'done', result: done(repoId, 'skipped', 'not_owner') };
+    }
+    const got = await this.github(gh, user, () =>
+      gh.github.getReadme(token, repoId, this.cfg.GITHUB_README_MAX_BYTES),
+    );
+    // The limit as of the last call made: the README's, not the repository's.
+    if (got.rateLimit !== null) ctx.note(got.rateLimit);
+    const description = descriptionOf(repo, got.readme, this.cfg.PROJECT_DESCRIPTION_MAX_BYTES);
+    const base = {
+      ...fieldsOf(repo, description.html ?? null),
+      category: 'other',
+      status: 'ongoing',
+      isPublic: !repo.private,
+      isDraft: true,
+    };
+    const github = this.schemas.create.safeParse(base);
+    if (!github.success) {
+      return { kind: 'done', result: done(repoId, 'skipped', 'invalid_repository') };
+    }
+    let input = github.data;
+    if (overrides !== undefined && Object.keys(overrides).length > 0) {
+      const merged = this.schemas.create.safeParse({ ...base, ...overrides });
+      if (!merged.success) {
+        throw new ValidationError(
+          merged.error.issues.map((i) => ({
+            path: ['overrides', String(repoId), ...i.path].join('.'),
+            message: i.message,
+          })),
+        );
+      }
+      input = merged.data;
+    }
+    return {
+      kind: 'create',
+      repo,
+      input,
+      github: github.data,
+      notes: description.note === undefined ? [] : [description.note],
+    };
   }
 
   /**
@@ -226,7 +386,7 @@ export class GithubImportService {
           );
           continue;
         }
-        const { repo, input, notes } = item;
+        const { repo, input, github, notes } = item;
         const existing = have.get(repo.id);
         if (existing !== undefined) {
           results.push(done(repo.id, 'exists', null, existing));
@@ -246,13 +406,15 @@ export class GithubImportService {
             : null,
           readmeUrl: `${repo.htmlUrl}#readme`,
         });
-        const technologies = await setProjectTerms(trx, id, 'technologies', input.technologies);
+        await setProjectTerms(trx, id, 'technologies', input.technologies);
+        // What GitHub gave, not what the student typed: a later re-sync then sees
+        // an override as an edit and keeps it (docs/m7-plan.md §3.5).
         await writeSnapshot(trx, id, {
-          title: hashField('title', input.title),
-          summary: hashField('summary', input.summary),
-          descriptionHtml: hashField('descriptionHtml', input.descriptionHtml),
-          repoUrl: hashField('repoUrl', input.repoUrl),
-          technologies: hashField('technologies', technologies),
+          title: hashField('title', github.title),
+          summary: hashField('summary', github.summary),
+          descriptionHtml: hashField('descriptionHtml', github.descriptionHtml),
+          repoUrl: hashField('repoUrl', github.repoUrl),
+          technologies: hashField('technologies', github.technologies),
         });
         count++;
         results.push({ ...done(repo.id, 'created', null, id), notes });

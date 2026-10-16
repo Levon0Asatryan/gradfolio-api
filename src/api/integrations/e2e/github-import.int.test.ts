@@ -2,6 +2,7 @@ import { createConnection } from 'mysql2/promise';
 import { describe, expect, it } from 'vitest';
 import { waitForLockWaiters } from '../../../testing/barrier.js';
 import { testDatabaseUrl } from '../../../testing/database.js';
+import { hashField } from '../../../core/github/snapshot.js';
 import { githubConnectHarness, type Http, type Student } from '../../../testing/github-connect.js';
 import { db } from '../../../testing/team.js';
 
@@ -557,5 +558,314 @@ describe('the dashboard and the logs', () => {
     expect(limited.body.code).toBe('RATE_LIMITED');
     expect(Number(limited.headers['retry-after'])).toBeGreaterThan(0);
     await http.get('/v1/me/github/repos').set(alice.auth).expect(200);
+  });
+});
+
+describe('GET /v1/me/github/repos?q= (search)', () => {
+  const search = (http: Http, s: Student, qs: string) =>
+    http.get(`/v1/me/github/repos?${qs}`).set(s.auth);
+  const ids = (res: { body: unknown }) => rowsOf(res, 'items').map((r) => r.repoId);
+
+  it('matches name, description and language, case-insensitively, and marks the imported', async () => {
+    const { http, alice, bob } = await setup();
+    h.addRepo({
+      id: 1,
+      ownerId: 100,
+      name: 'Thesis-Tracker',
+      description: 'tracks',
+      language: 'Go',
+    });
+    h.addRepo({
+      id: 2,
+      ownerId: 100,
+      name: 'other',
+      description: 'A THESIS helper',
+      language: 'Rust',
+    });
+    h.addRepo({
+      id: 3,
+      ownerId: 100,
+      name: 'plain',
+      description: 'nothing',
+      language: 'Thesisscript',
+    });
+    h.addRepo({ id: 4, ownerId: 100, name: 'unrelated', description: null, language: null });
+    h.addRepo({ id: 5, ownerId: 200, name: 'bobs-thesis' });
+    await importIds(http, alice, [1]).expect(200);
+
+    const res = await search(http, alice, 'q=tHeSiS').expect(200);
+    expect(ids(res).sort()).toEqual([1, 2, 3]);
+    expect(rowsOf(res, 'items').find((r) => r.repoId === 1)).toMatchObject({ imported: true });
+    expect(rowsOf(res, 'items').find((r) => r.repoId === 2)).toMatchObject({ imported: false });
+    expect(res.body.nextCursor).toBeNull();
+    // Bob's search sees only Bob's repositories and none of Alice's imports.
+    const bobs = await search(http, bob, 'q=thesis').expect(200);
+    expect(ids(bobs)).toEqual([5]);
+    expect(rowsOf(bobs, 'items')[0]).toMatchObject({ imported: false, projectId: null });
+    for (const bad of ['q=', 'q=%20%20', `q=${'x'.repeat(101)}`]) {
+      expect((await search(http, alice, bad)).status, bad).toBe(400);
+    }
+  });
+
+  it('reads at most GITHUB_SEARCH_SCAN_PAGES pages, then hands back a cursor that continues', async () => {
+    const { http, alice } = await setup({ GITHUB_SEARCH_SCAN_PAGES: '2' });
+    for (let id = 2; id <= 250; id++) h.addRepo({ id, ownerId: 100, name: `bulk-${id}` });
+    h.addRepo({ id: 1, ownerId: 100, name: 'needle-lib' });
+
+    h.gh.requests.length = 0;
+    const first = await search(http, alice, 'q=needle').expect(200);
+    expect(ids(first)).toEqual([]);
+    expect(first.body.nextCursor).toEqual(expect.any(String));
+    expect(h.gh.requests.filter((r) => r.path === '/user/repos')).toHaveLength(2);
+
+    const next = await search(http, alice, `q=needle&cursor=${first.body.nextCursor}`).expect(200);
+    expect(ids(next)).toEqual([1]);
+    expect(next.body.nextCursor).toBeNull();
+  });
+});
+
+describe('POST /v1/me/github/import/preview', () => {
+  const preview = (http: Http, s: Student, repoIds: number[]) =>
+    http.post('/v1/me/github/import/preview').set(s.auth).send({ repoIds });
+  const projectCount = async () =>
+    Number(
+      (
+        await db
+          .selectFrom('projects')
+          .select((e) => e.fn.countAll().as('n'))
+          .executeTakeFirstOrThrow()
+      ).n,
+    );
+
+  it('returns the drafts an import would create, and writes nothing', async () => {
+    const { http, alice } = await setup();
+    h.addRepo({
+      id: 10,
+      ownerId: 100,
+      ownerLogin: 'alice',
+      name: 'tracker',
+      description: 'Tracks',
+      language: 'Python',
+      readme:
+        '<h1>T</h1><p><img src="a.png" alt="Banner"> <a href="docs/g.md">g</a></p><script>x()</script>',
+    });
+    const before = await projectCount();
+    const res = await preview(http, alice, [10]).expect(200);
+    const [r] = res.body.results as { outcome: string; draft: Record<string, unknown> }[];
+    expect(r!.outcome).toBe('draft');
+    expect(r!.draft).toMatchObject({
+      title: 'tracker',
+      summary: 'Tracks',
+      technologies: ['Python'],
+      links: [],
+      isPublic: true,
+      repoUrl: 'https://github.com/alice/tracker',
+    });
+    expect(r!.draft.descriptionHtml).toContain('<h2>T</h2>');
+    expect(r!.draft.descriptionHtml).toContain(
+      'https://github.com/alice/tracker/blob/main/docs/g.md',
+    );
+    expect(r!.draft.descriptionHtml).not.toMatch(/<img|<script/);
+    expect(await projectCount()).toBe(before);
+    expect(res.body.rateLimit.remaining).toBe(4990);
+  });
+
+  it('says exists, or why there is no draft; another user’s import is not theirs', async () => {
+    const { http, alice, bob } = await setup();
+    h.addRepo({ id: 20, ownerId: 100 });
+    h.addRepo({ id: 21, ownerId: 999, name: 'famous' });
+    const first = await importIds(http, alice, [20]).expect(200);
+    const res = await preview(http, alice, [20, 21, 22]).expect(200);
+    expect(
+      (res.body.results as { repoId: number; outcome: string; reason: string | null }[]).map(
+        (r) => [r.repoId, r.outcome, r.reason],
+      ),
+    ).toEqual([
+      [20, 'exists', null],
+      [21, 'skipped', 'not_owner'],
+      [22, 'skipped', 'not_found'],
+    ]);
+    expect(res.body.results[0].projectId).toBe(first.body.results[0].projectId);
+    // Bob previewing Alice's repository finds it is not his, and learns no project id of hers.
+    const bobs = await preview(http, bob, [20]).expect(200);
+    expect(bobs.body.results[0]).toMatchObject({
+      outcome: 'skipped',
+      projectId: null,
+      draft: null,
+    });
+  });
+
+  it('is strict, needs GitHub, and is under the import budget', async () => {
+    const { http, alice } = await setup();
+    for (const body of [{}, { repoIds: [] }, { repoIds: [1], overrides: {} }, { repoIds: ['1'] }]) {
+      expect(
+        (await http.post('/v1/me/github/import/preview').set(alice.auth).send(body)).status,
+      ).toBe(400);
+    }
+    const loner = await h.student('auth0|preview-loner');
+    expect((await preview(http, loner, [1]).expect(409)).body.code).toBe('GITHUB_NOT_CONNECTED');
+    const limited = await h.start({
+      ...h.env(),
+      RATE_LIMIT_IMPORT: '1',
+      RATE_LIMIT_INTEGRATION: '100',
+    });
+    const a = await h.connectedStudent(limited, '300', 'carol');
+    h.addRepo({ id: 30, ownerId: 300 });
+    await preview(limited, a, [30]).expect(200);
+    expect((await preview(limited, a, [30]).expect(429)).body.code).toBe('RATE_LIMITED');
+  });
+});
+
+describe('POST /v1/me/github/import with overrides', () => {
+  const withOverrides = (
+    http: Http,
+    s: Student,
+    repoIds: number[],
+    overrides: Record<string, unknown>,
+  ) => http.post('/v1/me/github/import').set(s.auth).send({ repoIds, overrides });
+
+  it('stores what the student edited, validated like a manual create; the README stays from GitHub', async () => {
+    const { http, alice } = await setup();
+    h.addRepo({
+      id: 40,
+      ownerId: 100,
+      name: 'raw-name',
+      description: 'gh summary',
+      language: 'Go',
+      readme: '<p>from github</p>',
+    });
+    h.addRepo({ id: 41, ownerId: 100, name: 'second', readme: '<p>second readme</p>' });
+    const res = await withOverrides(http, alice, [40, 41], {
+      '40': {
+        title: '  My Thesis Tracker ',
+        summary: 'My own words',
+        technologies: ['Go', 'SQL'],
+        links: [{ label: 'Demo', url: 'https://demo.example.am' }],
+      },
+      '41': { descriptionHtml: '<p>mine</p><script>alert(1)</script>' },
+    }).expect(200);
+    expect(rowsOf(res, 'results').map((r) => r.outcome)).toEqual(['created', 'created']);
+
+    const one = (await projectRow(alice.id, 40))!;
+    expect(one).toMatchObject({
+      title: 'My Thesis Tracker',
+      summary: 'My own words',
+      isDraft: true,
+      source: 'github',
+    });
+    expect(one.descriptionHtml).toContain('from github');
+    expect(one.links).toEqual([{ label: 'Demo', url: 'https://demo.example.am' }]);
+    const tech = await db
+      .selectFrom('projectTechnologies')
+      .select('name')
+      .where('projectId', '=', one.id)
+      .execute();
+    expect(tech.map((t) => t.name).sort()).toEqual(['Go', 'SQL']);
+    const two = (await projectRow(alice.id, 41))!;
+    expect(two.title).toBe('second');
+    expect(two.descriptionHtml).toBe('<p>mine</p>');
+  });
+
+  it('refuses a bad override with 400 naming it, and creates nothing for any repository', async () => {
+    const { http, alice } = await setup();
+    h.addRepo({ id: 50, ownerId: 100 });
+    h.addRepo({ id: 51, ownerId: 100 });
+    for (const bad of [
+      { '51': { title: '' } },
+      { '51': { links: [{ label: 'x', url: 'javascript:alert(1)' }] } },
+      { '51': { summary: 'a'.repeat(70_001) } },
+    ]) {
+      const res = await withOverrides(http, alice, [50, 51], bad);
+      expect(res.status, JSON.stringify(bad).slice(0, 60)).toBe(400);
+    }
+    const res = await withOverrides(http, alice, [50, 51], { '51': { title: '' } }).expect(400);
+    expect(JSON.stringify(res.body)).toContain('overrides.51.title');
+    expect(await projectRow(alice.id, 50)).toBeUndefined();
+    expect(await projectRow(alice.id, 51)).toBeUndefined();
+  });
+
+  it('cannot set the source, the facts or the visibility, nor name a repository outside repoIds', async () => {
+    const { http, alice } = await setup();
+    h.addRepo({ id: 60, ownerId: 100, stars: 7 });
+    for (const field of [
+      'source',
+      'stars',
+      'repoStars',
+      'forks',
+      'isPublic',
+      'isDraft',
+      'githubRepoId',
+      'repoUrl',
+      'category',
+    ]) {
+      const res = await withOverrides(http, alice, [60], {
+        '60': { [field]: field === 'isPublic' ? false : 'x' },
+      });
+      expect(res.status, field).toBe(400);
+    }
+    expect((await withOverrides(http, alice, [60], { '61': { title: 'x' } })).status).toBe(400);
+    expect((await withOverrides(http, alice, [60], { abc: { title: 'x' } })).status).toBe(400);
+    expect(await projectRow(alice.id, 60)).toBeUndefined();
+    await importIds(http, alice, [60]).expect(200);
+    expect(await projectRow(alice.id, 60)).toMatchObject({
+      repoStars: 7,
+      isPublic: true,
+      isDraft: true,
+    });
+  });
+
+  it('the snapshot records what GitHub gave: an overridden title survives a re-sync', async () => {
+    const { http, alice } = await setup();
+    h.addRepo({
+      id: 70,
+      ownerId: 100,
+      name: 'gh-name',
+      description: 'gh summary',
+      readme: '<p>v1</p>',
+    });
+    const created = await withOverrides(http, alice, [70], {
+      '70': { title: 'My own title', summary: 'gh summary' },
+    }).expect(200);
+    const id = rowsOf(created, 'results')[0]!.projectId!;
+    const snap = (
+      await db
+        .selectFrom('projectGithubImports')
+        .select('snapshot')
+        .where('projectId', '=', id)
+        .executeTakeFirstOrThrow()
+    ).snapshot!;
+    expect(snap.title).toBe(hashField('title', 'gh-name'));
+    expect(snap.title).not.toBe(hashField('title', 'My own title'));
+
+    // Nothing changed at GitHub: the title is the student's edit (kept); an override equal to
+    // GitHub's own value (the summary) is not an edit at all.
+    const same = await http.post(`/v1/me/projects/${id}/github/sync`).set(alice.auth).expect(200);
+    const outcome = (f: string) =>
+      (same.body.fields as { field: string; outcome: string }[]).find((x) => x.field === f)!
+        .outcome;
+    expect(outcome('title')).toBe('kept');
+    expect(outcome('summary')).toBe('unchanged');
+
+    // GitHub renames the repository: both changed, the student's title stands and is reported.
+    h.gh.repos.get(70)!.name = 'renamed-upstream';
+    h.gh.repos.get(70)!.readme = '<p>v2</p>';
+    const after = await http.post(`/v1/me/projects/${id}/github/sync`).set(alice.auth).expect(200);
+    const outcome2 = (f: string) =>
+      (after.body.fields as { field: string; outcome: string }[]).find((x) => x.field === f)!
+        .outcome;
+    expect(outcome2('title')).toBe('conflict');
+    expect(outcome2('descriptionHtml')).toBe('updated');
+    expect((await projectRow(alice.id, 70))!.title).toBe('My own title');
+  });
+
+  it('ignores an override for a repository that is already imported', async () => {
+    const { http, alice } = await setup();
+    h.addRepo({ id: 80, ownerId: 100, name: 'first-name' });
+    await importIds(http, alice, [80]).expect(200);
+    const again = await withOverrides(http, alice, [80], { '80': { title: 'Changed' } }).expect(
+      200,
+    );
+    expect(rowsOf(again, 'results')[0]!.outcome).toBe('exists');
+    expect((await projectRow(alice.id, 80))!.title).toBe('first-name');
   });
 });
