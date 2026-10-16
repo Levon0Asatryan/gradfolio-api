@@ -435,7 +435,7 @@ describe('a refresh and the world changing under it', () => {
     gate.release();
 
     const res = await refreshing;
-    expect(res.body).toMatchObject({ github: 'unchanged', created: 0 });
+    expect(res.body).toMatchObject({ github: 'discarded', created: 0 });
     const state = await db
       .selectFrom('integrations')
       .select(['suggestionsPolledAt', 'profileSnapshot'])

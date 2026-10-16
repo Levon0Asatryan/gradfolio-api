@@ -167,7 +167,7 @@ export class SuggestionsService {
     });
     if (outcome.githubDropped === 'gone') github = 'not_connected';
     // Connected again, as another connection: nothing of this read was applied; try again.
-    if (outcome.githubDropped === 'replaced') github = 'unchanged';
+    if (outcome.githubDropped === 'replaced') github = 'discarded';
     const polled = (await readPollState(this.dbs.db, user.id))?.polledAt ?? null;
     return {
       github,
