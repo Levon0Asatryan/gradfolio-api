@@ -3,7 +3,7 @@
  * Please do not edit it manually.
  */
 
-import type { Bool, DateText, GithubImportSnapshot, JsonColumn, LinkList, NotificationParams, StringList, TranslationParams } from "./column-types.js";
+import type { Bool, DateText, GithubImportSnapshot, GithubProfileSnapshot, JsonColumn, LinkList, NotificationParams, StringList, SuggestionPayload, TranslationParams } from "./column-types.js";
 import type { ColumnType } from "kysely";
 
 export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
@@ -72,8 +72,11 @@ export interface Integrations {
   id: string;
   integrationType: "github" | "linkedin";
   lastSyncedAt: Date | null;
+  profileEtag: string | null;
+  profileSnapshot: JsonColumn<GithubProfileSnapshot>;
   refreshToken: null;
   status: Generated<"connected" | "linking" | "not_connected">;
+  suggestionsPolledAt: Date | null;
   tokenExpiresAt: null;
   updatedAt: Generated<Date>;
   userId: string;
@@ -165,6 +168,19 @@ export interface ProjectTechnologies {
   sortOrder: Generated<number>;
 }
 
+export interface Suggestions {
+  createdAt: Generated<Date>;
+  dedupeKey: string;
+  id: string;
+  kind: string;
+  payload: JsonColumn<SuggestionPayload>;
+  resolvedAt: Date | null;
+  source: "auth0" | "github" | "linkedin";
+  status: Generated<"accepted" | "dismissed" | "open" | "superseded">;
+  targetId: string | null;
+  userId: string;
+}
+
 export interface Terms {
   name: string;
 }
@@ -213,6 +229,7 @@ export interface DB {
   projectTags: ProjectTags;
   projectTeamMembers: ProjectTeamMembers;
   projectTechnologies: ProjectTechnologies;
+  suggestions: Suggestions;
   terms: Terms;
   users: Users;
   userSkills: UserSkills;

@@ -45,7 +45,7 @@ describe('0008_github_connect', () => {
        VALUES ('a', '${USER}', 'github', 'connected', 'gho_left', 'ghr_left', UTC_TIMESTAMP(), '42')`,
     );
 
-    expect(await up(conn, o)).toEqual(['0008_github_connect']);
+    expect(await up(conn, o, '0008_github_connect')).toEqual(['0008_github_connect']);
 
     const [rows] = await conn.query(
       'SELECT status, access_token, refresh_token, token_expires_at, external_user_id, external_login FROM integrations',
@@ -66,8 +66,8 @@ describe('0008_github_connect', () => {
 
   it('applies twice with nothing left, and down then up gives the same schema', async () => {
     const o = await opts();
-    expect(await up(conn, o)).toContain('0008_github_connect');
-    expect(await up(conn, o)).toEqual([]);
+    expect(await up(conn, o, '0008_github_connect')).toContain('0008_github_connect');
+    expect(await up(conn, o, '0008_github_connect')).toEqual([]);
     const first = await dumpSchema(conn);
     expect(first).toContain('ck_integrations_no_tokens');
     expect(first).toContain('CREATE TABLE `integration_nonces`');
@@ -78,13 +78,13 @@ describe('0008_github_connect', () => {
     expect(reverted).not.toContain('linking');
     expect(reverted).not.toContain('integration_nonces');
 
-    await up(conn, o);
+    await up(conn, o, '0008_github_connect');
     expect(await dumpSchema(conn)).toBe(first);
   });
 
   it('down turns a reservation into a plain not-connected row', async () => {
     const o = await opts();
-    await up(conn, o);
+    await up(conn, o, '0008_github_connect');
     await conn.query(
       `INSERT INTO users (id, auth0_id, name) VALUES ('${USER}', 'auth0|m', 'Kept')`,
     );

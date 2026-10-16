@@ -448,6 +448,37 @@ describe('GitHub connect settings (docs/m7-plan.md §8)', () => {
   });
 });
 
+describe('suggestion settings (docs/m7-plan.md §6)', () => {
+  it('default sensibly, and the university domains default to none', () => {
+    expect(loadConfig(REQUIRED)).toMatchObject({
+      SUGGESTIONS_MIN_INTERVAL_S: 900,
+      SUGGESTIONS_MAX_OPEN: 50,
+      SUGGESTIONS_PAGE_SIZE: 20,
+      SUGGESTIONS_PAGE_MAX: 50,
+      LINKEDIN_REIMPORT_DAYS: 90,
+      UNIVERSITY_DOMAINS: {},
+    });
+  });
+
+  it('parses UNIVERSITY_DOMAINS as domain=Institution pairs, lower-cased, skipping bad ones', () => {
+    const cfg = loadConfig({
+      ...REQUIRED,
+      UNIVERSITY_DOMAINS:
+        ' NPUA.am = National Polytechnic University of Armenia, ,x=,=y,ysu.am=YSU = Main',
+    });
+    expect(cfg.UNIVERSITY_DOMAINS).toEqual({
+      'npua.am': 'National Polytechnic University of Armenia',
+      'ysu.am': 'YSU = Main',
+    });
+  });
+
+  it('refuses a default page size above the maximum', () => {
+    expect(() =>
+      loadConfig({ ...REQUIRED, SUGGESTIONS_PAGE_SIZE: '60', SUGGESTIONS_PAGE_MAX: '50' }),
+    ).toThrow(/SUGGESTIONS_PAGE_MAX/);
+  });
+});
+
 describe('loadDatabaseConfig', () => {
   it('needs only the database settings: the migrate service has no Auth0 settings', () => {
     const cfg = loadDatabaseConfig({ DATABASE_URL });

@@ -334,6 +334,36 @@ const integrations = {
   LINK_ID_TOKEN_MAX_AGE_S: z.coerce.number().int().min(30).max(3600).default(300),
 };
 
+/**
+ * Suggestions (docs/m7-plan.md §6). The refresh floor per student, the open
+ * suggestions one student may hold (the oldest are superseded), the list's
+ * page sizes, and when LinkedIn's last export import counts as old. Mail
+ * domains of universities, `domain=Institution`, comma-separated: empty until
+ * Levon gives NPUA's (M7-T10); nothing uses it yet beyond parsing.
+ */
+const suggestions = {
+  SUGGESTIONS_MIN_INTERVAL_S: z.coerce.number().int().min(0).max(86_400).default(900),
+  SUGGESTIONS_MAX_OPEN: z.coerce.number().int().min(1).max(500).default(50),
+  SUGGESTIONS_PAGE_SIZE: z.coerce.number().int().min(1).max(100).default(20),
+  SUGGESTIONS_PAGE_MAX: z.coerce.number().int().min(1).max(100).default(50),
+  LINKEDIN_REIMPORT_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
+  UNIVERSITY_DOMAINS: z
+    .string()
+    .default('')
+    .transform(
+      (v) =>
+        Object.fromEntries(
+          v
+            .split(',')
+            .map((pair) => pair.split('='))
+            .map(
+              ([domain, ...name]) => [domain?.trim().toLowerCase(), name.join('=').trim()] as const,
+            )
+            .filter(([domain, name]) => domain !== undefined && domain !== '' && name !== ''),
+        ) as Record<string, string>,
+    ),
+};
+
 /** MySQL 8.4. */
 const database = {
   DATABASE_URL: z
@@ -417,6 +447,7 @@ export const configSchema = z
     ...dashboard,
     ...storage,
     ...integrations,
+    ...suggestions,
   })
   .refine(tlsInProduction, TLS_IN_PRODUCTION)
   .refine(noTlsOnSocket, NO_TLS_ON_SOCKET)
@@ -464,6 +495,10 @@ export const configSchema = z
   .refine((c) => c.SEARCH_GROUP_SIZE <= c.DISCOVERY_PAGE_MAX, {
     message: 'must not exceed DISCOVERY_PAGE_MAX',
     path: ['SEARCH_GROUP_SIZE'],
+  })
+  .refine((c) => c.SUGGESTIONS_PAGE_SIZE <= c.SUGGESTIONS_PAGE_MAX, {
+    message: 'must not exceed SUGGESTIONS_PAGE_MAX',
+    path: ['SUGGESTIONS_PAGE_SIZE'],
   })
   .refine((c) => c.PROJECTS_PAGE_SIZE <= c.PROJECTS_PAGE_MAX, {
     message: 'must not exceed PROJECTS_PAGE_MAX',

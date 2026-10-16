@@ -47,3 +47,23 @@ export interface NotificationParams {
  * SHA-256 (hex) of the value as last written by an import or re-sync.
  */
 export type GithubImportSnapshot = Record<string, string>;
+
+/**
+ * `suggestions.payload` (docs/m7-plan.md §6.4): what the suggestion proposes,
+ * validated by the suggestion's kind when it is written. Always an object.
+ */
+export type SuggestionPayload = Record<string, unknown>;
+
+/**
+ * `integrations.profile_snapshot`: GitHub's public profile fields as last read
+ * (docs/m7-plan.md §6.3). Public data of the student's own account, not a token.
+ */
+export interface GithubProfileSnapshot {
+  name?: string | null;
+  bio: string | null;
+  location: string | null;
+  company: string | null;
+  avatarUrl: string | null;
+  blog: string | null;
+  htmlUrl: string | null;
+}
