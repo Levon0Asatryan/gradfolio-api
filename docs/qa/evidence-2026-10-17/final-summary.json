@@ -1,0 +1,332 @@
+{
+  "date": "2026-10-17",
+  "frontendCommit": "9d6b214 plus local fixes",
+  "apiCommit": "f131ba6",
+  "identity": "local test issuer and Auth0 SDK test session cookies, not hosted Auth0 login",
+  "matrix": {
+    "startTime": "2026-10-17T07:07:56.284Z",
+    "duration": 153501.77699999997,
+    "expected": 64,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "matrixBeforeFixes": {
+    "startTime": "2026-10-17T06:52:57.001Z",
+    "duration": 255920.048,
+    "expected": 13,
+    "skipped": 0,
+    "unexpected": 49,
+    "flaky": 0
+  },
+  "extraConsoleRegression": {
+    "passed": 3,
+    "overlapWithMatrix": 2
+  },
+  "journeys": [
+    {
+      "id": "FULL-01",
+      "description": "two signed-in users reach account and dashboard through the real API",
+      "status": "pass",
+      "durationMs": 2206
+    },
+    {
+      "id": "FULL-02",
+      "description": "profile edit persists after reload and in the real API",
+      "status": "pass",
+      "durationMs": 1716
+    },
+    {
+      "id": "FULL-03",
+      "description": "create a public project through the UI and read its stored fields",
+      "status": "pass",
+      "durationMs": 1504
+    },
+    {
+      "id": "FULL-04",
+      "description": "edit a project through the UI and retain the change after reload",
+      "status": "pass",
+      "durationMs": 2251
+    },
+    {
+      "id": "FULL-05",
+      "description": "unsafe URL is rejected without losing the typed project form",
+      "status": "pass",
+      "durationMs": 1283
+    },
+    {
+      "id": "FULL-06",
+      "description": "anonymous public project back-link returns to browse without login",
+      "status": "pass",
+      "durationMs": 949
+    },
+    {
+      "id": "FULL-07",
+      "description": "other user cannot edit, delete, or list owner-only team data",
+      "status": "pass",
+      "durationMs": 1098
+    },
+    {
+      "id": "FULL-08",
+      "description": "private project disappears for anonymous visitors and other users",
+      "status": "pass",
+      "durationMs": 4509
+    },
+    {
+      "id": "FULL-09",
+      "description": "owner finds another user and sends a team invitation through the UI",
+      "status": "pass",
+      "durationMs": 2455
+    },
+    {
+      "id": "FULL-10",
+      "description": "invitee declines through Teams and the stored membership changes",
+      "status": "pass",
+      "durationMs": 1802
+    },
+    {
+      "id": "FULL-11",
+      "description": "owner re-invites and invitee accepts through the UI",
+      "status": "pass",
+      "durationMs": 2990
+    },
+    {
+      "id": "FULL-12",
+      "description": "accepted member leaves through the project UI and membership is removed",
+      "status": "pass",
+      "durationMs": 2258
+    },
+    {
+      "id": "FULL-13",
+      "description": "owner adds and removes an external teammate through the UI",
+      "status": "pass",
+      "durationMs": 5120
+    },
+    {
+      "id": "FULL-14",
+      "description": "private profile is hidden while an explicitly public project retains direct access per M4",
+      "status": "pass",
+      "durationMs": 142
+    },
+    {
+      "id": "FULL-15",
+      "description": "stored hostile HTML is sanitized before a public browser renders it",
+      "status": "pass",
+      "durationMs": 728
+    },
+    {
+      "id": "FULL-16",
+      "description": "Unicode and special-character tags preserve their route and duplicate terms collapse",
+      "status": "pass",
+      "durationMs": 839
+    },
+    {
+      "id": "FULL-17",
+      "description": "a draft stays private until the owner publishes it through the UI",
+      "status": "pass",
+      "durationMs": 1485
+    },
+    {
+      "id": "FULL-18",
+      "description": "delete project confirmation removes the real project",
+      "status": "pass",
+      "durationMs": 1403
+    },
+    {
+      "id": "FULL-19",
+      "description": "concurrent first requests create one stable local account",
+      "status": "pass",
+      "durationMs": 66
+    },
+    {
+      "id": "FULL-20",
+      "description": "account deletion through the UI signs out and removes the profile",
+      "status": "pass",
+      "durationMs": 2070
+    },
+    {
+      "id": "FULL-21",
+      "description": "missing, malformed and expired access tokens are rejected",
+      "status": "pass",
+      "durationMs": 20
+    },
+    {
+      "id": "FULL-22",
+      "description": "education UI creates, edits, reorders and deletes a stored entry",
+      "status": "pass",
+      "durationMs": 2764
+    },
+    {
+      "id": "FULL-23",
+      "description": "skills UI keeps one canonical skill after a case-variant duplicate",
+      "status": "pass",
+      "durationMs": 2128
+    },
+    {
+      "id": "FULL-24",
+      "description": "attachment link UI persists add, edit and deletion without saving the project form",
+      "status": "pass",
+      "durationMs": 2818
+    }
+  ],
+  "operations": [
+    {
+      "id": "OPS-LOCAL-01",
+      "description": "startup rejects missing issuer and audience",
+      "status": "pass",
+      "evidence": {
+        "exitCode": 1,
+        "rejectedFields": ["AUTH0_ISSUER_BASE_URL", "AUTH0_AUDIENCE"]
+      }
+    },
+    {
+      "id": "OPS-LOCAL-02",
+      "description": "startup rejects invalid API port",
+      "status": "pass",
+      "evidence": {
+        "exitCode": 1
+      }
+    },
+    {
+      "id": "OPS-LOCAL-03",
+      "description": "production rejects plaintext database transport",
+      "status": "pass",
+      "evidence": {
+        "exitCode": 1
+      }
+    },
+    {
+      "id": "OPS-LOCAL-04",
+      "description": "unknown route and unsupported method return safe JSON errors",
+      "status": "pass",
+      "evidence": [
+        {
+          "method": "GET",
+          "status": 404,
+          "code": "NOT_FOUND"
+        },
+        {
+          "method": "PUT",
+          "status": 404,
+          "code": "NOT_FOUND"
+        }
+      ]
+    },
+    {
+      "id": "OPS-LOCAL-05",
+      "description": "malformed JSON and oversized JSON return stable client errors",
+      "status": "pass",
+      "evidence": [
+        {
+          "status": 400,
+          "code": "BAD_REQUEST"
+        },
+        {
+          "status": 413,
+          "code": "PAYLOAD_TOO_LARGE"
+        }
+      ]
+    },
+    {
+      "id": "OPS-LOCAL-06",
+      "description": "default 120-request budget returns 429 and leaves another user unaffected",
+      "status": "pass",
+      "evidence": {
+        "passedBeforeLimit": 120,
+        "limited": 429,
+        "otherUser": 200
+      }
+    },
+    {
+      "id": "OPS-LOCAL-07",
+      "description": "signed-in search budget allows 30 calls and limits the 31st",
+      "status": "pass",
+      "evidence": {
+        "passedBeforeLimit": 30,
+        "limited": 429
+      }
+    },
+    {
+      "id": "OPS-LOCAL-08",
+      "description": "100 real API reads at concurrency 10 complete without server errors",
+      "status": "pass",
+      "evidence": {
+        "requests": 100,
+        "concurrency": 10,
+        "status": 200,
+        "medianMs": 66,
+        "p95Ms": 106,
+        "maxMs": 113
+      }
+    }
+  ],
+  "databaseOutage": [
+    {
+      "path": "/healthz",
+      "status": 200,
+      "body": {
+        "status": "ok"
+      }
+    },
+    {
+      "path": "/readyz",
+      "status": 503,
+      "body": {
+        "code": "DATABASE_UNAVAILABLE",
+        "message": "database is not reachable"
+      }
+    }
+  ],
+  "databaseRecovery": [
+    {
+      "path": "/healthz",
+      "status": 200,
+      "body": {
+        "status": "ok"
+      }
+    },
+    {
+      "path": "/readyz",
+      "status": 200,
+      "body": {
+        "status": "ok",
+        "database": "ok"
+      }
+    }
+  ],
+  "migrationRollback": "isolated qa_rollback: up 0001-0009, down 0009, up 0009, up no-op",
+  "dependencyAudits": {
+    "frontend": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 5,
+      "critical": 0,
+      "total": 5
+    },
+    "api": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 3,
+      "critical": 0,
+      "total": 3
+    },
+    "frontend-production": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "api-production": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    }
+  }
+}
