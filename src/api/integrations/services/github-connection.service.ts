@@ -323,7 +323,9 @@ export class GithubConnectionService {
     }
     // Whatever the row says, Auth0 may still hold a GitHub identity linked to this
     // login (a disconnect keeps it): deleting the account must not leave it there.
-    if (this.gh !== null) await this.unlinkGithubAtAuth0(this.gh, user);
+    // Deleting the Auth0 user (opt-in) removes every identity with it: nothing to unlink.
+    if (this.gh !== null && !this.cfg.AUTH0_DELETE_USERS)
+      await this.unlinkGithubAtAuth0(this.gh, user);
     return version;
   }
 
@@ -366,6 +368,26 @@ export class GithubConnectionService {
     if (row === undefined || row.status === 'not_connected') return;
     if (row.status === 'linking') throw linkInProgress();
     if (versionOf(row) !== revoked) throw stateChanged();
+  }
+
+  /**
+   * After the account's data is gone (opt-in, `AUTH0_DELETE_USERS`): deletes the
+   * caller's own Auth0 user, with every identity linked to it. Best effort and
+   * logged: the data is already deleted, and a login that remains only comes
+   * back as a blank account (Q7). Only ever the caller's verified `sub`.
+   */
+  async deleteAuth0UserAfterAccountDeletion(user: UserRow): Promise<void> {
+    if (this.gh === null || !this.cfg.AUTH0_DELETE_USERS) return;
+    try {
+      const result = await this.gh.management.deleteUser(user.auth0Id);
+      this.gh.tokens.forget(user.auth0Id);
+      this.logger.info({ result }, 'auth0 user deleted');
+    } catch (err) {
+      this.logger.error(
+        { cause: err instanceof Error ? err.name : 'unknown' },
+        'auth0 user deletion failed',
+      );
+    }
   }
 
   private required(): GithubConnect {

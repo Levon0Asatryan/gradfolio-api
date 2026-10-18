@@ -448,6 +448,25 @@ describe('GitHub connect settings (docs/m7-plan.md §8)', () => {
   });
 });
 
+describe('AUTH0_DELETE_USERS (docs/m7-plan.md §2.8)', () => {
+  const FIVE = {
+    AUTH0_CLIENT_ID: 'spa',
+    AUTH0_M2M_CLIENT_ID: 'm2m',
+    AUTH0_M2M_CLIENT_SECRET: 'secret',
+    GITHUB_CLIENT_ID: 'gh',
+    GITHUB_CLIENT_SECRET: 'ghs',
+  };
+  it('is off by default, and on only with the credentials that can delete', () => {
+    expect(loadConfig(REQUIRED).AUTH0_DELETE_USERS).toBe(false);
+    expect(
+      loadConfig({ ...REQUIRED, ...FIVE, AUTH0_DELETE_USERS: 'true' }).AUTH0_DELETE_USERS,
+    ).toBe(true);
+    expect(() => loadConfig({ ...REQUIRED, AUTH0_DELETE_USERS: 'true' })).toThrow(
+      /AUTH0_DELETE_USERS/,
+    );
+  });
+});
+
 describe('suggestion settings (docs/m7-plan.md §6)', () => {
   it('default sensibly, and the university domains default to none', () => {
     expect(loadConfig(REQUIRED)).toMatchObject({

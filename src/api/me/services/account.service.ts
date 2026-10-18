@@ -71,6 +71,8 @@ export class AccountService {
       const result = await trx.deleteFrom('users').where('id', '=', userId).executeTakeFirst();
       if (Number(result.numDeletedRows) === 0) throw new NotFoundError('account');
     });
+    // The login itself, when configured to (docs/m7-plan.md §2.8): after the data is gone.
+    await this.github.deleteAuth0UserAfterAccountDeletion(user);
     // Every object under the user's prefix, including uploads never registered.
     // After the commit: a failed delete is logged by `release` and swept later.
     await this.files.releaseAllOf(userId, ACCOUNT_FILE_LIMIT);

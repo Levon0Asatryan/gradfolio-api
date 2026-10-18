@@ -65,10 +65,18 @@ export interface RefusalDetail {
   errorCode: string | null;
 }
 
+/** What deleting a user did. */
+export type DeleteUserResult = 'deleted' | 'already_gone';
+
 /** What unlinking an identity did. */
 export type UnlinkResult = 'unlinked' | 'already_gone';
 
 export interface Auth0Management {
+  /**
+   * Deletes the user and every identity linked to it (`DELETE /users/{id}`, scope
+   * `delete:users`, which the M2M application does not have until the owner grants it).
+   */
+  deleteUser(sub: string, signal?: AbortSignal): Promise<DeleteUserResult>;
   /** The user's identities; null when Auth0 has no such user. */
   identities(sub: string, signal?: AbortSignal): Promise<ManagementIdentity[] | null>;
   /** Links the secondary account the id token names to `primarySub`. */
@@ -171,6 +179,20 @@ export class Auth0ManagementClient implements Auth0Management {
       outcome: 'unknown',
       error: new IntegrationUnavailableError(`management api ${res.status}`),
     };
+  }
+
+  async deleteUser(sub: string, signal?: AbortSignal): Promise<DeleteUserResult> {
+    const url = this.apiUrl(`users/${encodeURIComponent(sub)}`);
+    let res: UpstreamResponse;
+    try {
+      res = await this.call(url, 'DELETE', undefined, signal);
+    } catch (err) {
+      throw this.unavailable(err);
+    }
+    if (res.status >= 200 && res.status < 300) return 'deleted';
+    if (res.status === 404) return 'already_gone';
+    this.refuseOwnCredentialProblems(res);
+    throw new IntegrationUnavailableError(`management api ${res.status}`);
   }
 
   async unlinkIdentity(

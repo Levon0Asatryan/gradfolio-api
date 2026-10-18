@@ -30,6 +30,8 @@ describe('Auth0ManagementClient', () => {
     delete fake.linkStatus;
     delete fake.linkBody;
     delete fake.unlinkStatus;
+    delete fake.deleteUserStatus;
+    delete fake.onDeleteUser;
     fake.failureHeaders = {};
   });
 
@@ -266,6 +268,27 @@ describe('Auth0ManagementClient', () => {
         expect(e, String(status)).toBeInstanceOf(IntegrationUnavailableError);
       }
       expect(fake.users.get('auth0|ani')?.map((i) => i.provider)).toContain('github');
+    });
+  });
+
+  describe('deleteUser', () => {
+    it('deletes the user (and so every identity); a missing one is already gone', async () => {
+      fake.withGithub('auth0|ani', '7');
+      expect(await client().deleteUser('auth0|ani')).toBe('deleted');
+      expect(fake.users.has('auth0|ani')).toBe(false);
+      const call = fake.callsTo('/api/v2/users/').at(-1)!;
+      expect([call.method, call.path]).toEqual(['DELETE', '/api/v2/users/auth0%7Cani']);
+      expect(await client().deleteUser('auth0|ani')).toBe('already_gone');
+    });
+
+    it('any other answer is unavailable', async () => {
+      fake.withUser('auth0|ani');
+      for (const status of [400, 401, 403, 429, 500]) {
+        fake.deleteUserStatus = status;
+        const e = await unavailable(client().deleteUser('auth0|ani'));
+        expect(e, String(status)).toBeInstanceOf(IntegrationUnavailableError);
+      }
+      expect(fake.users.has('auth0|ani')).toBe(true);
     });
   });
 });
