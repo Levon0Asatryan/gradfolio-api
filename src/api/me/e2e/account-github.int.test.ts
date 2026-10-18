@@ -234,4 +234,80 @@ describe('account deletion revokes first', () => {
       expect(unlinks()).toEqual([]);
     });
   });
+
+  describe('deleting the Auth0 user too (AUTH0_DELETE_USERS, docs/m7-plan.md §2.8)', () => {
+    const deletes = () => h.auth0.calls.filter((c) => c.method === 'DELETE');
+    const on = () => ({ ...h.env(), AUTH0_DELETE_USERS: 'true' });
+
+    it('is off by default: the login stays, only the identity is unlinked', async () => {
+      const http = await h.start();
+      const s = await h.student('auth0|stays-at-auth0');
+      h.linkedAtAuth0(s.sub, '130', 'stay');
+      await http.delete('/v1/me').set(s.auth).expect(204);
+      expect(h.auth0.users.has(s.sub)).toBe(true);
+      expect(deletes().map((c) => c.path)).not.toContain(
+        `/api/v2/users/${encodeURIComponent(s.sub)}`,
+      );
+    });
+
+    it('when on, deletes the login with every identity, after the data is gone, and unlinks nothing', async () => {
+      const http = await h.start(on());
+      const s = await h.student('auth0|leaves-auth0');
+      h.linkedAtAuth0(s.sub, '131', 'gone');
+      await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(200);
+      let rowThere: boolean | undefined;
+      h.auth0.onDeleteUser = async () => {
+        rowThere =
+          (await db.selectFrom('users').select('id').where('id', '=', s.id).execute()).length > 0;
+      };
+      await http.delete('/v1/me').set(s.auth).expect(204);
+      expect(rowThere).toBe(false);
+      expect(h.auth0.users.has(s.sub)).toBe(false);
+      expect(deletes()).toHaveLength(1);
+      expect(h.gh.revoked).toEqual([h.auth0.githubTokenFor('131')]);
+    });
+
+    it('never deletes the login of a deletion that was refused', async () => {
+      const http = await h.start(on());
+      const s = await h.student('auth0|refused-first');
+      h.linkedAtAuth0(s.sub, '132', 'kept');
+      await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(200);
+      h.gh.grantStatus = 503;
+      await http.delete('/v1/me').set(s.auth).expect(502);
+      expect(deletes()).toEqual([]);
+      expect(h.auth0.users.has(s.sub)).toBe(true);
+    });
+
+    it('a failure after the data is gone is logged, not a failed deletion', async () => {
+      const http = await h.start(on());
+      const s = await h.student('auth0|auth0-down');
+      h.auth0.deleteUserStatus = 500;
+      h.logs.clear();
+      await http.delete('/v1/me').set(s.auth).expect(204);
+      expect(await db.selectFrom('users').select('id').where('id', '=', s.id).execute()).toEqual(
+        [],
+      );
+      expect(h.logs.lines().some((l) => l.msg === 'auth0 user deletion failed')).toBe(true);
+      expect(h.logs.text()).not.toMatch(/SENTINEL/);
+      expect(h.auth0.users.has(s.sub)).toBe(true);
+    });
+
+    it('a login Auth0 no longer has (404) is success', async () => {
+      const http = await h.start(on());
+      const s = await h.student('auth0|already-gone');
+      h.auth0.deleteUserStatus = 404;
+      h.logs.clear();
+      await http.delete('/v1/me').set(s.auth).expect(204);
+      expect(h.logs.lines().some((l) => l.msg === 'auth0 user deletion failed')).toBe(false);
+    });
+
+    it('deletes only the caller’s own login (second user)', async () => {
+      const http = await h.start(on());
+      const a = await h.student('auth0|alice-del');
+      const b = await h.student('auth0|bob-del');
+      await http.delete('/v1/me').set(a.auth).expect(204);
+      expect(h.auth0.users.has(a.sub)).toBe(false);
+      expect(h.auth0.users.has(b.sub)).toBe(true);
+    });
+  });
 });

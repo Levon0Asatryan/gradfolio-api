@@ -55,6 +55,10 @@ export interface FakeAuth0 {
   linkBody?: Record<string, unknown>;
   /** Answer an unlink with this status instead; nothing is unlinked. */
   unlinkStatus?: number;
+  /** Answer a user delete with this status instead; nothing is deleted. */
+  deleteUserStatus?: number;
+  /** Runs when a user delete arrives, before it is applied (a test reads the database here). */
+  onDeleteUser?: (sub: string) => Promise<void>;
   failureHeaders: Record<string, string>;
   /** Adds a user (when new) with a GitHub identity holding `githubTokenFor(id)`. */
   withGithub(sub: string, githubUserId: string): void;
@@ -245,6 +249,16 @@ export function installFakeAuth0(tenant: TestTenant): FakeAuth0 {
     }
 
     const user = /^\/api\/v2\/users\/([^/]+)$/.exec(url.pathname);
+    if (user && req.method === 'DELETE') {
+      const sub = decodeURIComponent(user[1]!);
+      await fake.onDeleteUser?.(sub);
+      if (fake.deleteUserStatus !== undefined) {
+        return json(res, fake.deleteUserStatus, { statusCode: fake.deleteUserStatus });
+      }
+      // The user and every identity linked to it go.
+      if (!fake.users.delete(sub)) return json(res, 404, { statusCode: 404, error: 'Not Found' });
+      return res.writeHead(204).end();
+    }
     if (user && req.method === 'GET') {
       if (fake.identitiesStatus !== undefined) {
         return json(

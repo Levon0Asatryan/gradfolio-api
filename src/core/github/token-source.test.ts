@@ -19,6 +19,7 @@ function management(bySub: Record<string, ManagementIdentity[] | null>) {
     },
     linkIdentity: () => Promise.reject(new Error('not used')),
     unlinkIdentity: () => Promise.reject(new Error('not used')),
+    deleteUser: () => Promise.reject(new Error('not used')),
   };
   return { m, calls };
 }

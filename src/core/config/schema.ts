@@ -313,6 +313,9 @@ const integrations = {
   AUTH0_MANAGEMENT_SPACING_MS: z.coerce.number().int().min(0).max(10_000).default(500),
   // The GitHub OAuth App behind Auth0's GitHub connection. Required (D9): only
   // its grant delete removes a token at GitHub, so without it nothing connects.
+  // Account deletion also deletes the Auth0 user (and so every identity linked to it).
+  // Needs `delete:users` on the M2M application: off until Levon grants it (M7-T13).
+  AUTH0_DELETE_USERS: envBoolean('false'),
   GITHUB_CLIENT_ID: optionalSetting(200),
   GITHUB_CLIENT_SECRET: optionalSetting(500),
   GITHUB_API_BASE_URL: githubApiBaseUrl,
@@ -468,6 +471,21 @@ export const configSchema = z
     {
       message: 'AUTH0_M2M_CLIENT_ID and AUTH0_M2M_CLIENT_SECRET must be set together',
       path: ['AUTH0_M2M_CLIENT_SECRET'],
+    },
+  )
+  .refine(
+    (c) =>
+      !c.AUTH0_DELETE_USERS ||
+      [
+        c.AUTH0_CLIENT_ID,
+        c.AUTH0_M2M_CLIENT_ID,
+        c.AUTH0_M2M_CLIENT_SECRET,
+        c.GITHUB_CLIENT_ID,
+        c.GITHUB_CLIENT_SECRET,
+      ].every((v) => v !== undefined),
+    {
+      message: 'AUTH0_DELETE_USERS needs the M2M application and the GitHub credentials (all five)',
+      path: ['AUTH0_DELETE_USERS'],
     },
   )
   .refine((c) => (c.GITHUB_CLIENT_ID === undefined) === (c.GITHUB_CLIENT_SECRET === undefined), {

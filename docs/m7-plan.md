@@ -272,6 +272,24 @@ hypothesis fits the timeline; the real 400 body was not logged. It is now.)
   deleted without `delete:users`, which the M2M app does not have. Deleting it, and the Auth0 user
   itself, is the opt-in of the next PR (`AUTH0_DELETE_USERS`, default off).
 
+### 2.8 Deleting the Auth0 user too (opt-in)
+
+Levon asked that deleting the account also delete the Auth0 login. That needs `delete:users` on the M2M
+application, a privilege increase (the app can then delete any user in the tenant), so it is behind
+`AUTH0_DELETE_USERS` (default **off**; refused at boot unless the five GitHub/M2M settings are set).
+
+- **On:** after the data is committed away, the caller's own verified `sub` is deleted with
+  `DELETE /users/{id}`. Auth0 removes every identity linked to it, so the unlink of §2.7 is skipped
+  and no standalone `github|<id>` user is left. A user already gone (404) is success. A failure is
+  logged (`auth0 user deletion failed`) and is **not** a failed deletion: the data is gone, and the
+  login would only come back as a blank account (Q7).
+- **Never** an id from a request: only `req.auth.sub`. A refused deletion (a GitHub revocation that
+  failed, a link in flight) deletes nothing at Auth0.
+- **A login with several identities loses all of them** (Google and GitHub, say): the student must sign
+  up again, and the GitHub sign-in alone no longer reaches the old account.
+- **Off:** as §2.7. What remains is the login, and, after an unlink, a harmless standalone
+  `github|<id>` user.
+
 ## 3. Import, re-sync, README (7.3–7.5)
 
 ### 3.1 GitHub client
