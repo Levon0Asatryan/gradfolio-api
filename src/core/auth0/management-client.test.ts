@@ -2,7 +2,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { installFakeAuth0, type FakeAuth0 } from '../../testing/fake-auth0.js';
 import { startTestTenant, type TestTenant } from '../../testing/jwks.js';
 import { IntegrationUnavailableError } from './errors.js';
-import { Auth0ManagementClient, type ManagementSettings } from './management-client.js';
+import {
+  Auth0ManagementClient,
+  type ManagementSettings,
+  refusalDetail,
+} from './management-client.js';
 
 /**
  * The Management API client against a fake tenant over real HTTP
@@ -24,6 +28,10 @@ describe('Auth0ManagementClient', () => {
     fake.tokenExpiresIn = 86_400;
     delete fake.identitiesStatus;
     delete fake.linkStatus;
+    delete fake.linkBody;
+    delete fake.unlinkStatus;
+    delete fake.deleteUserStatus;
+    delete fake.onDeleteUser;
     fake.failureHeaders = {};
   });
 
@@ -173,6 +181,7 @@ describe('Auth0ManagementClient', () => {
         expect(await client().linkIdentity('auth0|ani', idToken('github|7'))).toEqual({
           outcome: 'refused',
           status,
+          detail: { error: null, message: null, errorCode: null },
         });
       }
       for (const status of [401, 403, 429]) {
@@ -199,6 +208,87 @@ describe('Auth0ManagementClient', () => {
       const r = await client().linkIdentity('auth0|ani', idToken('github|7'), ctl.signal);
       expect(r.outcome).toBe('not_attempted');
       expect(fake.callsTo('/api/v2/')).toHaveLength(0);
+    });
+  });
+
+  describe('a refusal’s own words', () => {
+    const idToken = (sub: string) =>
+      `h.${Buffer.from(JSON.stringify({ sub })).toString('base64url')}.s`;
+
+    it('carries Auth0’s error, message and code, cut and on one line, and nothing else', async () => {
+      fake.linkStatus = 400;
+      fake.linkBody = {
+        statusCode: 400,
+        error: 'Bad Request',
+        message: `a\nb ${'x'.repeat(300)}`,
+        errorCode: 'invalid_body',
+        access_token: 'must-not-travel',
+      };
+      const r = await client().linkIdentity('auth0|ani', idToken('github|7'));
+      expect(r.outcome).toBe('refused');
+      if (r.outcome !== 'refused') return;
+      expect(r.detail.error).toBe('Bad Request');
+      expect(r.detail.errorCode).toBe('invalid_body');
+      expect(r.detail.message).toHaveLength(200);
+      expect(r.detail.message).not.toContain('\n');
+      expect(JSON.stringify(r)).not.toContain('must-not-travel');
+    });
+
+    it('reads a body that is not an object as nothing', () => {
+      for (const body of [undefined, null, 'text', 42, [], { error: 7, message: '   ' }]) {
+        expect(refusalDetail(body)).toEqual({ error: null, message: null, errorCode: null });
+      }
+    });
+  });
+
+  describe('unlinkIdentity', () => {
+    it('unlinks a secondary identity, which becomes a standalone user', async () => {
+      fake.withGithub('auth0|ani', '7');
+      expect(await client().unlinkIdentity('auth0|ani', 'github', '7')).toBe('unlinked');
+      const call = fake.callsTo('/api/v2/users/').at(-1)!;
+      expect([call.method, call.path]).toEqual([
+        'DELETE',
+        '/api/v2/users/auth0%7Cani/identities/github/7',
+      ]);
+      expect(fake.users.get('auth0|ani')?.map((i) => i.provider)).toEqual(['auth0']);
+      expect(fake.users.get('github|7')?.map((i) => i.provider)).toEqual(['github']);
+    });
+
+    it('an identity or a user that is not there is already gone', async () => {
+      fake.withUser('auth0|ani');
+      expect(await client().unlinkIdentity('auth0|ani', 'github', '7')).toBe('already_gone');
+      expect(await client().unlinkIdentity('auth0|nobody', 'github', '7')).toBe('already_gone');
+    });
+
+    it('any other answer is unavailable (503 to the caller); 429 and 401 as for every call', async () => {
+      fake.withGithub('auth0|ani', '7');
+      for (const status of [400, 401, 403, 429, 500]) {
+        fake.unlinkStatus = status;
+        const e = await unavailable(client().unlinkIdentity('auth0|ani', 'github', '7'));
+        expect(e, String(status)).toBeInstanceOf(IntegrationUnavailableError);
+      }
+      expect(fake.users.get('auth0|ani')?.map((i) => i.provider)).toContain('github');
+    });
+  });
+
+  describe('deleteUser', () => {
+    it('deletes the user (and so every identity); a missing one is already gone', async () => {
+      fake.withGithub('auth0|ani', '7');
+      expect(await client().deleteUser('auth0|ani')).toBe('deleted');
+      expect(fake.users.has('auth0|ani')).toBe(false);
+      const call = fake.callsTo('/api/v2/users/').at(-1)!;
+      expect([call.method, call.path]).toEqual(['DELETE', '/api/v2/users/auth0%7Cani']);
+      expect(await client().deleteUser('auth0|ani')).toBe('already_gone');
+    });
+
+    it('any other answer is unavailable', async () => {
+      fake.withUser('auth0|ani');
+      for (const status of [400, 401, 403, 429, 500]) {
+        fake.deleteUserStatus = status;
+        const e = await unavailable(client().deleteUser('auth0|ani'));
+        expect(e, String(status)).toBeInstanceOf(IntegrationUnavailableError);
+      }
+      expect(fake.users.has('auth0|ani')).toBe(true);
     });
   });
 });

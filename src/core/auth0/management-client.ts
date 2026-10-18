@@ -46,18 +46,52 @@ export interface ManagementIdentity {
 export type LinkResult =
   /** Auth0 linked it. */
   | { outcome: 'linked' }
-  /** Auth0 answered and did not link it (a 4xx about the request). */
-  | { outcome: 'refused'; status: number }
+  /** Auth0 answered and did not link it (a 4xx about the request); `detail` is its own words. */
+  | { outcome: 'refused'; status: number; detail: RefusalDetail }
   /** The request was never processed: nothing was linked. */
   | { outcome: 'not_attempted'; error: IntegrationUnavailableError }
   /** Sent, but no answer that says whether it was linked (timeout, 5xx). */
   | { outcome: 'unknown'; error: IntegrationUnavailableError };
 
+/**
+ * What Auth0 said about a refusal: the `error`, `message` and `errorCode` of its
+ * 4xx body, each cut and stripped of control characters. They name a rule
+ * ("the user is already linked"), never a credential, and are what turns a
+ * "refused" into a diagnosis.
+ */
+export interface RefusalDetail {
+  error: string | null;
+  message: string | null;
+  errorCode: string | null;
+}
+
+/** What deleting a user did. */
+export type DeleteUserResult = 'deleted' | 'already_gone';
+
+/** What unlinking an identity did. */
+export type UnlinkResult = 'unlinked' | 'already_gone';
+
 export interface Auth0Management {
+  /**
+   * Deletes the user and every identity linked to it (`DELETE /users/{id}`, scope
+   * `delete:users`, which the M2M application does not have until the owner grants it).
+   */
+  deleteUser(sub: string, signal?: AbortSignal): Promise<DeleteUserResult>;
   /** The user's identities; null when Auth0 has no such user. */
   identities(sub: string, signal?: AbortSignal): Promise<ManagementIdentity[] | null>;
   /** Links the secondary account the id token names to `primarySub`. */
   linkIdentity(primarySub: string, idToken: string, signal?: AbortSignal): Promise<LinkResult>;
+  /**
+   * Unlinks a secondary identity from `primarySub` (`DELETE /users/{id}/identities/{provider}/{user_id}`,
+   * scope `update:users`). Auth0 re-creates the former secondary as a standalone user. A user or
+   * an identity that is not there is `already_gone`.
+   */
+  unlinkIdentity(
+    primarySub: string,
+    provider: string,
+    userId: string,
+    signal?: AbortSignal,
+  ): Promise<UnlinkResult>;
 }
 
 const MAX_BODY_BYTES = 256 * 1024;
@@ -138,11 +172,48 @@ export class Auth0ManagementClient implements Auth0Management {
     } catch (err) {
       return { outcome: 'not_attempted', error: err as IntegrationUnavailableError };
     }
-    if (res.status >= 400 && res.status < 500) return { outcome: 'refused', status: res.status };
+    if (res.status >= 400 && res.status < 500) {
+      return { outcome: 'refused', status: res.status, detail: refusalDetail(res.body) };
+    }
     return {
       outcome: 'unknown',
       error: new IntegrationUnavailableError(`management api ${res.status}`),
     };
+  }
+
+  async deleteUser(sub: string, signal?: AbortSignal): Promise<DeleteUserResult> {
+    const url = this.apiUrl(`users/${encodeURIComponent(sub)}`);
+    let res: UpstreamResponse;
+    try {
+      res = await this.call(url, 'DELETE', undefined, signal);
+    } catch (err) {
+      throw this.unavailable(err);
+    }
+    if (res.status >= 200 && res.status < 300) return 'deleted';
+    if (res.status === 404) return 'already_gone';
+    this.refuseOwnCredentialProblems(res);
+    throw new IntegrationUnavailableError(`management api ${res.status}`);
+  }
+
+  async unlinkIdentity(
+    primarySub: string,
+    provider: string,
+    userId: string,
+    signal?: AbortSignal,
+  ): Promise<UnlinkResult> {
+    const url = this.apiUrl(
+      `users/${encodeURIComponent(primarySub)}/identities/${encodeURIComponent(provider)}/${encodeURIComponent(userId)}`,
+    );
+    let res: UpstreamResponse;
+    try {
+      res = await this.call(url, 'DELETE', undefined, signal);
+    } catch (err) {
+      throw this.unavailable(err);
+    }
+    if (res.status >= 200 && res.status < 300) return 'unlinked';
+    if (res.status === 404) return 'already_gone';
+    this.refuseOwnCredentialProblems(res);
+    throw new IntegrationUnavailableError(`management api ${res.status}`);
   }
 
   private apiUrl(path: string): URL {
@@ -152,7 +223,7 @@ export class Auth0ManagementClient implements Auth0Management {
   /** A Management API call: the M2M token, then the queue, then the request, all within one deadline. */
   private async call(
     url: URL,
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'DELETE',
     json: unknown,
     outer: AbortSignal | undefined,
   ): Promise<UpstreamResponse> {
@@ -252,4 +323,19 @@ class NotSent extends Error {
   constructor(readonly inner: unknown) {
     super('not sent');
   }
+}
+
+/** A short, single-line, printable version of a text Auth0 sent. */
+const clean = (v: unknown): string | null =>
+  typeof v === 'string' && v.trim() !== ''
+    ? v
+        .replace(/\p{Cc}+/gu, ' ')
+        .trim()
+        .slice(0, 200)
+    : null;
+
+/** `error`, `message` and `errorCode` of an Auth0 error body; nothing else is read. */
+export function refusalDetail(body: unknown): RefusalDetail {
+  const b = typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
+  return { error: clean(b.error), message: clean(b.message), errorCode: clean(b.errorCode) };
 }
