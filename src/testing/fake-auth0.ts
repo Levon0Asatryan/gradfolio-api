@@ -51,6 +51,10 @@ export interface FakeAuth0 {
   identitiesStatus?: number;
   /** Answer the link with this status instead (and these headers); nothing is linked. */
   linkStatus?: number;
+  /** The JSON body that status carries (Auth0's own error fields). */
+  linkBody?: Record<string, unknown>;
+  /** Answer an unlink with this status instead; nothing is unlinked. */
+  unlinkStatus?: number;
   failureHeaders: Record<string, string>;
   /** Adds a user (when new) with a GitHub identity holding `githubTokenFor(id)`. */
   withGithub(sub: string, githubUserId: string): void;
@@ -193,14 +197,51 @@ export function installFakeAuth0(tenant: TestTenant): FakeAuth0 {
         await held.released;
       }
       if (fake.linkStatus !== undefined) {
-        return json(res, fake.linkStatus, { statusCode: fake.linkStatus }, fake.failureHeaders);
+        return json(
+          res,
+          fake.linkStatus,
+          fake.linkBody ?? { statusCode: fake.linkStatus },
+          fake.failureHeaders,
+        );
       }
       const primary = decodeURIComponent(identities[1]!);
       const secondary = subOf((body as { link_with?: unknown } | undefined)?.link_with);
       if (!fake.users.has(primary) || secondary === undefined) return json(res, 400, {});
       const id = secondary.split('|')[1] ?? '';
+      // Auth0 refuses to link a user to what it already is or holds (the message is the
+      // fake's wording, not a recording; the production body is read from the log).
+      const held = fake.users.get(primary)!;
+      if (
+        secondary === primary ||
+        held.some((i) => i.provider === 'github' && String(i.user_id) === id)
+      ) {
+        return json(res, 400, {
+          statusCode: 400,
+          error: 'Bad Request',
+          message: 'The user is already linked to the given account (fake)',
+          errorCode: 'invalid_body',
+        });
+      }
       fake.withGithub(primary, id);
       return json(res, 201, fake.users.get(primary));
+    }
+
+    const unlink = /^\/api\/v2\/users\/([^/]+)\/identities\/([^/]+)\/([^/]+)$/.exec(url.pathname);
+    if (unlink && req.method === 'DELETE') {
+      if (fake.unlinkStatus !== undefined) {
+        return json(res, fake.unlinkStatus, { statusCode: fake.unlinkStatus }, fake.failureHeaders);
+      }
+      const primary = decodeURIComponent(unlink[1]!);
+      const [provider, userId] = [decodeURIComponent(unlink[2]!), decodeURIComponent(unlink[3]!)];
+      const list = fake.users.get(primary);
+      const at =
+        list?.findIndex((i) => i.provider === provider && String(i.user_id) === userId) ?? -1;
+      if (list === undefined || at < 0)
+        return json(res, 404, { statusCode: 404, error: 'Not Found' });
+      const [removed] = list.splice(at, 1);
+      // As Auth0 does: the former secondary is a standalone user again.
+      fake.users.set(`${provider}|${userId}`, [removed!]);
+      return json(res, 200, list);
     }
 
     const user = /^\/api\/v2\/users\/([^/]+)$/.exec(url.pathname);

@@ -249,6 +249,29 @@ the tracker exit is reworded.
 `CHECK`** (0008), so S10 holds by construction. Nothing token-shaped in responses, logs or errors:
 `REDACT_PATHS` already covers `*.access_token`; add `*.idToken`, `*.nonce`, `*.code`.
 
+### 2.7 The Auth0 side of a deleted account, and an idempotent link
+
+Found in the first production run: after Levon deleted his Gradfolio account and reconnected, Auth0
+answered the link with 400 three times. Deleting the account removed our rows but left the GitHub
+identity linked to his Auth0 login, and Auth0 refuses to link a user to what it already holds. (The
+hypothesis fits the timeline; the real 400 body was not logged. It is now.)
+
+- **The refusal is logged with Auth0's own words** (`error`, `message`, `errorCode`, each cut to 200
+  characters, control characters removed): a refusal is a diagnosis, not a guess.
+- **`link` is idempotent.** Before linking, the caller's identities are read; if the id token's GitHub
+  identity is already one of them, the link is skipped and the connection finished from what Auth0
+  holds (token, GitHub's confirmation, the flag). One extra Management API read per link.
+- **Account deletion unlinks** every GitHub identity that is _linked to_ the login
+  (`DELETE /users/{id}/identities/github/{user_id}`, scope `update:users`, which the M2M app already
+  has), after the revocation at GitHub and **before** any data is deleted: a failure (503) stops the
+  deletion, an identity already gone (404) is success. A login that is the GitHub one (`github|<id>`)
+  has nothing linked and is left alone. A link that completes between the unlink and the deletion's
+  transaction is caught by the existing check under the user lock (409, retry).
+- **What remains:** Auth0 re-creates the former secondary as a standalone user `github|<id>`. It is
+  harmless (nothing of ours refers to it; a later link merges it into the login again) and cannot be
+  deleted without `delete:users`, which the M2M app does not have. Deleting it, and the Auth0 user
+  itself, is the opt-in of the next PR (`AUTH0_DELETE_USERS`, default off).
+
 ## 3. Import, re-sync, README (7.3–7.5)
 
 ### 3.1 GitHub client

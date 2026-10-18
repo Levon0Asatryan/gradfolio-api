@@ -4,6 +4,7 @@ import type { Transaction } from 'kysely';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { AccessTokenIdentity } from '../../../core/auth/access-token.js';
 import { IntegrationUnavailableError } from '../../../core/auth0/errors.js';
+import type { LinkResult } from '../../../core/auth0/management-client.js';
 import { APP_CONFIG } from '../../../core/config/config.module.js';
 import type { AppConfig } from '../../../core/config/schema.js';
 import { DbService } from '../../../core/db/db.service.js';
@@ -206,18 +207,41 @@ export class GithubConnectionService {
 
     // Step 4: one deadline for the whole Auth0 step, so no call outlives the
     // reservation's stale age.
-    const result = await gh.management.linkIdentity(
-      user.auth0Id,
-      idToken,
-      AbortSignal.timeout(gh.linkDeadlineMs),
-    );
+    const deadline = AbortSignal.timeout(gh.linkDeadlineMs);
+    // Idempotent: this GitHub identity may already belong to the caller at Auth0
+    // (an account deleted here leaves it linked there; a link finished but its
+    // answer was lost). Auth0 refuses to link a user to what it already holds, so
+    // the link is skipped and the connection finished from what Auth0 says.
+    let alreadyLinked: boolean;
+    try {
+      const held = await gh.management.identities(user.auth0Id, deadline);
+      alreadyLinked =
+        held?.some(
+          (i) => i.provider === 'github' && i.isSocial && i.userId === claims.githubUserId,
+        ) ?? false;
+    } catch (err) {
+      // Nothing was linked: the reservation goes.
+      await this.releaseReservation(user.id, claims.githubUserId);
+      throw err;
+    }
+    const result: LinkResult = alreadyLinked
+      ? { outcome: 'linked' }
+      : await gh.management.linkIdentity(user.auth0Id, idToken, deadline);
+    if (alreadyLinked) this.logger.info({ userId: user.id }, 'github identity already linked');
     switch (result.outcome) {
       case 'linked':
         break;
       case 'refused':
         await this.releaseReservation(user.id, claims.githubUserId);
+        // Auth0's own words (a rule, never a credential): a refusal is a diagnosis, not a guess.
         this.logger.warn(
-          { userId: user.id, status: result.status },
+          {
+            userId: user.id,
+            status: result.status,
+            auth0Error: result.detail.error,
+            auth0Message: result.detail.message,
+            auth0Code: result.detail.errorCode,
+          },
           'github link refused by auth0',
         );
         throw new ConflictError('GITHUB_LINK_REFUSED', 'Auth0 refused to link this GitHub account');
@@ -279,22 +303,49 @@ export class GithubConnectionService {
 
   /**
    * Before an account is deleted: a GitHub connection the student gave us is
-   * revoked at GitHub first (D9), so deleting the account deletes the token.
+   * revoked at GitHub first (D9), so deleting the account deletes the token, and
+   * a GitHub identity linked to the login at Auth0 is unlinked (plan §2.7).
    * A failure stops the deletion; nothing is deleted. Returns the version of
    * the row it read (and revoked), for `assertRevokedForDeletion`.
    */
   async revokeBeforeAccountDeletion(user: UserRow): Promise<number | null> {
     const first = await this.githubRow(user.id);
-    if (first === undefined || first.status === 'not_connected') return versionOf(first);
+    let version = versionOf(first);
+    if (first !== undefined && first.status !== 'not_connected') {
+      const gh = this.required();
+      await this.reconcile(gh, user);
+      const row = await this.githubRow(user.id);
+      // A link or a revocation in flight can still change what the grant is:
+      // revoking now, or deleting the row, would miss what it is about to make.
+      if (row?.status === 'linking') throw linkInProgress();
+      if (row?.status === 'connected') await this.revoke(gh, user.auth0Id);
+      version = versionOf(row);
+    }
+    // Whatever the row says, Auth0 may still hold a GitHub identity linked to this
+    // login (a disconnect keeps it): deleting the account must not leave it there.
+    if (this.gh !== null) await this.unlinkGithubAtAuth0(this.gh, user);
+    return version;
+  }
 
-    const gh = this.required();
-    await this.reconcile(gh, user);
-    const row = await this.githubRow(user.id);
-    // A link or a revocation in flight can still change what the grant is:
-    // revoking now, or deleting the row, would miss what it is about to make.
-    if (row?.status === 'linking') throw linkInProgress();
-    if (row?.status === 'connected') await this.revoke(gh, user.auth0Id);
-    return versionOf(row);
+  /**
+   * Unlinks every GitHub identity that is *linked to* the caller's login (a
+   * secondary one). Left linked, the next GitHub sign-in of the same person
+   * resolves to this very login, and Auth0 refuses to link a user to what it
+   * already holds. Auth0 re-creates each former secondary as a standalone
+   * `github|<id>` user (what remains, and why it is harmless: docs/m7-plan.md
+   * §2.7). An identity already gone is success; any other failure stops the
+   * deletion before anything is deleted. A login that *is* the GitHub one
+   * (`github|<id>`) has nothing linked to unlink.
+   */
+  private async unlinkGithubAtAuth0(gh: GithubConnect, user: UserRow): Promise<void> {
+    const held = await gh.management.identities(user.auth0Id);
+    for (const identity of held ?? []) {
+      if (identity.provider !== 'github' || !identity.isSocial) continue;
+      if (user.auth0Id === `github|${identity.userId}`) continue;
+      const result = await gh.management.unlinkIdentity(user.auth0Id, 'github', identity.userId);
+      this.logger.info({ result }, 'github identity unlinked at auth0');
+    }
+    gh.tokens.forget(user.auth0Id);
   }
 
   /**

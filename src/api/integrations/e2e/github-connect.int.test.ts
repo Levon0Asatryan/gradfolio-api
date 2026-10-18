@@ -485,6 +485,56 @@ describe('link', () => {
     expect(auth0.callsTo('/api/v2/users/').filter((c) => c.method === 'POST')).toHaveLength(1);
   });
 
+  it('is idempotent: an identity Auth0 already holds is connected without linking again (the account-deleted case)', async () => {
+    const http = await start();
+    const s = await student('auth0|already-held');
+    githubKnows('97', 'held-gh');
+    const token = await idToken('97', await nonceFor(http, s));
+    // Meanwhile the identity is on the login at Auth0 (a link whose answer was lost, or one a
+    // deleted account left behind): Auth0 would answer 400 to a second link.
+    linkedAtAuth0(s.sub, '97', 'held-gh');
+    const before = auth0.callsTo('/api/v2/users/').filter((c) => c.method === 'POST').length;
+
+    const res = await http
+      .post('/v1/me/integrations/github/link')
+      .set(s.auth)
+      .send({ idToken: token })
+      .expect(200);
+    expect(res.body).toEqual({ state: 'connected', login: 'held-gh' });
+    expect(auth0.callsTo('/api/v2/users/').filter((c) => c.method === 'POST')).toHaveLength(before);
+    expect(await githubRow(s.id)).toMatchObject({ status: 'connected', externalUserId: '97' });
+    expect(await verifiedOf(s.id)).toBe(true);
+  });
+
+  it('a refusal is logged with Auth0’s own words, never a credential', async () => {
+    const http = await start();
+    const s = await student('auth0|refused-words');
+    githubKnows('99', 'words');
+    const token = await idToken('99', await nonceFor(http, s));
+    auth0.linkStatus = 400;
+    auth0.linkBody = {
+      statusCode: 400,
+      error: 'Bad Request',
+      message: 'Cannot link a user to itself\n(fake)',
+      errorCode: 'invalid_body',
+    };
+    logs.clear();
+    await http
+      .post('/v1/me/integrations/github/link')
+      .set(s.auth)
+      .send({ idToken: token })
+      .expect(409);
+    const line = logs.lines().find((l) => l.msg === 'github link refused by auth0')!;
+    expect(line).toMatchObject({
+      status: 400,
+      auth0Error: 'Bad Request',
+      auth0Message: 'Cannot link a user to itself (fake)',
+      auth0Code: 'invalid_body',
+    });
+    expect(logs.text()).not.toContain(token);
+    expect(logs.text()).not.toMatch(/SENTINEL/);
+  });
+
   it('a link Auth0 refuses releases the reservation: 409 GITHUB_LINK_REFUSED', async () => {
     const http = await start();
     const s = await student('auth0|refused');
