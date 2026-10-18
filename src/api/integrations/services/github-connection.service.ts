@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import type { Transaction } from 'kysely';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { AccessTokenIdentity } from '../../../core/auth/access-token.js';
@@ -72,13 +72,27 @@ const sha256 = (value: string) => createHash('sha256').update(value).digest('hex
  * runs first.
  */
 @Injectable()
-export class GithubConnectionService {
+export class GithubConnectionService implements OnModuleInit {
   constructor(
     private readonly dbs: DbService,
     @Inject(APP_CONFIG) private readonly cfg: AppConfig,
     @Inject(GITHUB_CONNECT) private readonly gh: GithubConnect | null,
     @InjectPinoLogger(GithubConnectionService.name) private readonly logger: PinoLogger,
   ) {}
+
+  /**
+   * `AUTH0_DELETE_USERS` has a precondition that is not built yet (docs/m7-plan.md
+   * §2.8): a deletion marker, so a still-valid access token cannot re-provision a
+   * public account from its claims after the Auth0 user is gone. Booting with the
+   * flag on is allowed (the owner decides) and says so, loudly, every time.
+   */
+  onModuleInit(): void {
+    if (this.cfg.AUTH0_DELETE_USERS) {
+      this.logger.warn(
+        'AUTH0_DELETE_USERS is on without a deletion tombstone: a still-valid access token can recreate a public account for a deleted user',
+      );
+    }
+  }
 
   /** `GET /v1/me/integrations`: the caller's own rows only; never a token or the GitHub id. */
   async status(user: UserRow, identity: AccessTokenIdentity): Promise<IntegrationsResponse> {

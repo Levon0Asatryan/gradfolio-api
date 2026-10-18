@@ -259,6 +259,18 @@ describe('account deletion revokes first', () => {
     const deletes = () => h.auth0.calls.filter((c) => c.method === 'DELETE');
     const on = () => ({ ...h.env(), AUTH0_DELETE_USERS: 'true' });
 
+    it('says so at boot when it is on without the deletion tombstone, and not when it is off', async () => {
+      h.logs.clear();
+      await h.start();
+      const warn = (m: string) => h.logs.lines().some((l) => l.msg === m);
+      const message =
+        'AUTH0_DELETE_USERS is on without a deletion tombstone: a still-valid access token can recreate a public account for a deleted user';
+      expect(warn(message)).toBe(false);
+      h.logs.clear();
+      await h.start(on());
+      expect(warn(message)).toBe(true);
+    });
+
     it('is off by default: the login stays, only the identity is unlinked', async () => {
       const http = await h.start();
       const s = await h.student('auth0|stays-at-auth0');
