@@ -289,6 +289,15 @@ application, a privilege increase (the app can then delete any user in the tenan
   up again, and the GitHub sign-in alone no longer reaches the old account.
 - **Off:** as §2.7. What remains is the login, and, after an unlink, a harmless standalone
   `github|<id>` user.
+- **Precondition for turning it on: a deletion tombstone, not built.** After the Auth0 user is gone, a
+  still-valid access token (up to an hour) can still provision a `users` row from its claims (name,
+  email, avatar): a public, never-removed account bound to a login that no longer exists. That row
+  outlives the token. The fix is a small table of deleted `sub`s, refused by provisioning for the
+  token's lifetime. Until it exists, the API **boots with the flag on but logs a warning at every
+  start** (`AUTH0_DELETE_USERS is on without a deletion tombstone …`) rather than refusing: the owner
+  decides, and the warning cannot be missed in Cloud Run's log. Queue row M7-T13 says the same. Tracker
+  row proposed: "M7 follow-up: deletion tombstone by sub for the access token's lifetime; precondition
+  of AUTH0_DELETE_USERS".
 
 ## 3. Import, re-sync, README (7.3–7.5)
 
