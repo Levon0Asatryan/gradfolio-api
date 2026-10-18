@@ -38,6 +38,10 @@ export interface TokenCacheSettings {
  * first), never persisted (D2). Only an identity with `provider` `github` and
  * `isSocial` counts.
  */
+/** One cache entry per (login, wanted GitHub id); no id wanted is its own entry. */
+const cacheKey = (auth0Sub: string, githubUserId: string | undefined) =>
+  `${auth0Sub}\n${githubUserId ?? ''}`;
+
 export class Auth0IdpTokenSource implements GithubTokenSource {
   private readonly cache = new Map<string, { identity: GithubIdentity; expiresAt: number }>();
 
@@ -52,16 +56,12 @@ export class Auth0IdpTokenSource implements GithubTokenSource {
     signal?: AbortSignal,
     githubUserId?: string,
   ): Promise<GithubIdentity | null> {
-    const hit = this.cache.get(auth0Sub);
-    // A login can hold more than one GitHub identity: when a caller names one, only it will do.
-    if (
-      hit &&
-      this.now() < hit.expiresAt &&
-      (githubUserId === undefined || hit.identity.githubUserId === githubUserId)
-    ) {
-      return hit.identity;
-    }
-    this.cache.delete(auth0Sub);
+    // A login can hold more than one GitHub identity. A caller that names one gets
+    // that one (and its own cache entry); one that does not gets the first.
+    const key = cacheKey(auth0Sub, githubUserId);
+    const hit = this.cache.get(key);
+    if (hit && this.now() < hit.expiresAt) return hit.identity;
+    this.cache.delete(key);
 
     const identities = await this.management.identities(auth0Sub, signal);
     const github = identities?.find(
@@ -80,12 +80,14 @@ export class Auth0IdpTokenSource implements GithubTokenSource {
       githubUserId: github.userId,
       token: new GithubAccessToken(github.accessToken.reveal()),
     };
-    this.remember(auth0Sub, identity);
+    this.remember(key, identity);
     return identity;
   }
 
+  /** Drops every identity cached for the login (disconnect, a GitHub 401, account deletion). */
   forget(auth0Sub: string): void {
-    this.cache.delete(auth0Sub);
+    const prefix = `${auth0Sub}\n`;
+    for (const key of [...this.cache.keys()]) if (key.startsWith(prefix)) this.cache.delete(key);
   }
 
   /** How many tokens are held now (tests). */
@@ -93,9 +95,9 @@ export class Auth0IdpTokenSource implements GithubTokenSource {
     return this.cache.size;
   }
 
-  private remember(auth0Sub: string, identity: GithubIdentity): void {
+  private remember(key: string, identity: GithubIdentity): void {
     if (this.settings.ttlMs <= 0) return;
-    this.cache.set(auth0Sub, { identity, expiresAt: this.now() + this.settings.ttlMs });
+    this.cache.set(key, { identity, expiresAt: this.now() + this.settings.ttlMs });
     // A Map iterates in insertion order: the first key is the oldest entry.
     while (this.cache.size > this.settings.maxEntries) {
       const oldest = this.cache.keys().next().value;
