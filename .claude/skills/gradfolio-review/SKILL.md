@@ -9,7 +9,7 @@ The review that runs **before** the first push, so the reviewer sees finished
 work. Every finding here is a review round that never happens.
 
 **Scope.** Reads `.review/rules/`, `AGENTS.md`, `CLAUDE.md`, the milestone plan
-in `docs/mN-plan.md`, the project's ADRs, and `docs/investigation.md`. It reads
+in `docs/modules/mN/plan.md`, the project's ADRs, and `docs/reference/investigation.md`. It reads
 and writes no rule corpus outside this repository.
 
 Invoked:

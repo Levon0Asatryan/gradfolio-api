@@ -18,7 +18,7 @@ import { addMember, db, person, type Person } from '../../../testing/team.js';
  * M6 PR (a): public search and tag pages against MySQL 8.4 -- the privacy matrix
  * (X1-X4), short words and stopwords (X9), case, ё/е and Armenian (X10),
  * hostile input (X8), cursors (X11), tag names (X12), fixed statement counts
- * and signing once per file (docs/m6-plan.md §7, §8, §10).
+ * and signing once per file (docs/modules/m6/plan.md §7, §8, §10).
  */
 
 let tenant: TestTenant;

@@ -21,7 +21,7 @@ export class AccountService {
   ) {}
 
   /**
-   * Deletes the caller's account and everything under it (docs/m3-plan.md §5.3,
+   * Deletes the caller's account and everything under it (docs/modules/m3/plan.md §5.3,
    * 3.6): profile sections, skills, projects with their attachments, tags and
    * team rows, integrations (tokens included), notifications and activities all
    * cascade (run, plan P6).
@@ -48,7 +48,7 @@ export class AccountService {
     this.logger.info({ userId }, 'account deletion started');
     const revoked = await this.github.revokeBeforeAccountDeletion(user);
     await inTransaction(this.dbs.db, async (trx) => {
-      // The user row first, as everywhere (docs/m3-plan.md §1: user row, then
+      // The user row first, as everywhere (docs/modules/m3/plan.md §1: user row, then
       // child rows). Without it this transaction locks the team rows first and
       // then waits for the user row, while a write that follows the documented
       // order holds the user row and waits for a team row: a deadlock (run,
@@ -62,7 +62,7 @@ export class AccountService {
         .where('userId', '=', userId)
         .execute();
       // An invitation nobody answered (or that was declined) has nothing to keep:
-      // the foreign key would turn it into a nameless pending row (m5-plan §2.4).
+      // the foreign key would turn it into a nameless pending row (docs/modules/m5/plan §2.4).
       await trx
         .deleteFrom('projectTeamMembers')
         .where('userId', '=', userId)

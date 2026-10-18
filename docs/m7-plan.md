@@ -518,7 +518,7 @@ concurrent confirms; with `lockUser` the second sees the first's row.
 
 ### 4.4 LinkedIn sign-in pre-fill (7.10)
 
-Already built (m2-plan §3.4): name and photo from the token claims on the first request,
+Already built (docs/modules/m2/plan §3.4): name and photo from the token claims on the first request,
 `headline` only if a `linkedin|` token carries it (expected absent, §8.2). Added: `GET
 /v1/me/integrations` reports `linkedin: { status, lastSyncedAt }`, where `status` is `connected`
 when the token's `identities` include `linkedin` or `sub` starts `linkedin|`. It is derived at read

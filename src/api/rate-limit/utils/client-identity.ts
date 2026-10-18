@@ -3,7 +3,7 @@ import { isIP } from 'node:net';
 import type { Request } from 'express';
 import type { AccessTokenIdentity } from '../../../core/auth/access-token.js';
 
-/** The header that carries the shared secret (docs/m6-plan.md §2.4). */
+/** The header that carries the shared secret (docs/modules/m6/plan.md §2.4). */
 export const PROXY_SECRET_HEADER = 'x-gradfolio-proxy-secret';
 /** The real client's address, believed only together with a valid secret. */
 export const CLIENT_IP_HEADER = 'x-client-ip';

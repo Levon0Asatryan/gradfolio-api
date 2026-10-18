@@ -7,7 +7,7 @@ import { testDatabase, testDatabaseUrl } from '../../../testing/database.js';
 import type { UserPrefill } from '../utils/prefill.js';
 import { findByAuth0Id, syncVerified, upsertByAuth0Id } from './user.repository.js';
 
-/** First-login provisioning on MySQL 8.4 (docs/m2-plan.md §2.5, §3.4). */
+/** First-login provisioning on MySQL 8.4 (docs/modules/m2/plan.md §2.5, §3.4). */
 
 const prefill = (over: Partial<UserPrefill> = {}): UserPrefill => ({
   name: 'Ani',

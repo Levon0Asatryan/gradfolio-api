@@ -1,6 +1,6 @@
 /**
  * Turns what a visitor typed into something safe and meaningful for MySQL
- * (docs/m6-plan.md §3.3). Pure: no I/O.
+ * (docs/modules/m6/plan.md §3.3). Pure: no I/O.
  *
  * Why tokens are classified rather than passed through (all found by running
  * them on MySQL 8.4.11, plan §1.4):

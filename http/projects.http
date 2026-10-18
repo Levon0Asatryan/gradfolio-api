@@ -51,7 +51,7 @@ Authorization: Bearer {{accessToken}}
 # @name createProject
 # 201 the new project (ProjectDetail). Only `title` is required; a new project is
 # public and published. descriptionHtml is sanitized on the way in (allow-list in
-# docs/m4-plan.md §4.1); the response shows what was kept. Unknown keys, id, userId,
+# docs/modules/m4/plan.md §4.1); the response shows what was kept. Unknown keys, id, userId,
 # source, repo fields and aiSummary are 400. 409 LIMIT_REACHED at the per-user cap.
 POST {{baseUrl}}/v1/projects
 Authorization: Bearer {{accessToken}}

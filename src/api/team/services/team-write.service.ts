@@ -29,7 +29,7 @@ import {
 /**
  * Team writes. Each is one transaction: the project lock (ownership checked in
  * that statement for the owner's writes), the member row, the change, and the
- * notification -- so a rollback leaves neither (docs/m5-plan.md §4, §5).
+ * notification -- so a rollback leaves neither (docs/modules/m5/plan.md §4, §5).
  *
  * `inTransaction` reruns a body after a deadlock, so each body is repeatable:
  * it reads what it needs under the locks and writes once.

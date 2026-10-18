@@ -25,7 +25,7 @@ export interface TeamNotification {
 
 /**
  * Writes a notification **inside the caller's transaction**: it commits or
- * rolls back with the change it reports (docs/m5-plan.md §5). Only team
+ * rolls back with the change it reports (docs/modules/m5/plan.md §5). Only team
  * services call this; there is no way to create one over HTTP. The link is
  * never stored: it is computed when the notification is read (S12).
  */

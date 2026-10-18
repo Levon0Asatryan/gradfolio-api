@@ -10,7 +10,7 @@ import { testConfig, testDatabase, testDatabaseUrl } from '../../../testing/data
 import { createProfile, createProject } from '../../../testing/factories.js';
 import { startTestTenant, type TestTenant } from '../../../testing/jwks.js';
 
-/** DELETE /v1/me through the whole stack against MySQL 8.4 (docs/m3-plan.md 3.6). */
+/** DELETE /v1/me through the whole stack against MySQL 8.4 (docs/modules/m3/plan.md 3.6). */
 
 let tenant: TestTenant;
 let app: NestExpressApplication | undefined;
@@ -260,7 +260,7 @@ describe('DELETE /v1/me', () => {
     ]);
   });
 
-  it('deletes the unanswered and declined invitations of the account instead of leaving nameless pending rows (m5-plan §2.4)', async () => {
+  it('deletes the unanswered and declined invitations of the account instead of leaving nameless pending rows (docs/modules/m5/plan §2.4)', async () => {
     const http = await start();
     const alice = await account('alice');
     const bob = await account('bob');

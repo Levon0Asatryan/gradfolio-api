@@ -263,7 +263,7 @@ diff <(dump eq_a) <(dump eq_b) && echo "DIFF EMPTY"     # -> DIFF EMPTY
 
 In the repo this becomes `src/core/db/migrator/schema-dump.ts` (same normalization, via
 mysql2), used by: the integration test for 1.2, the CI migrations job (up → down → up is
-identical) and `docs/m1-verification.md`. The CI job fetches `schema.sql` from the
+identical) and `docs/modules/m1/verification.md`. The CI job fetches `schema.sql` from the
 public `gradfolio-sql` repo **at a pinned commit** and runs the diff, so the baseline
 can never drift unnoticed.
 
@@ -573,7 +573,7 @@ Every guard ships with a test that fails when the guard is removed (Phase 3 tabl
    column types, pool `typeCast`/`dateStrings`, `toJsonColumn`, ids, MySQL error
    mapping, `inTransaction`, validators, term normalization, migrations 0002–0004, test
    factories and barrier, per-file reset, seed, CLAUDE.md updates (commands, facts), and
-   `docs/m1-verification.md`.
+   `docs/modules/m1/verification.md`.
 4. **gradfolio-sql** (one PR, own worktree): S1 compose mounts only `01-schema.sql` and
    `02-seed.sql` from a dedicated init folder; S2/S13 docs (11 tables, the id comment,
    "the backend supplies ids"); README → pointer to this repo's migrations; S3–S6

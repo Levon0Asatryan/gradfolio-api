@@ -17,7 +17,7 @@ to other students.
 MySQL 8.4 pool, health endpoints, a uniform error shape, a generated OpenAPI
 document, a container stack, and CI. No product endpoints yet. The remaining
 architecture decisions (query layer, schema ownership, privacy model, etc.) are open
-in [docs/investigation.md](docs/investigation.md) §6, and progress is tracked in
+in [docs/reference/investigation.md](docs/reference/investigation.md) §6, and progress is tracked in
 [docs/tracker.md](docs/tracker.md).
 
 ## Quick start
@@ -63,7 +63,7 @@ npm run dev                         # http://localhost:3000, reloads on change
 
 ## Schema and migrations
 
-This repository owns the database schema (decided in `docs/m1-plan.md`, Q2).
+This repository owns the database schema (decided in `docs/modules/m1/plan.md`, Q2).
 `src/core/db/migrations/NNNN_name.up.sql` and `.down.sql`; `0001_baseline` is
 gradfolio-sql's `schema.sql` at commit 187ff66.
 
@@ -84,7 +84,7 @@ and validated before anything else is constructed. An invalid or missing value s
 the process at boot, and the error names every offending key.
 
 - `DATABASE_URL`, `AUTH0_ISSUER_BASE_URL` and `AUTH0_AUDIENCE` have no default
-  ([docs/auth0-setup.md](docs/auth0-setup.md)). The database tools (`migrate`,
+  ([docs/ops/auth0-setup.md](docs/ops/auth0-setup.md)). The database tools (`migrate`,
   `db:seed`, `db:schema`) need only the database settings.
 - In production `DATABASE_SSL=required` and an `https:` issuer are enforced.
 - `TRUST_PROXY` is `false` or a hop count, never `true`: `true` would believe the
@@ -124,14 +124,14 @@ search, import and AI routes add their own. Over budget: `429 RATE_LIMITED` with
 
 ## Documentation
 
-| File                                                 | What it holds                                                                          |
-| ---------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| [CLAUDE.md](CLAUDE.md)                               | How work is done here, the commands, and the project facts every contributor must know |
-| [AGENTS.md](AGENTS.md)                               | Code-review rules: what reviewers (human, Codex, Claude) flag on a pull request        |
-| [docs/tracker.md](docs/tracker.md)                   | Status of record: milestones and follow-ups                                            |
-| [docs/investigation.md](docs/investigation.md)       | Database and frontend analysis, facts verified against MySQL 8.4, open decisions       |
-| [docs/handoff-template.md](docs/handoff-template.md) | Task prompt and report format used between chats                                       |
-| [.review/](.review/)                                 | This repo's own review rules, mined from real PR reviews                               |
+| File                                                                 | What it holds                                                                          |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| [CLAUDE.md](CLAUDE.md)                                               | How work is done here, the commands, and the project facts every contributor must know |
+| [AGENTS.md](AGENTS.md)                                               | Code-review rules: what reviewers (human, Codex, Claude) flag on a pull request        |
+| [docs/tracker.md](docs/tracker.md)                                   | Status of record: milestones and follow-ups                                            |
+| [docs/reference/investigation.md](docs/reference/investigation.md)   | Database and frontend analysis, facts verified against MySQL 8.4, open decisions       |
+| [docs/process/handoff-template.md](docs/process/handoff-template.md) | Task prompt and report format used between chats                                       |
+| [.review/](.review/)                                                 | This repo's own review rules, mined from real PR reviews                               |
 
 ## Contributing
 

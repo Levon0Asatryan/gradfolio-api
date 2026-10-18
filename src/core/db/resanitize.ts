@@ -11,7 +11,7 @@ export interface ResanitizeResult {
 
 /**
  * Re-runs the description sanitizer over stored rows, for when the allow-list
- * changes (docs/m4-plan.md §4.1). The sanitizer is idempotent, so a second run
+ * changes (docs/modules/m4/plan.md §4.1). The sanitizer is idempotent, so a second run
  * changes nothing. `apply: false` only counts; with `apply`, a row that changed
  * between the read and the write is reported as skipped, not rewritten. Output that sanitizes to nothing
  * becomes NULL, as on write.

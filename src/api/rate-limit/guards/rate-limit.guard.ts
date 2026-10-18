@@ -22,7 +22,7 @@ import { identify, secretDigests } from '../utils/client-identity.js';
  * server (Q11), so every user arrives from the same few Vercel addresses and
  * an address-keyed budget would be shared by all of them. Without a token, by
  * the visitor's address when the frontend vouched for it with the shared secret
- * (`X-Client-IP` + `X-Gradfolio-Proxy-Secret`, docs/m6-plan.md §2.4), else by
+ * (`X-Client-IP` + `X-Gradfolio-Proxy-Secret`, docs/modules/m6/plan.md §2.4), else by
  * the connection's address, which follows TRUST_PROXY.
  *
  * The throttler's key generator is kept: it includes the budget's name, and a

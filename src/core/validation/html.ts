@@ -1,7 +1,7 @@
 import sanitizeHtml from 'sanitize-html';
 
 /**
- * Sanitized project-description HTML (docs/m4-plan.md §4). The only way to get
+ * Sanitized project-description HTML (docs/modules/m4/plan.md §4). The only way to get
  * a value of this type is `sanitizeDescription`, and the project repository
  * accepts nothing else, so no write path can skip the sanitizer.
  */

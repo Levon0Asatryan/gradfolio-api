@@ -131,7 +131,7 @@ describe('unique keys', () => {
   });
 });
 
-/** What 0006 adds for teams and notifications, and the team table facts M5 relies on (m5-plan §2.1). */
+/** What 0006 adds for teams and notifications, and the team table facts M5 relies on (docs/modules/m5/plan §2.1). */
 describe('teams and notifications schema (0006)', () => {
   const db = testDatabase();
   const errnoOf = (p: Promise<unknown>) => p.then(() => undefined, mysqlErrno);

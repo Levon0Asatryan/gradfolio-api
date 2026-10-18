@@ -8,7 +8,7 @@ import { translationParams } from '../../validation/json-shapes.js';
 
 /**
  * A deterministic, realistic-size dataset for measuring search, browse and the
- * dashboard locally (docs/m6-plan.md §1.1): by default 1,000 users and 3,000
+ * dashboard locally (docs/modules/m6/plan.md §1.1): by default 1,000 users and 3,000
  * projects with English, Russian and Armenian text, a Zipf-like skill
  * distribution that includes `AI`, `ML`, `Go`, `C#`, `UI`, `R`, and summaries
  * that carry the short words and their false-positive bait (`main`, `ago`).
@@ -273,7 +273,7 @@ async function load(
         terms.add(name);
       }
       own.push({ id: pid, title: proj.at(-1)!.title });
-      // A team member is someone else: the owner is implicit (docs/m5-plan.md §2.2).
+      // A team member is someone else: the owner is implicit (docs/modules/m5/plan.md §2.2).
       // `u` ends with the current owner, so the others are all but the last.
       if (u.length > 1 && next() < 0.3) {
         const other = u[Math.floor(next() * (u.length - 1))]!;

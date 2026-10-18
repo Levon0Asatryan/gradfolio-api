@@ -18,7 +18,7 @@ evidence attached, to recruiters and peers. The API serves the Next.js frontend
 - **Scale:** university coursework. Tens of users, hundreds of projects, Aiven's free
   MySQL tier.
 - The schema facts below were verified by running them against MySQL 8.4.11; the
-  evidence is in `docs/investigation.md` §3.2.
+  evidence is in `docs/reference/investigation.md` §3.2.
 
 ## Code Review Rules
 
@@ -43,7 +43,7 @@ costs more than one that lists only those two. So the bar is deliberately high.
   passes for a reason other than the behaviour it names;
 - a **resource leak** that a long-running process would accumulate;
 - a **documented contract violated**: the code contradicts a sentence in
-  `docs/mN-plan.md`, an ADR, the API document or the requirements.
+  `docs/modules/mN/plan.md`, an ADR, the API document or the requirements.
 
 **Do not report:**
 

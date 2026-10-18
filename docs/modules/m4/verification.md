@@ -1,7 +1,7 @@
 # M4 verification
 
 The final test record for M4 on the API side: tracker 4.1–4.5 and what FE tasks 4.6–4.10
-needed from the API, [m4-plan.md](m4-plan.md). Unit, integration, clone, HTTP, storage and
+needed from the API, [m4-plan.md](plan.md). Unit, integration, clone, HTTP, storage and
 guard runs on 2026-10-09 against MySQL 8.4.11 on `origin/main` at `ff33005` (after #48),
 plus the bucket runs of 2026-10-08/09 against `gradfolio-files-1058577031182`. Two items need
 a real Auth0 token and Levon's hands; they are marked **PENDING** with the exact steps
@@ -208,7 +208,7 @@ the stored rows checked. `scripts/roundtrip.mjs` does the HTTP part and prints n
 Steps for Levon (about 5 minutes; the existing database-connection test user is fine):
 
 1. In the `gradfolio` checkout, `.env.local` has `AUTH0_AUDIENCE=https://api.gradfolio.app`
-   (as in [auth0-setup.md](auth0-setup.md) §7). `npm run dev -- -p 3010`.
+   (as in [auth0-setup.md](../../ops/auth0-setup.md) §7). `npm run dev -- -p 3010`.
 2. Open `http://localhost:3010/auth/login`, sign in as the test user, then open
    `http://localhost:3010/auth/access-token` and copy the `token` value.
 3. Put it in the gitignored `.env` of `gradfolio-api-m4` as `M4_TEST_TOKEN=eyJ…` (do not
@@ -302,7 +302,7 @@ rolled back, and a delete that failed (logged as `storage object delete failed` 
    `STORAGE_BUCKET` and `DATABASE_URL` set (a Cloud Run job from the API image running
    `node dist/core/storage/sweep-cli.js`, with the runtime service account, is the
    intended home; until it exists, from a shell with the sandboxed gcloud and the
-   break-glass database path in [deploy.md](deploy.md)). It lists keys under `u/` that no
+   break-glass database path in [deploy.md](../../ops/deploy.md)). It lists keys under `u/` that no
    `users.avatar_url`, `projects.hero_image_url` or `project_attachments.url / thumbnail_url`
    names and that are older than 24 h (`--hours N`).
 2. **Read the list.** An orphan younger than the floor is never listed; one listed that the

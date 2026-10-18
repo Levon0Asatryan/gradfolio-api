@@ -1,4 +1,4 @@
--- Two profile columns (docs/m3-plan.md §5.2), in one atomic ALTER.
+-- Two profile columns (docs/modules/m3/plan.md §5.2), in one atomic ALTER.
 --
 --   contact_email  the address shown on the public profile, chosen by the
 --                  user. users.email (the login address, pre-filled from

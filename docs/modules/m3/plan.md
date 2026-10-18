@@ -152,7 +152,7 @@ value)`); delete = filter. → item `POST` / partial `PATCH` / `DELETE`. There i
   `experience.skills` go through it, always after the user lock.
 - `COLUMN_LIMITS` + `columns.int.test.ts` fail until `users.contact_email` is added.
   `types.generated.ts` is regenerated (`db:types`; CI checks it).
-- Rate limits are per route per caller (m2-plan §2.6, run): the new routes do not
+- Rate limits are per route per caller (docs/modules/m2/plan §2.6, run): the new routes do not
   share a budget with each other. Anonymous callers are keyed by address. The
   frontend calls from its server (Q11), so anonymous profile views share the
   frontend's egress address(es): 120/min each by default. Fine at this scale;
@@ -301,7 +301,7 @@ src/core/db/migrations/0005_profile_fields.{up,down}.sql
 ## 6. Security properties and how each is proved
 
 Every proof is a test **seen failing** with the guard removed (recorded in
-`m3-verification.md`).
+`docs/modules/m3/verification.md`).
 
 | Property                                                                                                                 | Test                                                                                                                                                                                                                        | Guard removed                                   |
 | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
@@ -345,7 +345,7 @@ Auth0"). Per-viewer analytics. Breaking-change linting of the contract.
    create/patch/delete/order, `PUT /me/skills`, the shared lock/reorder helpers,
    the concurrency tests.
 4. **(c) `DELETE /me`** (only if 3.6 is in).
-5. `docs/m3-verification.md` in the last PR: fresh clone; verify, coverage ≥ 90 %,
+5. `docs/modules/m3/verification.md` in the last PR: fresh clone; verify, coverage ≥ 90 %,
    integration; second-user matrix; Q3 for owner/other/anonymous; private-field
    scan; barrier tests; a real Auth0 token editing every section over HTTP with
    stored rows checked; OpenAPI check; plan walk; guard proofs; CI; clean machine.

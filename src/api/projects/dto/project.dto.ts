@@ -112,7 +112,7 @@ export const projectDetailSchema = z
     aiSummary: z.string().nullable().meta({ description: 'Generated text (M8); null until then.' }),
     descriptionHtml: z.string().nullable().meta({
       description:
-        'Sanitized HTML (allow-list in docs/m4-plan.md §4.1). Render it with a second sanitizer anyway.',
+        'Sanitized HTML (allow-list in docs/modules/m4/plan.md §4.1). Render it with a second sanitizer anyway.',
     }),
     liveDemoUrl: z.string().nullable(),
     repo: projectRepoSchema,

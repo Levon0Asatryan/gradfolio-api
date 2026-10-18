@@ -1,7 +1,7 @@
 # Issues
 
 The main findings from the pre-architecture investigation. Evidence and details are in
-[gradfolio-api/docs/investigation.md](gradfolio-api/docs/investigation.md). "Run" means reproduced against MySQL
+[gradfolio-api/docs/reference/investigation.md](investigation.md). "Run" means reproduced against MySQL
 8.4.11.
 
 Severity:
@@ -50,7 +50,7 @@ Severity:
 
 ## Open decisions (M0)
 
-Details are in [investigation §6](gradfolio-api/docs/investigation.md#6-decisions-for-the-architecture-milestone-m0).
+Details are in [investigation §6](investigation.md#6-decisions-for-the-architecture-milestone-m0).
 
 - **Q1** Stack: Spring Boot or NestJS, plus the database access layer.
 - **Q2** Who owns the schema, and how migrations work.

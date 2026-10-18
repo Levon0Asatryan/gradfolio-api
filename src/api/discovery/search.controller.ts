@@ -14,7 +14,7 @@ import {
 import { SearchService } from './services/search.service.js';
 
 /**
- * Public search (docs/m6-plan.md §3). A token, when sent, is verified and only
+ * Public search (docs/modules/m6/plan.md §3). A token, when sent, is verified and only
  * changes whose rate budget is spent; the results are the same for everyone.
  */
 @OptionalAuth()

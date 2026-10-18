@@ -6,7 +6,7 @@ import type { DiscoveryCursor } from '../utils/discovery-cursor.js';
 import { CARD_COLUMNS } from './search.repository.js';
 
 /**
- * Browse (docs/m6-plan.md §3.5). Every statement starts from the discoverable
+ * Browse (docs/modules/m6/plan.md §3.5). Every statement starts from the discoverable
  * predicates and orders on an index added in 0007, ending in `id` in the same
  * direction so `(time, id)` is a total order and a row-value comparison pages
  * without a repeat or a gap.

@@ -17,7 +17,7 @@ Report a finding **only** if it is one of:
 - a concurrency defect — duplicate, race, deadlock;
 - a broken build or test, or a test that cannot fail;
 - a resource leak in the long-running process;
-- code contradicting `docs/mN-plan.md`, an ADR, `openapi.yaml` or the requirements.
+- code contradicting `docs/modules/mN/plan.md`, an ADR, `openapi.yaml` or the requirements.
 
 Do **not** report: formatting, naming, import order or type errors (CI blocks those);
 "consider"/"cleaner"/"more idiomatic" suggestions; defensive code for inputs already
@@ -28,7 +28,7 @@ One comment per defect. State the concrete failure — input, wrong behaviour, w
 and cite any fact you assert (a limit, a default, a library's behaviour); the author
 checks premises and pushes back with evidence when one is wrong.
 
-MySQL facts this code relies on (verified, see `docs/investigation.md`): the app
+MySQL facts this code relies on (verified, see `docs/reference/investigation.md`): the app
 generates UUID ids; the session time zone is UTC; JSON columns and `YYYY-MM` strings
 are validated only by the API; `JSON_CONTAINS` is case-sensitive; FULLTEXT ignores
 tokens shorter than 3 characters; MySQL commits DDL implicitly.

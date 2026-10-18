@@ -29,7 +29,7 @@ export function isPublished(eb: ExpressionBuilder<DB, 'projects'>) {
 /**
  * An accepted member of the project, as a predicate on `projects`: the viewer
  * has a team row on it with status `accepted`. Pending and rejected rows grant
- * nothing (docs/m5-plan.md §2).
+ * nothing (docs/modules/m5/plan.md §2).
  */
 export function isAcceptedMember(eb: ExpressionBuilder<DB, 'projects'>, userId: string) {
   return eb.exists(
@@ -43,7 +43,7 @@ export function isAcceptedMember(eb: ExpressionBuilder<DB, 'projects'>, userId: 
 }
 
 /**
- * Who may read **one project by id** (Q4, docs/m5-plan.md §2.3): everything
+ * Who may read **one project by id** (Q4, docs/modules/m5/plan.md §2.3): everything
  * `projectVisibleTo` allows, plus an accepted team member of a project that is
  * not a draft (private included). A pending or rejected invitee, a removed
  * member and a stranger get no row.

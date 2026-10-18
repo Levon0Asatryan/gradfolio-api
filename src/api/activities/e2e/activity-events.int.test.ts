@@ -9,7 +9,7 @@ import { startTestTenant, type TestTenant } from '../../../testing/jwks.js';
 
 /**
  * Which events write an activity, and that each is one transaction with its
- * event (docs/m5-plan.md §8). The activity writer is wrapped, not replaced:
+ * event (docs/modules/m5/plan.md §8). The activity writer is wrapped, not replaced:
  * `before` throws instead of writing (the event has happened, the activity has
  * not), `after` writes and then throws (both have). Either way the response is
  * 500 and the database must look as if the event never happened.

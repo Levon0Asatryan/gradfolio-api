@@ -1,6 +1,6 @@
 # Deployment runbook: Cloud Run + Cloud SQL
 
-Design and reasons: [deploy-plan.md](deploy-plan.md). Evidence: [deploy-verification.md](deploy-verification.md).
+Design and reasons: [deploy-plan.md](../modules/deploy/plan.md). Evidence: [deploy-verification.md](../modules/deploy/verification.md).
 Every command needs the sandboxed gcloud: `eval "$(direnv export bash)"` and check
 `gcloud info --format='value(config.paths.global_config_dir)'` prints
 `/Users/levon/Dev/university/.sandbox/gcloud`.
@@ -34,21 +34,21 @@ The trial credit expires after 90 days; after that the card is billed.
 
 ## Environment (no secret values)
 
-| Variable                  | On                                                                                             | Value / source                                                                                                                        |
-| ------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                | service, job                                                                                   | `production`                                                                                                                          |
-| `LOG_FORMAT`, `LOG_LEVEL` | service, job                                                                                   | `json`, `info`                                                                                                                        |
-| `API_DOCS_ENABLED`        | service                                                                                        | `false`                                                                                                                               |
-| `TRUST_PROXY`             | service                                                                                        | `1` (proved: forged `X-Forwarded-For` ignored)                                                                                        |
-| `DATABASE_SOCKET_PATH`    | service, job                                                                                   | `/cloudsql/project-33e407b5-7fd5-485d-8dc:us-east1:gradfolio-db`                                                                      |
-| `DATABASE_POOL_MAX`       | service                                                                                        | `5`                                                                                                                                   |
-| `DATABASE_URL`            | service: **secret** `gradfolio-database-url`; job: **secret** `gradfolio-migrate-database-url` | `mysql://<user>@localhost/gradfolio`, user `gradfolio_app` (DML only) / `gradfolio_migrator` (DDL)                                    |
-| `AUTH0_ISSUER_BASE_URL`   | service                                                                                        | the `dev-…us.auth0.com` tenant, trailing slash (production tenant: M9 9.4)                                                            |
-| `AUTH0_AUDIENCE`          | service                                                                                        | `https://api.gradfolio.app`                                                                                                           |
-| `STORAGE_BUCKET`          | service                                                                                        | `gradfolio-files-1058577031182`. Unset: URL-only, `POST /v1/me/uploads` answers 503                                                   |
-| `PROXY_SHARED_SECRETS`    | service: **secret** `gradfolio-proxy-secret` (optional)                                        | The secret the frontend sends as `X-Gradfolio-Proxy-Secret` so the API believes `X-Client-IP`. Unset: ignored. `docs/m6-plan.md` §2.4 |
-| `API_PROXY_SECRET`        | Vercel (Production only, **Sensitive**)                                                        | The same secret as `PROXY_SHARED_SECRETS`; the frontend forwards the visitor's address with it                                        |
-| `API_BASE_URL`            | Vercel (Production, Preview)                                                                   | the API URL above                                                                                                                     |
+| Variable                  | On                                                                                             | Value / source                                                                                                                                |
+| ------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                | service, job                                                                                   | `production`                                                                                                                                  |
+| `LOG_FORMAT`, `LOG_LEVEL` | service, job                                                                                   | `json`, `info`                                                                                                                                |
+| `API_DOCS_ENABLED`        | service                                                                                        | `false`                                                                                                                                       |
+| `TRUST_PROXY`             | service                                                                                        | `1` (proved: forged `X-Forwarded-For` ignored)                                                                                                |
+| `DATABASE_SOCKET_PATH`    | service, job                                                                                   | `/cloudsql/project-33e407b5-7fd5-485d-8dc:us-east1:gradfolio-db`                                                                              |
+| `DATABASE_POOL_MAX`       | service                                                                                        | `5`                                                                                                                                           |
+| `DATABASE_URL`            | service: **secret** `gradfolio-database-url`; job: **secret** `gradfolio-migrate-database-url` | `mysql://<user>@localhost/gradfolio`, user `gradfolio_app` (DML only) / `gradfolio_migrator` (DDL)                                            |
+| `AUTH0_ISSUER_BASE_URL`   | service                                                                                        | the `dev-…us.auth0.com` tenant, trailing slash (production tenant: M9 9.4)                                                                    |
+| `AUTH0_AUDIENCE`          | service                                                                                        | `https://api.gradfolio.app`                                                                                                                   |
+| `STORAGE_BUCKET`          | service                                                                                        | `gradfolio-files-1058577031182`. Unset: URL-only, `POST /v1/me/uploads` answers 503                                                           |
+| `PROXY_SHARED_SECRETS`    | service: **secret** `gradfolio-proxy-secret` (optional)                                        | The secret the frontend sends as `X-Gradfolio-Proxy-Secret` so the API believes `X-Client-IP`. Unset: ignored. `docs/modules/m6/plan.md` §2.4 |
+| `API_PROXY_SECRET`        | Vercel (Production only, **Sensitive**)                                                        | The same secret as `PROXY_SHARED_SECRETS`; the frontend forwards the visitor's address with it                                                |
+| `API_BASE_URL`            | Vercel (Production, Preview)                                                                   | the API URL above                                                                                                                             |
 
 `gradfolio-db-root-password` (secret) is for bootstrap and grants only; nothing at runtime reads it.
 Service accounts: `gradfolio-api-run`, `gradfolio-migrate-run` (runtime), `gradfolio-deployer` (CI, via Workload Identity Federation: pool `github`, only repo `Levon0Asatryan/gradfolio-api` on `refs/heads/main`). No key files exist.
@@ -109,7 +109,7 @@ print to the job log (JSON lines appear under `jsonPayload`).
 
 ## File storage (M4)
 
-Bucket `gradfolio-files-1058577031182` (plan: [m4-plan.md](m4-plan.md) §3). Private; the API signs every upload and every read.
+Bucket `gradfolio-files-1058577031182` (plan: [m4-plan.md](../modules/m4/plan.md) §3). Private; the API signs every upload and every read.
 CORS (`PUT` from the production frontend and `http://localhost:3010`) is on the bucket and lives in `docker/gcs-cors.json`; the rule must name every header a signed upload carries (`cors-config.test.ts` fails when `uploadHeaders()` and the file drift). Apply a change with `gcloud storage buckets update gs://gradfolio-files-1058577031182 --cors-file=docker/gcs-cors.json` and re-check with a preflight (`curl -X OPTIONS -H 'Origin: …' -H 'Access-Control-Request-Method: PUT' -H 'Access-Control-Request-Headers: content-type,x-goog-content-length-range,x-goog-if-generation-match' https://<bucket>.storage.googleapis.com/x`: the origin must be echoed, a foreign one must get no `access-control-allow-*`); Vercel preview origins are not listed
 (no wildcard exists), so previews cannot upload. IAM, all on `gradfolio-api-run`: `roles/storage.objectUser` on the bucket, and
 `roles/iam.serviceAccountTokenCreator` on **itself** (it signs through IAM `signBlob`; project Owner is not enough). No key file.

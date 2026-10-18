@@ -7,7 +7,7 @@ import { NotFoundError } from '../errors/app-error.js';
  * every write that depends on the *set* of a user's rows: create (count and
  * position), reorder (exact set), replace-all skills, account deletion.
  *
- * Without it (run, docs/m3-plan.md §4.3): a reorder accepts a stale set; two
+ * Without it (run, docs/modules/m3/plan.md §4.3): a reorder accepts a stale set; two
  * first-time skill replacements deadlock (1213); a create racing an account
  * deletion fails with a foreign-key error (1452).
  *

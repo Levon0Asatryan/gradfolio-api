@@ -7,7 +7,7 @@ import { down, up } from './runner.js';
 import { dumpSchema } from './schema-dump.js';
 
 /**
- * Migration 0007 (docs/m6-plan.md §5) is additive: applied to a database that
+ * Migration 0007 (docs/modules/m6/plan.md §5) is additive: applied to a database that
  * already holds data it adds seven indexes and changes nothing else, so the
  * previous revision keeps serving while it builds.
  */

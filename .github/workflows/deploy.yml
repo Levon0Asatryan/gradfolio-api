@@ -1,6 +1,6 @@
 name: Deploy
 
-# Production: Cloud Run + Cloud SQL (docs/deploy-plan.md §6). Runs only after
+# Production: Cloud Run + Cloud SQL (docs/modules/deploy/plan.md §6). Runs only after
 # the CI workflow succeeded on main, so a red main never deploys.
 on:
   workflow_run:
@@ -38,7 +38,7 @@ jobs:
 
       # A re-run of an older successful CI run keeps its original sha: refuse to
       # deploy anything but the tip of main (a stale run would act as a rollback
-      # without anyone choosing one; rollback is `update-traffic`, see docs/deploy.md).
+      # without anyone choosing one; rollback is `update-traffic`, see docs/ops/deploy.md).
       - name: Refuse a stale commit
         run: |
           git fetch --quiet origin main

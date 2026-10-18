@@ -11,7 +11,7 @@ import {
 
 /**
  * Writes an activity **inside the transaction of the event it reports**: it
- * commits or rolls back with it (docs/m5-plan.md §8). `userId` is whose feed it
+ * commits or rolls back with it (docs/modules/m5/plan.md §8). `userId` is whose feed it
  * lands in. The key and parameters are checked against the registry first, so
  * an event cannot be recorded with prose, private data, or a key the frontend
  * has no text for -- and an invalid one fails the event's transaction too.

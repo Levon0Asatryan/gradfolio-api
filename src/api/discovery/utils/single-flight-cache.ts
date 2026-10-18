@@ -1,6 +1,6 @@
 /**
  * One value, served from memory for `ttlMs`, loaded by one caller at a time
- * (docs/m6-plan.md §3.4). Concurrent misses share the single load; a load that
+ * (docs/modules/m6/plan.md §3.4). Concurrent misses share the single load; a load that
  * fails is not cached and is thrown to every waiter, so the next request tries
  * again. `ttlMs` of 0 caches nothing (each call loads, concurrent ones share).
  *

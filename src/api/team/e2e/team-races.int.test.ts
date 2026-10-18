@@ -23,7 +23,7 @@ import {
  * lock, the competing requests are started, the test waits until MySQL shows
  * them blocked behind it (performance_schema.data_lock_waits), then releases
  * the lock. Exactly one of the competitors wins, and what is stored agrees
- * with what each was told (docs/m5-plan.md §4.3).
+ * with what each was told (docs/modules/m5/plan.md §4.3).
  */
 
 let tenant: TestTenant;

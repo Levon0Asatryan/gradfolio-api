@@ -15,7 +15,7 @@ import {
 } from '../../../testing/team.js';
 
 /**
- * A team change and its notification are one transaction (docs/m5-plan.md §5,
+ * A team change and its notification are one transaction (docs/modules/m5/plan.md §5,
  * §9): a failure on either side leaves neither. Both directions, for every
  * write that notifies, plus once with a real MySQL error from a trigger.
  *

@@ -35,7 +35,7 @@ const NAME_MAX = 255; // users.name VARCHAR(255)
 const HEADLINE_MAX = 500; // users.headline VARCHAR(500)
 
 /**
- * Pre-fill rules (docs/m2-plan.md §3.4). Data from an identity provider is cut
+ * Pre-fill rules (docs/modules/m2/plan.md §3.4). Data from an identity provider is cut
  * or dropped, never rejected: a login must not fail because a provider sent a
  * 300-character name or an odd picture URL.
  */
@@ -49,7 +49,7 @@ export function prefillFrom(identity: AccessTokenIdentity): UserPrefill {
 
   // An Auth0 database login's `name` claim *is* the email address. Used as is,
   // it would publish the login email as the display name on a public profile
-  // (found with a real database-login token, docs/m3-verification.md §7), so a
+  // (found with a real database-login token, docs/modules/m3/verification.md §7), so a
   // name that is an email address counts as no name: the local part is used.
   const claimedName = looksLikeEmail(identity.name) ? undefined : nonBlank(identity.name);
   const name = claimedName ?? nonBlank(email?.slice(0, email.indexOf('@'))) ?? FALLBACK_NAME;
@@ -61,7 +61,7 @@ export function prefillFrom(identity: AccessTokenIdentity): UserPrefill {
       ? identity.picture
       : null;
 
-  // LinkedIn's sign-in does not provide a headline (m2-plan §8.2); one is used
+  // LinkedIn's sign-in does not provide a headline (docs/modules/m2/plan §8.2); one is used
   // only if a LinkedIn identity ever carries it.
   const headline =
     identity.sub.startsWith('linkedin|') && identity.headline !== undefined

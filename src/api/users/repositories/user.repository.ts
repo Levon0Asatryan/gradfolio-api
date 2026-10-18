@@ -68,7 +68,7 @@ export async function githubIdTaken(trx: Transaction<DB>, githubId: string): Pro
  * login never overwrites what the user edited. The re-read is `FOR SHARE`: in
  * a transaction that has already read, a plain SELECT sees its old snapshot
  * and misses a row a competitor committed meanwhile (run: it returns no row;
- * docs/m2-plan.md §2.5).
+ * docs/modules/m2/plan.md §2.5).
  */
 export async function upsertByAuth0Id(
   trx: Transaction<DB>,

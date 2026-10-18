@@ -156,11 +156,11 @@ Notification rows are never created over HTTP; only team services write them. No
 | **Poll the count, 60 s** | One indexed `COUNT(*)`; works through the Next server (Q11) | Up to 60 s late; must pause when hidden                                                                                                                                                               |
 | SSE                      | Instant                                                     | A held connection per tab on a 30 s request timeout and concurrency 40; the FE calls the API only from its server, so the stream would pass through Vercel functions; reconnect and auth-expiry logic |
 
-**Recommendation: refresh on navigation and focus, plus a 60 s poll of the unread count only while `document.visibilityState === 'visible'`;** the list loads when the bell opens, and after accept/reject it refetches the count. Cost: Cloud Run already runs min 1 (`docs/deploy.md`), so the poll adds request CPU only: one tiny query per 60 s per open tab, i.e. tens of users ≈ well under 1 request/s, inside the 120/min default budget (one tab uses 1 + navigations). No new infrastructure. The FE plan agrees with this; websockets stay out of v1.
+**Recommendation: refresh on navigation and focus, plus a 60 s poll of the unread count only while `document.visibilityState === 'visible'`;** the list loads when the bell opens, and after accept/reject it refetches the count. Cost: Cloud Run already runs min 1 (`docs/ops/deploy.md`), so the poll adds request CPU only: one tiny query per 60 s per open tab, i.e. tens of users ≈ well under 1 request/s, inside the 120/min default budget (one tab uses 1 + navigations). No new infrastructure. The FE plan agrees with this; websockets stay out of v1.
 
 ## 7. Teams on profile and lists (5.3)
 
-The read side exists (accepted rows only; `team[]` on the project). M5 adds: the teammate branch of §2.3, `team[]` showing the **live** member name and avatar when the member's profile is visible (M4's `memberVisible`), else the row's name and no avatar; avatars of linked members now come from `users.avatar_url` through `FileUrlService.read`, which resolves the "M5 must" note in m4-plan §3.6 (row `avatar_url` stays NULL for externals; no new file registration). Pending and rejected never appear in any response but the owner's `GET /projects/:id/team`, and the invitee's own notification.
+The read side exists (accepted rows only; `team[]` on the project). M5 adds: the teammate branch of §2.3, `team[]` showing the **live** member name and avatar when the member's profile is visible (M4's `memberVisible`), else the row's name and no avatar; avatars of linked members now come from `users.avatar_url` through `FileUrlService.read`, which resolves the "M5 must" note in docs/modules/m4/plan §3.6 (row `avatar_url` stays NULL for externals; no new file registration). Pending and rejected never appear in any response but the owner's `GET /projects/:id/team`, and the invitee's own notification.
 
 ## 8. Activities (PR c)
 
@@ -206,7 +206,7 @@ Every endpoint: `OPERATIONS`, a request in `http/team.http` / `notifications.htt
 | (a)  | Migration 0006 + types; `projectReadableBy` and the teammate branch; `GET /projects/:id/team`; notifications list, unread count, mark one, mark all; seed `params`; OpenAPI, `http/`; account-deletion cleanup. |
 | (b)  | Lookup, invite, external, remove, accept, reject, leave, with notifications in the same transaction; barrier races; transaction proofs.                                                                         |
 | (c)  | Activities table use: registry, writers in existing services, `GET /me/activities`.                                                                                                                             |
-| then | `docs/m5-verification.md`: fresh clone, coverage ≥ 90 %, integration, second-user matrix, real two-account Auth0 run (Levon's second account), prod `/readyz`.                                                  |
+| then | `docs/modules/m5/verification.md`: fresh clone, coverage ≥ 90 %, integration, second-user matrix, real two-account Auth0 run (Levon's second account), prod `/readyz`.                                          |
 
 ## 12. Out of scope
 
@@ -215,5 +215,5 @@ Email or push for notifications; deleting notifications; editing a member's role
 ## 13. Not verified in this plan
 
 - FOR SHARE (accept) vs FOR UPDATE (invite/remove) lock interplay was reasoned from InnoDB rules and R3, not run end to end; PR (b)'s barrier tests are its proof.
-- The cost line in §6 is arithmetic from `docs/deploy.md`, not a measured load.
+- The cost line in §6 is arithmetic from `docs/ops/deploy.md`, not a measured load.
 - Real Auth0 tokens for two accounts: needs Levon's second account.

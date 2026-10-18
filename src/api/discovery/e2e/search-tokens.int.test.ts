@@ -5,7 +5,7 @@ import { createProject, createUser } from '../../../testing/factories.js';
 import { FT_STOPWORDS } from '../utils/search-query.js';
 
 /**
- * The server facts the search design rests on (docs/m6-plan.md §1.4), asserted
+ * The server facts the search design rests on (docs/modules/m6/plan.md §1.4), asserted
  * so that a MySQL upgrade or a changed Cloud SQL flag fails here instead of
  * returning silent zeros in production.
  */

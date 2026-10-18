@@ -1,7 +1,7 @@
 # M6 verification: discovery and dashboard (API)
 
 What was run for tasks 6.1 to 6.5 and the suggestions endpoint, and what it produced.
-Plan: [m6-plan.md](m6-plan.md). Everything below was run on **MySQL 8.4.11** (compose
+Plan: [m6-plan.md](plan.md). Everything below was run on **MySQL 8.4.11** (compose
 project `gradfolio-m6`) unless it says production.
 
 | PR  | What                                                     | State (2026-10-11)                                  |

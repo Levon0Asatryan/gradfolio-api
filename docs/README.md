@@ -4,20 +4,21 @@ This folder holds documentation that belongs **with the code**: it would go out 
 date if the code changed and nobody updated it, so it is reviewed in the same pull
 request as the change that affects it.
 
-| Document                                   | Covers                                                                        |
-| ------------------------------------------ | ----------------------------------------------------------------------------- |
-| [../README.md](../README.md)               | Running, developing, configuring, the layout and its rules                    |
-| [tracker.md](tracker.md)                   | Status of every milestone, PR and follow-up. Read it first.                   |
-| [investigation.md](investigation.md)       | Database and frontend analysis, facts verified on MySQL 8.4, decisions Q1–Q10 |
-| [handoff-template.md](handoff-template.md) | How work is handed to a worker chat and reported back                         |
-| [auth0-setup.md](auth0-setup.md)           | The Auth0 tenant configuration the API and frontend depend on (a checklist)   |
-| [../openapi.yaml](../openapi.yaml)         | The API surface, generated from the zod schemas                               |
-| `mN-plan.md`                               | The investigation and plan each milestone was built from                      |
-| `mN-verification.md`                       | What was run to accept each milestone, and what it produced                   |
-| [spec/](spec/)                             | The product feature specification and the competitor analysis                 |
-| [issues.md](issues.md)                     | Known defects across all three repos (S\*, F\*, P\* IDs)                      |
-| [handoffs/](handoffs/README.md)            | The prompt each worker or lead chat was given, and its report, per milestone  |
-| [course/](course/)                         | Coursework: how the project is split between the three students (Armenian)    |
+The folders, from the top:
+
+| Where                              | What it holds                                                                                                                                                                                    |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [tracker.md](tracker.md)           | **The general plan.** Status of every milestone, decision, PR and follow-up. Read it first.                                                                                                      |
+| [modules/](modules/README.md)      | **One folder per module** (M1–M9, deploy, UI): its plan, verification and, from M8 on, task briefs. Also how the three levels of chats work.                                                     |
+| [ops/](ops/)                       | Running the system: the [deploy runbook](ops/deploy.md) and the [Auth0 tenant checklist](ops/auth0-setup.md)                                                                                     |
+| [process/](process/)               | How work is done: the [handoff template](process/handoff-template.md) and [every prompt and report](process/handoffs/README.md)                                                                  |
+| [reference/](reference/)           | Background that doesn't change per milestone: the [investigation](reference/investigation.md), [known defects](reference/issues.md), the [product spec and competitor analysis](reference/spec/) |
+| [course/](course/)                 | Coursework: how the project is split between the three students (Armenian)                                                                                                                       |
+| [../README.md](../README.md)       | Running, developing, configuring, the layout and its rules                                                                                                                                       |
+| [../openapi.yaml](../openapi.yaml) | The API surface, generated from the zod schemas                                                                                                                                                  |
+
+M7's plan and production-run documents are still at `docs/m7-plan.md` and
+`docs/m7-prod-run.md` while M7 is in progress.
 
 ## What is not here
 

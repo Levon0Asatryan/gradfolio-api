@@ -2,7 +2,7 @@
 #
 # Needs an Auth0 access token for the Gradfolio API audience. Locally: log in
 # through the frontend and open http://localhost:3000/auth/access-token
-# (docs/auth0-setup.md §7); put the token in .env as `accessToken=…`.
+# (docs/ops/auth0-setup.md §7); put the token in .env as `accessToken=…`.
 
 @baseUrl = {{$dotenv baseUrl}}
 @accessToken = {{$dotenv accessToken}}
