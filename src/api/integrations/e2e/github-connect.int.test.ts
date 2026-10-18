@@ -506,6 +506,33 @@ describe('link', () => {
     expect(await verifiedOf(s.id)).toBe(true);
   });
 
+  it('connects the identity that was linked when the login holds several GitHub identities', async () => {
+    const http = await start();
+    const s = await student('auth0|two-github');
+    githubKnows('201', 'first-gh');
+    githubKnows('202', 'second-gh');
+    const token = await idToken('202', await nonceFor(http, s));
+    // Auth0 now holds two GitHub identities for the login; the id token names the second.
+    linkedAtAuth0(s.sub, '201', 'first-gh');
+    auth0.users.get(s.sub)!.push({
+      provider: 'github',
+      user_id: 202,
+      connection: 'github',
+      isSocial: true,
+      access_token: auth0.githubTokenFor('202'),
+    });
+    const res = await http
+      .post('/v1/me/integrations/github/link')
+      .set(s.auth)
+      .send({ idToken: token })
+      .expect(200);
+    expect(res.body).toEqual({ state: 'connected', login: 'second-gh' });
+    expect(await githubRow(s.id)).toMatchObject({
+      externalUserId: '202',
+      externalLogin: 'second-gh',
+    });
+  });
+
   it('a refusal is logged with Auth0’s own words, never a credential', async () => {
     const http = await start();
     const s = await student('auth0|refused-words');

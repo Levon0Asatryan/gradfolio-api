@@ -256,7 +256,8 @@ export class GithubConnectionService {
 
     // Step 5. A failure from here on also leaves the reservation for reconciliation.
     gh.tokens.forget(user.auth0Id);
-    const found = await gh.tokens.tokenFor(user.auth0Id);
+    // The identity that was linked, not whichever GitHub identity comes first.
+    const found = await gh.tokens.tokenFor(user.auth0Id, undefined, claims.githubUserId);
     if (found === null) throw new IntegrationUnavailableError('linked identity not visible yet');
     const ghUser = await this.githubUser(gh, user.auth0Id, found);
     await this.markConnected(user.id, ghUser, reserved);
@@ -311,7 +312,10 @@ export class GithubConnectionService {
   async revokeBeforeAccountDeletion(user: UserRow): Promise<number | null> {
     const first = await this.githubRow(user.id);
     let version = versionOf(first);
-    if (first !== undefined && first.status !== 'not_connected') {
+    // A GitHub row of any status means GitHub was used here: without the means to reach
+    // Auth0 (credentials removed from the deployment) a linked identity could not be
+    // unlinked, so the deletion waits (503) rather than leave it to refuse the next link.
+    if (first !== undefined && (first.status !== 'not_connected' || this.gh === null)) {
       const gh = this.required();
       await this.reconcile(gh, user);
       const row = await this.githubRow(user.id);

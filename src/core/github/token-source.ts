@@ -16,7 +16,11 @@ export interface GithubIdentity {
  */
 export interface GithubTokenSource {
   /** The caller's GitHub identity and token; null when no GitHub identity is linked. */
-  tokenFor(auth0Sub: string, signal?: AbortSignal): Promise<GithubIdentity | null>;
+  tokenFor(
+    auth0Sub: string,
+    signal?: AbortSignal,
+    githubUserId?: string,
+  ): Promise<GithubIdentity | null>;
   /** Drops what is cached for `auth0Sub` (disconnect, a GitHub 401, account deletion). */
   forget(auth0Sub: string): void;
 }
@@ -43,13 +47,29 @@ export class Auth0IdpTokenSource implements GithubTokenSource {
     private readonly now: () => number = Date.now,
   ) {}
 
-  async tokenFor(auth0Sub: string, signal?: AbortSignal): Promise<GithubIdentity | null> {
+  async tokenFor(
+    auth0Sub: string,
+    signal?: AbortSignal,
+    githubUserId?: string,
+  ): Promise<GithubIdentity | null> {
     const hit = this.cache.get(auth0Sub);
-    if (hit && this.now() < hit.expiresAt) return hit.identity;
+    // A login can hold more than one GitHub identity: when a caller names one, only it will do.
+    if (
+      hit &&
+      this.now() < hit.expiresAt &&
+      (githubUserId === undefined || hit.identity.githubUserId === githubUserId)
+    ) {
+      return hit.identity;
+    }
     this.cache.delete(auth0Sub);
 
     const identities = await this.management.identities(auth0Sub, signal);
-    const github = identities?.find((i) => i.provider === 'github' && i.isSocial);
+    const github = identities?.find(
+      (i) =>
+        i.provider === 'github' &&
+        i.isSocial &&
+        (githubUserId === undefined || i.userId === githubUserId),
+    );
     if (github === undefined) return null;
     if (github.accessToken === undefined) {
       // The identity is there but Auth0 gave no token: the M2M app lacks

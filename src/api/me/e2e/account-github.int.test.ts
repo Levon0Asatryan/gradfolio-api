@@ -226,6 +226,26 @@ describe('account deletion revokes first', () => {
       expect(unlinks()).toEqual([]);
     });
 
+    it('without the means to reach Auth0, an account that used GitHub waits (503); one that never did does not', async () => {
+      const http = await h.start();
+      const used = await h.student('auth0|used-github');
+      h.linkedAtAuth0(used.sub, '125', 'used');
+      await http.post('/v1/me/integrations/github/connect').set(used.auth).expect(200);
+      await http.delete('/v1/me/integrations/github').set(used.auth).expect(200);
+      expect(await githubRow(used.id)).toMatchObject({ status: 'not_connected' });
+
+      // The deployment loses the credentials: the identity cannot be unlinked, so the deletion waits.
+      const bare = await h.start({});
+      const res = await bare.delete('/v1/me').set(used.auth).expect(503);
+      expect(res.body.code).toBe('INTEGRATION_UNAVAILABLE');
+      expect(
+        await db.selectFrom('users').select('id').where('id', '=', used.id).execute(),
+      ).toHaveLength(1);
+
+      const never = await h.student('auth0|never-used-github');
+      await bare.delete('/v1/me').set(never.auth).expect(204);
+    });
+
     it('an account that never linked GitHub asks Auth0 once and unlinks nothing', async () => {
       const http = await h.start();
       const s = await h.student('auth0|never-linked');
