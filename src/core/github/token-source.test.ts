@@ -71,6 +71,21 @@ describe('Auth0IdpTokenSource', () => {
     expect(await source.tokenFor('auth0|a', undefined, '9')).toBeNull();
   });
 
+  it('caches each wanted identity on its own, and forget drops them all', async () => {
+    const { m, calls } = management({ 'auth0|a': [github('7', 'tok7'), github('8', 'tok8')] });
+    const source = new Auth0IdpTokenSource(m, { ttlMs: 1000, maxEntries: 10 });
+    await source.tokenFor('auth0|a', undefined, '8');
+    await source.tokenFor('auth0|a', undefined, '7');
+    await source.tokenFor('auth0|a', undefined, '8');
+    await source.tokenFor('auth0|a', undefined, '7');
+    expect(calls).toHaveLength(2);
+    expect(source.size).toBe(2);
+    source.forget('auth0|a');
+    expect(source.size).toBe(0);
+    await source.tokenFor('auth0|a', undefined, '8');
+    expect(calls).toHaveLength(3);
+  });
+
   it('a GitHub identity without a token is a configuration fault: 503', async () => {
     const { m } = management({ 'auth0|a': [github('7')] });
     await expect(

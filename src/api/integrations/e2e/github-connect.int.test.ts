@@ -12,6 +12,7 @@ import {
   githubConnectHarness,
   githubRow,
   sha256,
+  type Http,
   SPA_CLIENT_ID,
   type Student,
   verifiedOf,
@@ -530,6 +531,91 @@ describe('link', () => {
     expect(await githubRow(s.id)).toMatchObject({
       externalUserId: '202',
       externalLogin: 'second-gh',
+    });
+  });
+
+  describe('a login holding several GitHub identities, the linked one not first', () => {
+    /** Auth0 lists identity `first` before `second`; `second` is linked. Returns the student, connected to it. */
+    async function connectedToSecond(http: Http, first: string, second: string) {
+      const s = await student(`auth0|several-${first}`);
+      githubKnows(first, `gh-${first}`);
+      githubKnows(second, `gh-${second}`);
+      const token = await idToken(second, await nonceFor(http, s));
+      linkedAtAuth0(s.sub, first, `gh-${first}`);
+      auth0.users.get(s.sub)!.push({
+        provider: 'github',
+        user_id: Number(second),
+        connection: 'github',
+        isSocial: true,
+        access_token: auth0.githubTokenFor(second),
+      });
+      await http
+        .post('/v1/me/integrations/github/link')
+        .set(s.auth)
+        .send({ idToken: token })
+        .expect(200);
+      expect(await githubRow(s.id)).toMatchObject({ status: 'connected', externalUserId: second });
+      return s;
+    }
+    const lastAuthorization = (path: string) =>
+      gh.requests.filter((r) => r.path === path).at(-1)?.authorization;
+
+    it('every later GitHub read uses the connected identity, with the cache and without it', async () => {
+      for (const [cache, first, second] of [
+        ['300', '211', '212'],
+        ['0', '213', '214'],
+      ] as const) {
+        const http = await start({ ...GITHUB_ENV(), GITHUB_TOKEN_CACHE_S: cache });
+        const s = await connectedToSecond(http, first, second);
+        gh.requests.length = 0;
+        await http.get('/v1/me/github/repos').set(s.auth).expect(200);
+        await http.get('/v1/me/github/repos').set(s.auth).expect(200);
+        expect(lastAuthorization('/user/repos'), cache).toBe(
+          `Bearer ${auth0.githubTokenFor(second)}`,
+        );
+        // Connect again: the connection stays on its own identity.
+        await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(200);
+        expect(await githubRow(s.id)).toMatchObject({
+          externalUserId: second,
+          externalLogin: `gh-${second}`,
+        });
+      }
+    });
+
+    it('disconnect revokes the connected identity’s grant, not the first one’s', async () => {
+      const http = await start();
+      const s = await connectedToSecond(http, '221', '222');
+      await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+      expect(gh.revoked).toEqual([auth0.githubTokenFor('222')]);
+      expect(gh.tokens.has(auth0.githubTokenFor('221'))).toBe(true);
+      expect(await githubRow(s.id)).toMatchObject({ status: 'not_connected' });
+    });
+
+    it('a half-done link to the second identity settles to that identity', async () => {
+      const http = await start();
+      const s = await student('auth0|several-half');
+      githubKnows('231', 'gh-231');
+      githubKnows('232', 'gh-232');
+      const token = await idToken('232', await nonceFor(http, s));
+      auth0.linkStatus = 504;
+      await http
+        .post('/v1/me/integrations/github/link')
+        .set(s.auth)
+        .send({ idToken: token })
+        .expect(503);
+      delete auth0.linkStatus;
+      // Auth0 did link it after all, and the login also holds the first identity.
+      linkedAtAuth0(s.sub, '231', 'gh-231');
+      auth0.users.get(s.sub)!.push({
+        provider: 'github',
+        user_id: 232,
+        connection: 'github',
+        isSocial: true,
+        access_token: auth0.githubTokenFor('232'),
+      });
+      await ageReservation(s.id);
+      const card = await http.get('/v1/me/integrations').set(s.auth).expect(200);
+      expect(card.body.github).toMatchObject({ status: 'connected', login: 'gh-232' });
     });
   });
 

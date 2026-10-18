@@ -122,7 +122,12 @@ export class GithubConnectionService {
     if (row?.status !== 'connected') {
       throw new ConflictError('GITHUB_NOT_CONNECTED', 'connect GitHub first');
     }
-    const found = await gh.tokens.tokenFor(user.auth0Id);
+    // The identity that was connected, not whichever GitHub identity comes first.
+    const found = await gh.tokens.tokenFor(
+      user.auth0Id,
+      undefined,
+      row.externalUserId ?? undefined,
+    );
     if (found === null) {
       await this.markDisconnected(user.id, identity, versionOf(row));
       throw new GithubNotLinkedError('no github identity at auth0');
@@ -147,7 +152,9 @@ export class GithubConnectionService {
     const row = await this.githubRow(user.id);
     if (row?.status === 'linking') throw linkInProgress();
 
-    const found = await gh.tokens.tokenFor(user.auth0Id);
+    // A connection already made stays on its own identity.
+    const wanted = row?.status === 'connected' ? (row.externalUserId ?? undefined) : undefined;
+    const found = await gh.tokens.tokenFor(user.auth0Id, undefined, wanted);
     if (found === null) {
       if (row?.status === 'connected') {
         await this.markDisconnected(user.id, identity, versionOf(row));
@@ -283,7 +290,7 @@ export class GithubConnectionService {
       // and stamp `connected` onto a dead grant.
       expected = await this.beginRevocation(user.id, row);
       try {
-        await this.revoke(gh, user.auth0Id);
+        await this.revoke(gh, user.auth0Id, row.externalUserId);
       } catch (err) {
         // Back to connected only when the grant certainly stands: GitHub said
         // so, or the request never went out. After a timeout, a dropped
@@ -322,7 +329,7 @@ export class GithubConnectionService {
       // A link or a revocation in flight can still change what the grant is:
       // revoking now, or deleting the row, would miss what it is about to make.
       if (row?.status === 'linking') throw linkInProgress();
-      if (row?.status === 'connected') await this.revoke(gh, user.auth0Id);
+      if (row?.status === 'connected') await this.revoke(gh, user.auth0Id, row.externalUserId);
       version = versionOf(row);
     }
     // Whatever the row says, Auth0 may still hold a GitHub identity linked to this
@@ -423,9 +430,10 @@ export class GithubConnectionService {
    * is dropped first, because a stale token that GitHub already refuses would
    * read as "already gone" while a newer token stayed alive.
    */
-  private async revoke(gh: GithubConnect, sub: string): Promise<void> {
+  private async revoke(gh: GithubConnect, sub: string, githubUserId: string | null): Promise<void> {
     gh.tokens.forget(sub);
-    const found = await gh.tokens.tokenFor(sub);
+    // The grant of the connected account, not the first GitHub identity's.
+    const found = await gh.tokens.tokenFor(sub, undefined, githubUserId ?? undefined);
     // No GitHub identity at Auth0: there is no token left to revoke.
     if (found !== null) {
       const result = await gh.github.deleteGrant(
@@ -586,7 +594,11 @@ export class GithubConnectionService {
     if (stale === undefined) return;
 
     let confirmed: GithubUser | undefined;
-    const found = await gh.tokens.tokenFor(user.auth0Id);
+    const found = await gh.tokens.tokenFor(
+      user.auth0Id,
+      undefined,
+      stale.externalUserId ?? undefined,
+    );
     if (found !== null && found.githubUserId === stale.externalUserId) {
       try {
         const ghUser = await this.githubUser(gh, user.auth0Id, found);
