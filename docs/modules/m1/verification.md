@@ -1,6 +1,6 @@
 # M1 verification
 
-The final test record for M1 (tracker 1.1–1.14, `docs/m1-plan.md`), run on
+The final test record for M1 (tracker 1.1–1.14, `docs/modules/m1/plan.md`), run on
 2026-09-29 against MySQL 8.4.11.
 
 - Every database run below starts from an **empty volume** (`docker compose down -v`
@@ -289,7 +289,7 @@ Before the fix, the entrypoint ran `drop.sql` and `queries.sql` first and stoppe
 
 ## 9. Plan walk
 
-Every requirement sentence in `docs/m1-plan.md`, and the line that implements it.
+Every requirement sentence in `docs/modules/m1/plan.md`, and the line that implements it.
 
 | Plan                                                                                   | Implemented at                                                                             |
 | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |

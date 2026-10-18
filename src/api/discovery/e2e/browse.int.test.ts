@@ -20,7 +20,7 @@ import { browseProjectsQuery, browseUsersQuery } from '../repositories/browse.re
 /**
  * M6 PR (b): browse (projects, people, facets) and the tag cloud against MySQL
  * 8.4: the privacy matrix for every route (X1-X4), sort and filters, paging,
- * the index each statement uses (docs/m6-plan.md §6), the cache's staleness and
+ * the index each statement uses (docs/modules/m6/plan.md §6), the cache's staleness and
  * fixed statement counts.
  */
 

@@ -28,7 +28,7 @@ export class GcsFileStorage implements FileStorage {
   }: Parameters<FileStorage['signUpload']>[0]): Promise<SignedUpload> {
     // Content-Type, an exact size and a create-only precondition are signed headers:
     // a PUT that changes any of them does not match the signature (run,
-    // docs/m4-plan.md §3.3), and once the object exists a replay of the same URL
+    // docs/modules/m4/plan.md §3.3), and once the object exists a replay of the same URL
     // is refused (412), so the bytes that were validated are the bytes that stay.
     const headers = uploadHeaders(size);
     const [url] = await this.bucket.file(key).getSignedUrl({

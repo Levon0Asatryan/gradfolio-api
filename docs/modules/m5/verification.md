@@ -1,7 +1,7 @@
 # M5 verification
 
 The final test record for M5 on the API side: tracker 5.1–5.5 and what FE tasks 5.6–5.7
-need from the API, [m5-plan.md](m5-plan.md). Fresh-clone, integration, HTTP and guard runs
+need from the API, [m5-plan.md](plan.md). Fresh-clone, integration, HTTP and guard runs
 on 2026-10-09 against MySQL 8.4.11, on `m5/c` at `4936d97` (main `4fe0930` plus PR #54), and
 the real two-account Auth0 runs of 2026-10-10 (§9), locally and on production.
 
@@ -266,7 +266,7 @@ either alone changes nothing observable, removing both fails.
 ## 14. 5.8 `GET /me/teams` (2026-10-10)
 
 One call, four lists on their own cursors (`owned`, `member`, `incoming`, `outgoing`;
-[m5-plan.md](m5-plan.md) §4 and PR #58). On `main` at `3d69f70`, MySQL 8.4.11:
+[m5-plan.md](plan.md) §4 and PR #58). On `main` at `3d69f70`, MySQL 8.4.11:
 
 - **Gate** (measured on the PR head before its last fix): verify green, 849 unit tests, 595
   integration tests (one added by the last fix), coverage 98.03 / 95.84 / 96.66 / 98.89.

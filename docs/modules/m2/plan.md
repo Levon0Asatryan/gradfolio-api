@@ -3,7 +3,7 @@
 Tracker tasks 2.1–2.16, API side, plus the design the frontend follows (2.8–2.15 are
 done later by a frontend session, from §11). Decides **Q7** (when the user row is
 created) and **Q11** (how the frontend calls the API). The Auth0 dashboard steps are in
-[auth0-setup.md](auth0-setup.md).
+[auth0-setup.md](../../ops/auth0-setup.md).
 
 Every claim marked **run** was executed on 2026-09-30 with the versions this repo pins
 or would pin: jose **6.2.12**, @nestjs/throttler **6.7.1** on @nestjs/common/core 12.1,
@@ -450,7 +450,7 @@ Every guard ships with a test that fails when it is removed (Phase 3 table).
 
 ## 6. Pull requests
 
-1. **This plan** (docs only): `docs/m2-plan.md`, `docs/auth0-setup.md`.
+1. **This plan** (docs only): `docs/modules/m2/plan.md`, `docs/ops/auth0-setup.md`.
 2. **(a) Token guard, config, errors, throttler:** config and its tests; the `core/auth`
    verifier, its errors and tests (local JWKS helper in `src/testing/`);
    `AccessTokenGuard`, `@Public()` (health); `RateLimitGuard`, `@RateBudget`;
@@ -458,7 +458,7 @@ Every guard ships with a test that fails when it is removed (Phase 3 table).
    `.env.example`, compose, CI env; CLAUDE.md commands and facts.
 3. **(b) Provisioning and `/v1/me`:** user repository + provisioning + race tests;
    `CurrentUserGuard`, `@CurrentUser()`; `GET /v1/me`; verified sync; OpenAPI (operation,
-   bearer scheme), `http/me.http`; `docs/m2-verification.md`.
+   bearer scheme), `http/me.http`; `docs/modules/m2/verification.md`.
 
 ## 7. Out of scope
 

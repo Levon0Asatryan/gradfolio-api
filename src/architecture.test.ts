@@ -66,7 +66,7 @@ describe('architecture', () => {
     ).toEqual([]);
   });
 
-  // Discovery lists columns one by one (docs/m6-plan.md §7 X6): a column added to a
+  // Discovery lists columns one by one (docs/modules/m6/plan.md §7 X6): a column added to a
   // table must be opted in before it can reach a public response.
   it('never selects every column in src/api/discovery', async () => {
     const files = (await sourceFiles(join(SRC, 'api/discovery'))).filter((f) => !isTest(f));

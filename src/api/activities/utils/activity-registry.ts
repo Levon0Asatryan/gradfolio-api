@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * Every activity the API writes: its key, whether it is a `project` or a
- * `profile` event, and the exact shape of its parameters (docs/m5-plan.md §8).
+ * `profile` event, and the exact shape of its parameters (docs/modules/m5/plan.md §8).
  *
  * The frontend renders the text from the key and the parameters (its
  * `dashboard.activity.<key>` strings, placeholders `{projectName}`, `{skillName}`,

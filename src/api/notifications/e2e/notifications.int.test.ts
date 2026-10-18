@@ -12,7 +12,7 @@ import { startTestTenant, type TestTenant } from '../../../testing/jwks.js';
 /**
  * M5 PR (a): the caller's notifications through the whole stack against MySQL
  * 8.4 -- scoping to the owner (S3), links computed from real ids (S12), and a
- * notification about something that is gone (docs/m5-plan.md §5).
+ * notification about something that is gone (docs/modules/m5/plan.md §5).
  */
 
 let tenant: TestTenant;

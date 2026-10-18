@@ -170,7 +170,7 @@ describe('logging', () => {
   });
 });
 
-describe('the forwarded client address (D4, docs/m6-plan.md §2.4)', () => {
+describe('the forwarded client address (D4, docs/modules/m6/plan.md §2.4)', () => {
   const SECRET = 'a'.repeat(40);
   const PREVIOUS = 'b'.repeat(40);
   const vouched = (ip: string, secret = SECRET) => ({

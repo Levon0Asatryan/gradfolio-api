@@ -4,7 +4,7 @@ import { discoverableOwner, discoverableProject, discoverableUser } from '../uti
 import type { DiscoveryCursor } from '../utils/discovery-cursor.js';
 
 /**
- * Projects and people for one term (docs/m6-plan.md §3). Names match through
+ * Projects and people for one term (docs/modules/m6/plan.md §3). Names match through
  * the term tables' case-insensitive collation, never `JSON_CONTAINS` (S9).
  */
 

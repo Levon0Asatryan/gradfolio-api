@@ -18,7 +18,7 @@ const SWEEP_LIMIT = 100_000;
 
 /**
  * Finds objects that no row points at -- an upload never registered, a claim
- * whose transaction rolled back, a delete that failed (docs/m4-plan.md §3.5) --
+ * whose transaction rolled back, a delete that failed (docs/modules/m4/plan.md §3.5) --
  * and deletes those older than `minAgeMs`. The age floor is what keeps a file
  * that was just claimed, with its row not yet committed, from being taken.
  * Only the `u/` prefix is looked at. `apply: false` reports and deletes nothing.

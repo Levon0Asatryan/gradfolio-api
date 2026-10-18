@@ -23,7 +23,7 @@ export async function findOwnedProjectId(
 
 /**
  * Every team write below runs inside `inTransaction`, in this lock order: the
- * project row, then the member row, then inserts (docs/m5-plan.md §4.3). One
+ * project row, then the member row, then inserts (docs/modules/m5/plan.md §4.3). One
  * order for all of them, so invite, accept, remove and leave cannot deadlock.
  */
 

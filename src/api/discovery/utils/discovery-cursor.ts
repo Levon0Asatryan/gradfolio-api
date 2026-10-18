@@ -5,7 +5,7 @@ import { z } from 'zod';
  * `(time, id)` for lists in time order. `s` names the list, so one list's
  * cursor is a 400 on another.
  *
- * Not authenticated, by design (docs/m6-plan.md §3.1): it only positions a
+ * Not authenticated, by design (docs/modules/m6/plan.md §3.1): it only positions a
  * comparison inside a statement that re-applies the query's predicates and the
  * visibility predicates, so a forged one can skip or repeat rows of the
  * forger's own listing and nothing more.

@@ -16,7 +16,7 @@ Repo: /Users/levon/Dev/university/gradfolio-repos/gradfolio-api
 (GitHub Levon0Asatryan/gradfolio-api).
 
 Read these first, in order: CLAUDE.md, AGENTS.md, docs/tracker.md,
-docs/investigation.md.
+docs/reference/investigation.md.
 
 ## Task
 <one milestone or one plan step>
@@ -35,7 +35,7 @@ docs/investigation.md.
 
 ## Phase 1: Investigation (before any plan or code)
 - Every requirement in scope: the spec in
-  gradfolio-api `docs/spec/`, the schema in ../gradfolio-sql,
+  gradfolio-api `docs/reference/spec/`, the schema in ../gradfolio-sql,
   and the frontend types in ../gradfolio/src. List any contradictions.
 - The code on main that this work touches, and the patterns to follow.
 - How comparable systems solve the problem, and their published bugs and
@@ -64,7 +64,7 @@ Follow the approved plan. Put any deviations in the report under "Decisions made
   fix could have broken. Resolve each thread once its fix is verified.
 
 ## Stop points
-- After writing docs/mN-plan.md: stop and report.
+- After writing docs/modules/mN/plan.md: stop and report.
 - Do not merge. Do not push to main.
 - Do not edit the gradfolio or gradfolio-sql repos. List the changes they need in
   your report.
@@ -95,7 +95,7 @@ Handle these yourself and put them in the report instead:
 Fix or defer, resolving threads, and moving between PRs are your decisions.
 
 Send reports to the orchestrator session <name> with SendMessage, in the format
-from docs/handoff-template.md, part 2.
+from docs/process/handoff-template.md, part 2.
 ```
 
 ## Part 2: report from the worker

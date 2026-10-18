@@ -6699,7 +6699,7 @@ components:
           type: string
         descriptionHtml:
           nullable: true
-          description: Sanitized HTML (allow-list in docs/m4-plan.md §4.1). Render it with a second sanitizer anyway.
+          description: Sanitized HTML (allow-list in docs/modules/m4/plan.md §4.1). Render it with a second sanitizer anyway.
           type: string
         liveDemoUrl:
           nullable: true

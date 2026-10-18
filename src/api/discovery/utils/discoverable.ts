@@ -4,7 +4,7 @@ import { visibleTo } from '../../profiles/utils/visibility.js';
 import { projectVisibleTo } from '../../projects/utils/visibility.js';
 
 /**
- * What discovery may show (docs/m6-plan.md §2.5, §4.1): search, tags, browse and
+ * What discovery may show (docs/modules/m6/plan.md §2.5, §4.1): search, tags, browse and
  * the tag cloud. The one place M6 composes visibility, so a new endpoint cannot
  * forget a predicate.
  *

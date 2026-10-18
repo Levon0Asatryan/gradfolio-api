@@ -5,14 +5,22 @@ pull request. This file has the conventions to follow while writing.
 
 ## How work is done
 
-Work is split across chats:
+Work is split across chats, on three levels (details in
+[docs/modules/README.md](docs/modules/README.md)):
 
-- one **orchestrator** session tracks the project and checks the work;
-- **worker** chats each implement one milestone, or one step of a plan, from a
-  handoff prompt (`docs/handoff-template.md`).
+- the **main chat** (the orchestrator) owns `docs/tracker.md`, splits each module into
+  task briefs, and checks finished work;
+- one **module chat** per module in progress sequences that module's tasks, owns the
+  review waits and merges, and keeps the task table in `docs/modules/mN/README.md`
+  current;
+- one **task chat** per task does exactly one brief from `docs/modules/mN/tasks/`, in
+  the format of `docs/process/handoff-template.md`.
 
-`docs/tracker.md` is the status of record, so read it first. Levon approves plans and
-merges pull requests. No chat merges.
+Earlier modules (M1–M7) ran as a single lead chat with sub-agents. Their documents are
+in `docs/modules/mN/`.
+
+`docs/tracker.md` is the general plan and the status of record, so read it first.
+Levon approves plans and decisions. A task chat never merges its own PR.
 
 ### Cost discipline: keep the review loop cheap
 
@@ -93,7 +101,7 @@ merges pull requests. No chat merges.
 
 ### Before writing code
 
-- Plan first, in `docs/mN-plan.md`: investigation, decisions, data model, endpoints,
+- Plan first, in `docs/modules/mN/plan.md`: investigation, decisions, data model, endpoints,
   security properties and how each is proved, and the PR breakdown.
 - Check that `git config user.email` is the email of the developer whose chat this
   is (for Levon, `levonasatryan1098@gmail.com`).
@@ -158,9 +166,9 @@ merges pull requests. No chat merges.
    - Use `--rm` on throwaway `docker run`s, and remove scratch files.
    - An evidence run starts from an empty database volume so old rows cannot leak
      into its numbers. Say so in the report.
-6. At the end of a milestone, write `docs/mN-verification.md`: what was run and what
+6. At the end of a milestone, write `docs/modules/mN/verification.md`: what was run and what
    it produced, including defects found by running it.
-7. Report in the format in `docs/handoff-template.md`. Say plainly what was not
+7. Report in the format in `docs/process/handoff-template.md`. Say plainly what was not
    verified.
 
 Style: laconic. Same facts, fewer words.
@@ -183,7 +191,7 @@ Absolute path: `/Users/levon/Dev/university/gradfolio-repos`.
 | `gradfolio-sql/` | MySQL 8.4 schema (11 tables), seed data, example queries, per-table docs.     |
 
 Background for every milestone:
-[`docs/investigation.md`](docs/investigation.md), covering the schema facts verified
+[`docs/reference/investigation.md`](docs/reference/investigation.md), covering the schema facts verified
 by running them, the gaps between frontend and schema, and open decisions Q1–Q10.
 
 ### Stack
@@ -192,7 +200,7 @@ Decided: **NestJS 12 on Node 24, TypeScript 6.0 (ESM, `nodenext`)**, Express 5,
 zod 4 for config and request validation, pino (`nestjs-pino`) for logs, `mysql2`
 for the MySQL 8.4 pool, Vitest 5, ESLint 10 (type-aware) with Prettier, husky and
 lint-staged. Schema: owned here, as SQL migrations run by our own per-step runner
-(`src/core/db/migrator`); query layer: Kysely (both decided in `docs/m1-plan.md`).
+(`src/core/db/migrator`); query layer: Kysely (both decided in `docs/modules/m1/plan.md`).
 
 - **TypeScript stays on 6.0.x**: typescript-eslint 8 supports `<6.1.0`. Dependabot
   ignores TypeScript minor and major bumps.
@@ -302,7 +310,7 @@ so a move silently re-admits an excluded file.
 
 ### Facts every chat must know
 
-These are established in `docs/investigation.md`; do not re-argue them.
+These are established in `docs/reference/investigation.md`; do not re-argue them.
 
 - **The backend generates ids** (`newId()`). An INSERT that relies on `DEFAULT (UUID())`
   cannot return the new id (`LAST_INSERT_ID()` = 0); the row types make `id` required.
@@ -325,7 +333,7 @@ These are established in `docs/investigation.md`; do not re-argue them.
 - **Every route needs a token unless it is `@Public()`** (`AccessTokenGuard`, global).
   Tokens: RS256 only, fixed issuer (one trailing slash) and audience, `exp` required
   (jose accepts a token without one unless told). A failure to fetch Auth0's keys is
-  `503 AUTH_UNAVAILABLE`, never 401 (`docs/m2-plan.md` §2.2). Never log a jose error
+  `503 AUTH_UNAVAILABLE`, never 401 (`docs/modules/m2/plan.md` §2.2). Never log a jose error
   or its message: claim errors carry the token's whole payload.
 - **Rate limits** (`RateLimitGuard`, after the token guard): keyed by the verified
   `sub`, else the address. The frontend calls from its server, so an address key would
@@ -334,7 +342,7 @@ These are established in `docs/investigation.md`; do not re-argue them.
   (run, `@nestjs/throttler` 6.7.1), so routes under one named budget share its **limit
   value**, never a counter: one route cannot spend another's allowance. A visitor the
   frontend vouched for (`X-Client-IP` + `X-Gradfolio-Proxy-Secret`) is keyed by that
-  address (`docs/m6-plan.md` §2.4). `@nestjs/throttler` takes `ttl` in
+  address (`docs/modules/m6/plan.md` §2.4). `@nestjs/throttler` takes `ttl` in
   **milliseconds**. `TRUST_PROXY` is a hop count, never `true`.
 - **This repository owns the schema** (`src/core/db/migrations`). `gradfolio-sql` is
   reference docs; its `schema.sql` is frozen as `0001_baseline`.

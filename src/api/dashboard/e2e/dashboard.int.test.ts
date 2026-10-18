@@ -21,7 +21,7 @@ import {
  * M6 PR (c): GET /v1/me/dashboard against MySQL 8.4 -- counts, recent projects,
  * the feed and the 30-day count equal what is stored; a second user gets their
  * own and nothing of anyone else's; the statement count is fixed; the indexes
- * serve each statement (docs/m6-plan.md §3.2, §7 X7).
+ * serve each statement (docs/modules/m6/plan.md §3.2, §7 X7).
  */
 
 let tenant: TestTenant;

@@ -1,7 +1,7 @@
 # M2 verification
 
 The final test record for M2 on the API side: tracker 2.1–2.7 and 2.16,
-[m2-plan.md](m2-plan.md). Run on 2026-10-02 and 2026-10-03 against MySQL 8.4.11 and
+[m2-plan.md](plan.md). Run on 2026-10-02 and 2026-10-03 against MySQL 8.4.11 and
 the Auth0 tenant `dev-wkthnyn8b8mjn5ae`.
 
 - Every stack run starts from an **empty volume** (`docker-compose -p gradfolio-m2

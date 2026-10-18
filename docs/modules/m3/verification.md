@@ -1,7 +1,7 @@
 # M3 verification
 
 The final test record for M3 on the API side: tracker 3.1–3.6, the API half of 2.12 and
-2.14, [m3-plan.md](m3-plan.md). Unit, integration, clone, stack and guard runs on
+2.14, [m3-plan.md](plan.md). Unit, integration, clone, stack and guard runs on
 2026-10-05 against MySQL 8.4.11 on `origin/main` at `b0aa64d` (after #28), with the
 follow-up #29 (§11.1), re-run on `main` at `7488c1d` after #29 and the deployment PRs
 #30–#36 (§1). Every stack run starts from an **empty volume**
@@ -149,7 +149,7 @@ the PR (b) head): bodies, path parameters and nullable fields come out as expect
 
 ## 7. Real Auth0 token
 
-Method: [auth0-setup.md](auth0-setup.md) §7. Levon logged in through the local frontend
+Method: [auth0-setup.md](../../ops/auth0-setup.md) §7. Levon logged in through the local frontend
 and put the access token in the gitignored `.env` of this worktree (1 h life). **The
 token came from the Auth0 _database_ connection (a test user), not Google**: `sub`
 provider `auth0`, `identities` `["auth0"]`, `email_verified` false. Issuer
@@ -402,7 +402,7 @@ push; Copilot was unavailable (quota).
 - M3: 3.1–3.6 API side done (#26–#28, #29); 2.12 and 2.14 API side done (`isOwner`,
   `onboarded`, `POST /v1/me/onboarding/complete`, `contactEmail`).
 - Q3 decided: option A. Q5 decided: `openapi-typescript` in the frontend at a pinned API
-  commit (m3-plan §3); 2.9's generated types land with 3.8 (M3).
+  commit (docs/modules/m3/plan §3); 2.9's generated types land with 3.8 (M3).
 - **2.10:** `/` stays protected. The public pages are `/profile/[id]`, `/projects/[id]`
   and `/search` (anonymous recruiters, spec §8d), not "all personal pages".
 - 3.5: there is no frontend reorder UI today; the endpoints exist for the task and for M4.

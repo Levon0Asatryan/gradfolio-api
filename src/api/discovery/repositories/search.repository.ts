@@ -5,7 +5,7 @@ import type { DiscoveryCursor } from '../utils/discovery-cursor.js';
 import { escapeLike, type ParsedQuery, type Token } from '../utils/search-query.js';
 
 /**
- * The statements behind search (docs/m6-plan.md §3.3, §4). Every one starts from
+ * The statements behind search (docs/modules/m6/plan.md §3.3, §4). Every one starts from
  * `discoverableUser` / `discoverableProject` + `discoverableOwner`, then adds the
  * query's predicates, so no search path can return a row discovery may not.
  *

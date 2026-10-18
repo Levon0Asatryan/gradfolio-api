@@ -62,7 +62,7 @@ export function toHeader(row: ProfileUserRow): ProfileHeader {
  * Writes the fields in `patch` to the caller's own row. Returns the number of
  * rows matched: 0 means the account is gone (deleted after the guard resolved
  * it), which the service turns into 404. The pool counts matched rows, so a
- * patch that changes nothing still returns 1 (docs/m3-plan.md §4.3, P1).
+ * patch that changes nothing still returns 1 (docs/modules/m3/plan.md §4.3, P1).
  */
 export async function updateHeader(
   db: Executor,

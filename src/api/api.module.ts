@@ -57,7 +57,7 @@ import { UsersModule } from './users/users.module.js';
   ],
   providers: [
     ErrorFilter,
-    // Global guards run in the order listed here (run, docs/m2-plan.md §2.6):
+    // Global guards run in the order listed here (run, docs/modules/m2/plan.md §2.6):
     // the token first, so the rate limit can key on the verified caller.
     { provide: APP_GUARD, useClass: AccessTokenGuard },
     { provide: APP_GUARD, useClass: RateLimitGuard },

@@ -4,7 +4,7 @@ import type { AppConfig } from '../config/schema.js';
 import { AuthUnavailableError, type RejectionReason, UnauthenticatedError } from './errors.js';
 
 /**
- * Where our post-login Action puts profile claims (docs/auth0-setup.md §6).
+ * Where our post-login Action puts profile claims (docs/ops/auth0-setup.md §6).
  * Auth0 requires custom claims on an access token for a custom API to be
  * namespaced.
  */
@@ -87,7 +87,7 @@ const bounded = (max: number) =>
 /**
  * Profile claims come from our Action (namespace stripped). One of the wrong
  * type, or over its bound, is dropped rather than trusted; it never fails the
- * request (docs/m2-plan.md §3.3).
+ * request (docs/modules/m2/plan.md §3.3).
  */
 const profileSchema = z.object({
   email: bounded(CLAIM_LIMITS.email),
@@ -173,7 +173,7 @@ export function guardedKeySet(
 /**
  * Verifies Auth0 access tokens: RS256 only, signature against the tenant's
  * JWKS, fixed issuer and audience, `exp` required, `exp`/`nbf` within the
- * clock tolerance (docs/m2-plan.md §3.3).
+ * clock tolerance (docs/modules/m2/plan.md §3.3).
  *
  * The key set is fetched once and cached by jose: refreshed after 10 minutes,
  * and on an unknown `kid` at most once per 30 seconds, so a flood of made-up

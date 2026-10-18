@@ -1,4 +1,4 @@
--- Teams and notifications (docs/m5-plan.md §3). Additive: the previous
+-- Teams and notifications (docs/modules/m5/plan.md §3). Additive: the previous
 -- revision never reads these, so it serves unchanged while this applies.
 --
 --   notifications.params   the snapshot a notification renders from (actor and

@@ -255,7 +255,7 @@ becomes "any https URL".
   the variable is set.
 - **The first real-bucket checks** (claim precondition; one winner of two; adapter methods as
   the runtime account; a full upload to delete flow) are recorded in the PR description and in
-  `m4-verification.md`. The IAM `signBlob` call the library makes on Cloud Run is checked at the
+  `docs/modules/m4/verification.md`. The IAM `signBlob` call the library makes on Cloud Run is checked at the
   production round trip, because it needs the runtime identity.
 
 ### 3.7 Follow-up to PR (c), three review findings (all confirmed)
@@ -510,7 +510,7 @@ identical, safe against the previous revision, per the M4 rules.
 ## 7. Security properties and how each is proved
 
 Every proof is a test **seen failing** with the guard removed (recorded in
-`m4-verification.md`).
+`docs/modules/m4/verification.md`).
 
 | Property                                                                                                                               | Test                                                                                                                                                                                                                                                                                                | Guard removed                                                 |
 | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
@@ -555,7 +555,7 @@ the real client is exercised by the probe and the real run.
    `FileStorage` + `FileUrlService`, `POST /me/uploads`, `accept()`, deletes after
    commit, account deletion deleting objects, `storage:sweep`, `deploy.yml`/`deploy.md`
    changes for `STORAGE_BUCKET`, FE image host note. The bucket and IAM exist (§3.2).
-5. `docs/m4-verification.md` in the last PR: fresh clone; verify, coverage ≥ 90 %,
+5. `docs/modules/m4/verification.md` in the last PR: fresh clone; verify, coverage ≥ 90 %,
    integration; second-user matrix; Q3 for owner/other/anonymous on the project, every
    list and the profile; the grep that no private project leaks; the XSS corpus; barrier
    tests; a real Auth0 token creating a project with every field and attachment type,

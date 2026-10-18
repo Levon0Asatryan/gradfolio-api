@@ -14,7 +14,7 @@ phase('Gather');
 const ctx = await agent(
   `Collect the review context for the current branch. Do not review anything yet.
 Return: the diff against origin/main (paths and full patch), the contents of
-.review/rules/gradfolio.md, the milestone plan docs/mN-plan.md this branch
+.review/rules/gradfolio.md, the milestone plan docs/modules/mN/plan.md this branch
 implements if one applies, the "Code Review Rules" section of AGENTS.md, the
 current HEAD sha, and the deferrals recorded in this branch's pull request, if
 it has one: each review-thread reply or PR comment by the author that defers a

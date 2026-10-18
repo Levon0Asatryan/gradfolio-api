@@ -1,7 +1,7 @@
 # Auth0 setup checklist (tracker 2.1–2.4)
 
 Levon runs this in the Auth0 dashboard; the design behind each step is in
-[m2-plan.md](m2-plan.md). Tick each box. Where the dashboard differs from what is
+[m2-plan.md](../modules/m2/plan.md). Tick each box. Where the dashboard differs from what is
 written here (Auth0 moves things), do the equivalent and note the difference in §9.
 
 **Secrets never go into a repository, a PR, a chat or a log.** Client secrets stay in
@@ -105,7 +105,7 @@ Authentication → Social:
       `https://<tenant domain>/login/callback`. In Auth0's LinkedIn connection use the
       newest strategy version, attributes **profile** and **email**, paste the client id
       and secret. Enable for the app. It returns name, photo and email; **no headline**
-      (m2-plan §8.2).
+      (docs/modules/m2/plan §8.2).
 
 Test accounts:
 
@@ -123,7 +123,7 @@ runtime offered. Code:
 /**
  * Adds namespaced profile claims to access tokens for the Gradfolio API only.
  * The API reads them to create the user's row and keep `verified` current
- * (gradfolio-api docs/m2-plan.md §3.4). Custom claims on an access token for a
+ * (gradfolio-api docs/modules/m2/plan.md §3.4). Custom claims on an access token for a
  * custom API must be namespaced.
  */
 exports.onExecutePostLogin = async (event, api) => {

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-/** What may be uploaded, and how to recognise it (docs/m4-plan.md §3.5). No SVG, no HTML. */
+/** What may be uploaded, and how to recognise it (docs/modules/m4/plan.md §3.5). No SVG, no HTML. */
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const;
 export const PDF_TYPE = 'application/pdf';
 export type UploadType = (typeof IMAGE_TYPES)[number] | typeof PDF_TYPE;

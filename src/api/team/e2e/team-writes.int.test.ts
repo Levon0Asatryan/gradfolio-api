@@ -17,7 +17,7 @@ import {
 
 /**
  * M5 PR (b): invite, external member, remove, accept, reject, leave and the
- * user lookup through the whole stack against MySQL 8.4 (docs/m5-plan.md §4).
+ * user lookup through the whole stack against MySQL 8.4 (docs/modules/m5/plan.md §4).
  */
 
 let tenant: TestTenant;

@@ -301,7 +301,7 @@ function sectionOperations(s: {
   ];
 }
 
-/** Public search and tag pages: no token needed, results are the same for everyone (docs/m6-plan.md). */
+/** Public search and tag pages: no token needed, results are the same for everyone (docs/modules/m6/plan.md). */
 function discoveryOperations(): Operation[] {
   const base = { tag: 'discovery' } as const;
   const failures = {

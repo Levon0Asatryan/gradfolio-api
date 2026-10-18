@@ -84,7 +84,7 @@ Vercel's egress address when anonymous: known follow-up (M6), not new.
 | `sql_mode`  | MySQL default, plus mysql2's session `IGNORE_SPACE`                              | MySQL 8.4 default (strict)                       | none; `SELECT @@sql_mode` compared in Phase 3                                                                                     |
 | `time_zone` | session pinned to `+00:00` on every connection                                   | `SYSTEM` = UTC                                   | none; the pool pins it anyway                                                                                                     |
 
-The collation and baseline are verified by the dump-and-diff method of m1-verification,
+The collation and baseline are verified by the dump-and-diff method of docs/modules/m1/verification,
 through all current migrations (Phase 3, item 2).
 
 ## 2. Resources
@@ -127,7 +127,7 @@ authorized networks (the connector is the only way in), at +$7.30 / mo.
   ignored when the socket is set (a placeholder host such as `localhost` is fine).
 - `poolOptions` (`src/core/db/pool.ts`) adds `socketPath`. `loadDatabaseConfig()` and the
   api config both include it, so the migrate job uses the same path.
-- `.env.example`, `docs/deploy.md` and the compose comment describe it.
+- `.env.example`, `docs/ops/deploy.md` and the compose comment describe it.
 
 ### 3.3 The TLS rule
 
@@ -205,7 +205,7 @@ the pipeline's own first run.
 
 - **Expand/contract rule.** For a moment the old revision runs against the new schema,
   so a migration must work with the previous release's code (add before use; remove only
-  one release after the code stops using it). Written into `docs/deploy.md`.
+  one release after the code stops using it). Written into `docs/ops/deploy.md`.
 - Idempotence: the second run prints nothing to apply (the runner records each step; its
   lock is `MIGRATION_LOCK_TIMEOUT_S`, so overlapping runs wait, never both apply).
 - The first run creates the schema in the empty database (`0001_baseline` onward).
@@ -259,7 +259,7 @@ Both cost the same service; one vCPU, 512 MiB, plus the database.
 | **1** (always one warm) | idle: 2,628,000 s × ($0.0000025 × 1 vCPU + $0.0000025 × 0.5 GiB) = about **$9.86**, plus request time | no cold starts                                                                                |
 
 Recommendation: **0**, and switch to 1 for demo and defense days with one command
-(`gcloud run services update gradfolio-api --min-instances 1`). Documented in `docs/deploy.md`.
+(`gcloud run services update gradfolio-api --min-instances 1`). Documented in `docs/ops/deploy.md`.
 
 ## 8. Monthly total against the credits
 
@@ -276,7 +276,7 @@ Recommendation: **0**, and switch to 1 for demo and defense days with one comman
 Against the **$300** trial credit that is about 31 months (min 0) or 15 months (min 1)
 of runway in money terms. But the trial credit **expires after 90 days** (Google's terms):
 after that the card is billed at the totals above unless the student credit applies.
-The budget alert (Levon's) must exist; `docs/deploy.md` records its thresholds, and the
+The budget alert (Levon's) must exist; `docs/ops/deploy.md` records its thresholds, and the
 plan checks it (`gcloud billing budgets list`) before the first billed resource.
 Deletion protection and a 20 GiB storage cap bound a runaway.
 
@@ -312,12 +312,12 @@ Deletion protection and a 20 GiB storage cap bound a runaway.
    `.github/workflows/ci.yml`**: the integration job gains a `socat` step that relays a
    Unix socket to the MySQL service container, plus the env var the socket test reads.
    `deploy.yml` is a separate, new workflow; `ci.yml` stays the gate it waits on.
-2. Infrastructure by `gcloud` (each command listed in `docs/deploy.md`): APIs, network
+2. Infrastructure by `gcloud` (each command listed in `docs/ops/deploy.md`): APIs, network
    peering, Cloud SQL, database, users, secrets, registry, service accounts, WIF.
 3. `deploy.yml` PR; first run builds, migrates, deploys.
 4. Vercel variable, redeploy. Message the M3 lead when Phase 3 items 1 to 4 pass.
-5. `docs/deploy.md` (runbook: resources, costs, environment table without values,
-   migrate, rollback, password rotation, budget alert) and `docs/deploy-verification.md`.
+5. `docs/ops/deploy.md` (runbook: resources, costs, environment table without values,
+   migrate, rollback, password rotation, budget alert) and `docs/modules/deploy/verification.md`.
 
 ## 11. Proposed tracker changes (not applied: this chat does not edit `docs/tracker.md`)
 

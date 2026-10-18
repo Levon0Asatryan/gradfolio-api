@@ -17,7 +17,7 @@ import {
 import { BrowseService } from './services/browse.service.js';
 import { TagService } from './services/tag.service.js';
 
-/** Tag pages: projects and people for a skill, technology or tag (docs/m6-plan.md §3). */
+/** Tag pages: projects and people for a skill, technology or tag (docs/modules/m6/plan.md §3). */
 @OptionalAuth()
 @RateBudget('browse')
 @Controller('tags')

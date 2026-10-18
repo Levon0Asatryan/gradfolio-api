@@ -9,7 +9,7 @@
 export const REDACT_PATHS = [
   'req.headers.authorization',
   'req.headers.cookie',
-  // The shared secret that lets the frontend name the real client (docs/m6-plan.md §2.4).
+  // The shared secret that lets the frontend name the real client (docs/modules/m6/plan.md §2.4).
   'req.headers["x-gradfolio-proxy-secret"]',
   'res.headers["set-cookie"]',
   '*.password',

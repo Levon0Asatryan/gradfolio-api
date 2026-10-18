@@ -1,4 +1,4 @@
--- Discovery indexes (docs/m6-plan.md §5). Additive: the previous revision never
+-- Discovery indexes (docs/modules/m6/plan.md §5). Additive: the previous revision never
 -- names them, so it serves unchanged while they build (BTREE, INPLACE, no lock).
 -- Nothing is dropped, tightened or rewritten.
 --

@@ -108,7 +108,7 @@ const issuerBaseUrl = z
   )
   .transform((v) => `${new URL(v).origin}/`);
 
-/** Verifying Auth0 access tokens (docs/m2-plan.md §3.2). */
+/** Verifying Auth0 access tokens (docs/modules/m2/plan.md §3.2). */
 const auth = {
   AUTH0_ISSUER_BASE_URL: issuerBaseUrl,
   // The Auth0 API identifier. Any non-empty string; not fetched.
@@ -119,7 +119,7 @@ const auth = {
   AUTH0_CLOCK_TOLERANCE_S: z.coerce.number().int().min(0).max(60).default(5),
 };
 
-/** Request budgets per window, per route, per client (docs/m2-plan.md §3.6). */
+/** Request budgets per window, per route, per client (docs/modules/m2/plan.md §3.6). */
 const rateLimit = {
   RATE_LIMIT_WINDOW_S: z.coerce.number().int().min(1).max(3600).default(60),
   // Every route.
@@ -130,7 +130,7 @@ const rateLimit = {
   RATE_LIMIT_AI: z.coerce.number().int().min(1).max(100_000).default(10),
   RATE_LIMIT_LOOKUP: z.coerce.number().int().min(1).max(100_000).default(30),
   RATE_LIMIT_UPLOAD: z.coerce.number().int().min(1).max(100_000).default(20),
-  // Browse, tag pages and the tag cloud (docs/m6-plan.md §9).
+  // Browse, tag pages and the tag cloud (docs/modules/m6/plan.md §9).
   RATE_LIMIT_BROWSE: z.coerce.number().int().min(1).max(100_000).default(60),
   // Typeahead: a debounced box sends a burst per keystroke pause, so this is the
   // largest per-route number, kept small by the cost of one suggestion (three
@@ -162,7 +162,7 @@ const rateLimit = {
     }),
 };
 
-/** The caller's dashboard (docs/m6-plan.md §3.2). */
+/** The caller's dashboard (docs/modules/m6/plan.md §3.2). */
 const dashboard = {
   // "Recent activity" counts the caller's activities in this many days.
   DASHBOARD_ACTIVITY_DAYS: z.coerce.number().int().min(1).max(365).default(30),
@@ -171,7 +171,7 @@ const dashboard = {
   DASHBOARD_FEED_SIZE: z.coerce.number().int().min(1).max(50).default(5),
 };
 
-/** Search, browse and tag pages (docs/m6-plan.md §3.1). */
+/** Search, browse and tag pages (docs/modules/m6/plan.md §3.1). */
 const discovery = {
   // Items per page when `limit` is not given, and the most a caller may ask for.
   DISCOVERY_PAGE_SIZE: z.coerce.number().int().min(1).max(100).default(12),
@@ -190,7 +190,7 @@ const discovery = {
   FACET_MAX: z.coerce.number().int().min(1).max(200).default(50),
 };
 
-/** Profile page bounds (docs/m3-plan.md §1, Limits). */
+/** Profile page bounds (docs/modules/m3/plan.md §1, Limits). */
 const profile = {
   // Projects listed on one profile (own and accepted-team together).
   // Education, experience and certification entries one user may hold, each.
@@ -200,7 +200,7 @@ const profile = {
   PROFILE_PROJECTS_LIMIT: z.coerce.number().int().min(1).max(500).default(50),
 };
 
-/** Project reads (docs/m4-plan.md §1, §5.2). */
+/** Project reads (docs/modules/m4/plan.md §1, §5.2). */
 const projects = {
   // Items per page when `limit` is not given, and the most a caller may ask for.
   PROJECTS_PAGE_SIZE: z.coerce.number().int().min(1).max(200).default(20),
@@ -225,7 +225,7 @@ const projects = {
     ),
 };
 
-/** File storage (docs/m4-plan.md §3). Unset STORAGE_BUCKET: URL-only, uploads answer 503. */
+/** File storage (docs/modules/m4/plan.md §3). Unset STORAGE_BUCKET: URL-only, uploads answer 503. */
 const storage = {
   STORAGE_BUCKET: z
     .string()
@@ -244,7 +244,7 @@ const storage = {
   PROJECT_MAX_ATTACHMENTS: z.coerce.number().int().min(1).max(200).default(20),
 };
 
-/** Teams and notifications (docs/m5-plan.md §1, §5.3). */
+/** Teams and notifications (docs/modules/m5/plan.md §1, §5.3). */
 const notifications = {
   // Rows a project's team may hold, in any status: bounds what an owner (or a
   // pile of rejected invitations) can grow, checked under the project lock.

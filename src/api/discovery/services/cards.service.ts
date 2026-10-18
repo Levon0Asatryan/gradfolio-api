@@ -35,7 +35,7 @@ interface ProjectRow {
 /**
  * Rows of a page become cards: the page's children are read in a fixed number
  * of statements (never one per row) and every stored file URL becomes a signed
- * read URL, once per distinct URL (docs/m6-plan.md §4.2, §8).
+ * read URL, once per distinct URL (docs/modules/m6/plan.md §4.2, §8).
  */
 @Injectable()
 export class CardsService {

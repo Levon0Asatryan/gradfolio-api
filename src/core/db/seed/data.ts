@@ -503,7 +503,7 @@ export interface SeedNotification {
   type: 'team_invite' | 'team_accepted' | 'team_rejected';
   isRead: boolean;
   project: ProjectId;
-  /** What the frontend renders the text from (m5-plan §5.1); `title`/`message` are the fallback. */
+  /** What the frontend renders the text from (docs/modules/m5/plan §5.1); `title`/`message` are the fallback. */
   params: { actorName: string; projectTitle: string; role?: string };
 }
 

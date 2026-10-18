@@ -4,7 +4,7 @@ import { discoverableOwner, discoverableProject, discoverableUser } from '../uti
 import { escapeLike } from '../utils/search-query.js';
 
 /**
- * Typeahead (docs/m6-plan.md §3, the suggestions endpoint). Prefix and word-start
+ * Typeahead (docs/modules/m6/plan.md §3, the suggestions endpoint). Prefix and word-start
  * `LIKE` only, so a single letter works and a stopword is not special; every
  * group starts from the discoverable predicates, and every list is at most
  * `limit` rows of the columns named here. The text is bound, with `%`, `_` and
