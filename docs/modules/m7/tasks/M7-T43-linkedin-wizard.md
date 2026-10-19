@@ -8,7 +8,7 @@
 FE plan section for the wizard: four steps (instructions, upload, review, done). The export
 arrives later by email, so the instructions say so and the wait never blocks onboarding.
 The ZIP is PUT directly to the signed URL (M4's `UploadControl` pattern), never through
-Next. The wizard lives in the onboarding stepper (`/integrations/connections`) and on
+Next. The preview is not held by the server: confirm sends the complete selected items, possibly edited (plan §4.3). The wizard lives in the onboarding stepper (`/integrations/connections`) and on
 `/integrations`. API calls are server-side only (Q11) except that PUT. The LinkedIn card is
 status-only today (`src/components/integrations/LinkedinCard.tsx`).
 
@@ -27,7 +27,7 @@ Out: API work.
 
 ## Decisions
 
-Made: the preview stays in memory, confirm sends ids. **Levon decides:** nothing.
+Made: the preview stays in the browser's memory only; confirm sends the selected items, as plan §4.3 and the DTO say (the FE plan's "ids" proposal is superseded). **Levon decides:** nothing.
 
 ## Acceptance
 

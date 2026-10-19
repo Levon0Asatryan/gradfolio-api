@@ -26,7 +26,10 @@ In:
   applies only a field that still equals the snapshot; `409 SUGGESTION_STALE` if the
   student edited it since).
 - Stars and forks stay silent (decision D8: refreshed on re-sync, no suggestion).
-- One notification per refresh batch, not per suggestion: new `notifications.type`
+- One notification per refresh batch, not per suggestion. **This departs from plan §6.5**
+  ("not in the notifications bell"); Levon asked for it on 2026-10-18 ("send a notification
+  when the user changes a repo's README and suggest an update"), so the decision is his and
+  the PR updates plan §6.5 to match. New `notifications.type`
   `suggestions_available`, params `{count, kinds}`. This needs an **additive migration**
   (take the next free number on the latest `main`; M8 adds migrations too). Applied twice
   leaves nothing; `down` then `up` is identical.
@@ -39,7 +42,7 @@ Out: UI (T32).
 
 ## Decisions
 
-Made: no silent overwrite; one notification per batch. **Levon decides:** nothing.
+Made: no silent overwrite; one notification per batch (Levon, 2026-10-18, overriding plan §6.5). **Levon decides:** nothing.
 
 ## Acceptance
 

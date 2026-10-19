@@ -32,7 +32,7 @@ In:
   columns.
 - A bucket lifecycle rule for `imports/` (age one day) as backstop.
 
-Out: confirm (T42), the UI (T43).
+The preview is returned to the browser and not stored; confirm (T42) is stateless. Out: confirm (T42), the UI (T43).
 
 ## Decisions
 
