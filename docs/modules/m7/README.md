@@ -43,8 +43,8 @@ finding. The findings were re-landed in #104, #123 and task M7-T30.
 **Status legend:** `todo` (not started), `in progress` (a task chat is working on it),
 `review` (PR open), `done` (merged and deployed), `blocked` (waiting on something that is
 not a task; the Depends column says what). The module chat updates this table in a small
-docs PR whenever a task changes state. **Last updated: 2026-10-19** (T20, T23, T30 in
-progress; the rest todo or blocked).
+docs PR whenever a task changes state. **Last updated: 2026-10-19** (T20 and T23 in
+progress by Levon's choice; the rest todo or blocked; T30 has an unpushed fix commit but no chat).
 
 The **Status** column is the status of record. **Depends on** lists tasks that must be
 **merged** first. Task IDs start at T20 because **M7-T1 to M7-T13 are Levon's queue rows**
@@ -59,7 +59,7 @@ brief, "queue M7-T1" always means a queue row.
 | M7-T23 | Deletion tombstone: precondition of `AUTH0_DELETE_USERS`                    | api     | —                 | 7.2     | in progress | [T23](tasks/M7-T23-deletion-tombstone.md)      |
 | M7-T24 | Startup check: log which of the five GitHub settings is missing             | api     | —                 | 7.2     | todo        | [T24](tasks/M7-T24-startup-check.md)           |
 | M7-T25 | Education and organisation suggestions from verified emails and orgs        | api     | queue M7-T10      | 7.13    | blocked     | [T25](tasks/M7-T25-education-suggestions.md)   |
-| M7-T30 | Focus and announcement after Publish on cards and the project page          | fe      | —                 | 7.14    | in progress | [T30](tasks/M7-T30-publish-focus.md)           |
+| M7-T30 | Focus and announcement after Publish on cards and the project page          | fe      | —                 | 7.14    | todo        | [T30](tasks/M7-T30-publish-focus.md)           |
 | M7-T31 | Import entry points: after connect, Projects → Add                          | fe      | —                 | 7.14    | todo        | [T31](tasks/M7-T31-import-entry-points.md)     |
 | M7-T32 | Suggestions inbox: skills, links, project changes, notification             | fe      | T20 (T21, T22)    | 7.13    | todo        | [T32](tasks/M7-T32-suggestions-inbox.md)       |
 | M7-T33 | One source for the Auth0 settings read by the app                           | fe      | —                 | 7.11    | todo        | [T33](tasks/M7-T33-auth0-settings-source.md)   |
