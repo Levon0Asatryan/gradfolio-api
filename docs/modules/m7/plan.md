@@ -201,8 +201,11 @@ connected or toward `verified`, and every GitHub route treats it as not connecte
 `DELETE /v1/me/integrations/github`
 : 1. Revoke first: fetch the token through the token source and `DELETE /applications/{id}/grant`
 (§2.5). `204` counts as revoked, and so does the status GitHub gives for a grant that is already
-gone (**unverified**: the docs list `422`; the §2.1 spike runs it and the code maps what it saw); no
-linked identity in Auth0 also counts. Anything else (5xx, timeout, `401` on our client
+gone (the docs list `422`, **never seen**; production, 2026-10-19: a token GitHub refuses got `404`
+from the delete with valid client credentials, and a `404` is also what an unknown client id gets). So
+any other 4xx is followed by `GET /user` with the token: a `401` there means the token is dead, which is
+what revocation is for, and the disconnect completes (`result: token_refused`); anything else leaves the
+grant standing. No linked identity in Auth0 also counts. Anything else (5xx, timeout, `401` on our client
 credentials) answers `502 GITHUB_REVOKE_FAILED` and **changes nothing**, so the card still shows
 "connected" and the student retries. 2. Then, in one transaction: flag off, `external_*` and `last_synced_at` cleared, open
 suggestions with source `github` deleted, token cache entry dropped; `{ "status": "not_connected" }`.
@@ -217,7 +220,8 @@ while a link or revocation is in flight. A crash between 1 and 2 leaves a marker
 the marker existed it left a connected row whose token is dead: the next GitHub call gets `401`,
 which already maps to `409 GITHUB_NOT_LINKED` (§3.1), and a repeated `DELETE` finds the grant gone
 and finishes. Reconnecting needs one fresh GitHub login, which replaces the dead token Auth0 holds
-(§2.1 step 6). Projects already imported stay (`source = 'github'`); re-sync then answers
+(§2.1 step 6); `connect` with a token GitHub refuses clears a stale flag and offers that login
+(`link_required`) for a login that is not itself the GitHub one. Projects already imported stay (`source = 'github'`); re-sync then answers
 `409 GITHUB_NOT_CONNECTED`. The Auth0 identity is **not** unlinked (a GitHub-only user would lose
 their login; `update:users` is already a wide scope): the card says so.
 
