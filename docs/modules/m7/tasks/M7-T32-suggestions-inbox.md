@@ -35,6 +35,15 @@ Out: new API work.
 Made: nothing is applied without a click. **Levon decides:** whether the navigation shows a
 count (default: yes, text plus number, not colour alone).
 
+## Added by T25 (api #114): education and experience kinds
+
+The API now also offers `education.add` (verified university email) and `experience.add`
+(listed organisation). Accepting either **requires `overrides`** in the body, or the API
+answers 400 and the suggestion stays open: education needs degree, field and start year;
+experience needs title and start. The inbox must show a small form for these fields before
+it sends accept. Read the exact shape from `docs/api/openapi` / `http/suggestions.http`.
+Test: accept without overrides is never sent; a 400 keeps the card open with the message.
+
 ## Acceptance
 
 Playwright: accept a skill, dismiss a link, see a stale item handled; guards removed (no
