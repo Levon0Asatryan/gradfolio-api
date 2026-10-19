@@ -3867,7 +3867,7 @@ paths:
       tags:
         - suggestions
       summary: The caller’s suggestions, newest first
-      description: Open ones by default (`status=all` adds the answered). A `profile.*` suggestion names the `field`, what it holds now (`current`) and what an accept would write (`proposed`). `openCount` is the caller’s open suggestions in all.
+      description: Open ones by default (`status=all` adds the answered). A `profile.*` suggestion names the `field`, what it holds now (`current`) and what an accept would write (`proposed`). A `skill.add` suggestion names the `skill` and the `evidence` (public repositories and projects that show it). `openCount` is the caller’s open suggestions in all.
       security:
         - bearerAuth: []
       parameters:
@@ -3930,7 +3930,7 @@ paths:
       tags:
         - suggestions
       summary: Read GitHub’s public profile and recompute the suggestions
-      description: "Reads GitHub at most once per SUGGESTIONS_MIN_INTERVAL_S (conditionally by ETag; a refresh inside the floor uses the stored profile and says `throttled`), then opens what is new, supersedes what GitHub no longer says, and never reopens an answered suggestion with the same value. LinkedIn: a sign-in’s name and photo, and a re-import reminder. Without GitHub connected only the LinkedIn rules run."
+      description: "Reads GitHub at most once per SUGGESTIONS_MIN_INTERVAL_S (conditionally by ETag; a refresh inside the floor uses the stored profile and says `throttled`), then opens what is new, supersedes what GitHub no longer says, and never reopens an answered suggestion with the same value. It also reads the caller’s newest public repositories (not forks): one `GET /user/repos` page and, for the newest SUGGESTIONS_LANGUAGE_REPOS (default 5), one `GET …/languages` each, and offers a skill missing from the profile (compared case-insensitively) that at least two repositories or projects show. A refresh inside the floor reads nothing and keeps the open skill suggestions. LinkedIn: a sign-in’s name and photo, and a re-import reminder. Without GitHub connected only the LinkedIn rules run."
       security:
         - bearerAuth: []
       responses:
@@ -3976,7 +3976,7 @@ paths:
       tags:
         - suggestions
       summary: "Apply a suggestion: write the one field it names"
-      description: Writes that field through the profile’s own rules and marks the suggestion accepted, in one transaction. Idempotent for an accepted one. A reminder is only acknowledged.
+      description: Writes that field through the profile’s own rules and marks the suggestion accepted, in one transaction. A `skill.add` appends the skill to the profile’s skills (at most PROFILE_MAX_SKILLS, else 400). Idempotent for an accepted one. A reminder is only acknowledged.
       security:
         - bearerAuth: []
       parameters:
@@ -4007,7 +4007,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: "SUGGESTION_RESOLVED: it was already dismissed, superseded or accepted; SUGGESTION_INVALID: the value can no longer be written (it is superseded)"
+          description: "SUGGESTION_RESOLVED: it was already dismissed, superseded or accepted; SUGGESTION_INVALID: the value can no longer be written (it is superseded); SUGGESTION_STALE: the skill is already on the profile (it is superseded)"
           content:
             application/json:
               schema:
@@ -4061,7 +4061,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: "SUGGESTION_RESOLVED: it was already dismissed, superseded or accepted; SUGGESTION_INVALID: the value can no longer be written (it is superseded)"
+          description: "SUGGESTION_RESOLVED: it was already dismissed, superseded or accepted; SUGGESTION_INVALID: the value can no longer be written (it is superseded); SUGGESTION_STALE: the skill is already on the profile (it is superseded)"
           content:
             application/json:
               schema:
@@ -7058,6 +7058,7 @@ components:
             - profile.links.github
             - profile.links.website
             - linkedin.reimport
+            - skill.add
         source:
           type: string
           enum:
@@ -7090,6 +7091,32 @@ components:
           enum:
             - fill
             - replace
+        skill:
+          nullable: true
+          description: "`skill.add` only: the skill an accept would add to the profile."
+          type: string
+        evidence:
+          nullable: true
+          description: "`skill.add` only, as of when it was offered: how many of the student’s own public repositories and projects show the skill. `total` counts a project imported from a repository once."
+          type: object
+          properties:
+            total:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            repositories:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            projects:
+              type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+          required:
+            - total
+            - repositories
+            - projects
+          additionalProperties: false
         lastSyncedAt:
           nullable: true
           description: "`linkedin.reimport` only: the last confirmed export import, ISO 8601."
@@ -7109,6 +7136,8 @@ components:
         - current
         - proposed
         - mode
+        - skill
+        - evidence
         - lastSyncedAt
         - createdAt
         - resolvedAt

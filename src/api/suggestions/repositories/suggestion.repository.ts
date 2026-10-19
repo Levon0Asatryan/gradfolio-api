@@ -273,3 +273,27 @@ export async function currentProfile(trx: Transaction<DB>, userId: string) {
     .executeTakeFirst();
   return u;
 }
+
+/** The caller's listed skills, in their order. */
+export async function skillNamesOf(trx: Transaction<DB>, userId: string): Promise<string[]> {
+  const rows = await trx
+    .selectFrom('userSkills')
+    .select('skillName')
+    .where('userId', '=', userId)
+    .orderBy('sortOrder')
+    .execute();
+  return rows.map((r) => r.skillName);
+}
+
+/** The technologies of each of the caller's own projects (drafts too), one row per technology. */
+export function projectTechnologies(
+  trx: Transaction<DB>,
+  userId: string,
+): Promise<{ projectId: string; githubRepoId: number | null; name: string }[]> {
+  return trx
+    .selectFrom('projects')
+    .innerJoin('projectTechnologies', 'projectTechnologies.projectId', 'projects.id')
+    .select(['projects.id as projectId', 'projects.githubRepoId', 'projectTechnologies.name'])
+    .where('projects.userId', '=', userId)
+    .execute();
+}

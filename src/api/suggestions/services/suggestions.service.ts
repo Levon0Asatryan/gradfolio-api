@@ -8,6 +8,9 @@ import { lockUser } from '../../../core/db/user-lock.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../core/errors/app-error.js';
 import { GithubNotLinkedError } from '../../../core/github/errors.js';
 import type { GithubProfile } from '../../../core/github/github-client.js';
+import type { GithubAccessToken } from '../../../core/github/github-access-token.js';
+import type { GithubClient } from '../../../core/github/github-client.js';
+import { SkillsService } from '../../profiles/services/skills.service.js';
 import { decodeTimeCursor, encodeTimeCursor } from '../../common/utils/time-cursor.js';
 import { updateProfileSchema } from '../../profiles/dto/profile.dto.js';
 import { ProfileService, type AvatarMemo } from '../../profiles/services/profile.service.js';
@@ -30,10 +33,12 @@ import {
   lockSuggestion,
   oldestOpen,
   openCount,
+  projectTechnologies,
   openOfSources,
   readPollState,
   resolve,
   restorePolled,
+  skillNamesOf,
   statusesOfKeys,
   supersede,
   type SuggestionRow,
@@ -48,9 +53,11 @@ import {
   type ProfileNow,
   quarterOf,
 } from './profile-rules.js';
+import { type EvidenceItem, skillKey, skillsToOffer } from './skill-rules.js';
 
 const CURSOR_SCOPE = 'sug';
 const DAY_MS = 86_400_000;
+const REPO_PAGE = 100;
 
 interface Row {
   kind: SuggestionKind;
@@ -58,6 +65,34 @@ interface Row {
   dedupeKey: string;
   payload: Record<string, unknown>;
 }
+
+/** The newest repositories' evidence is read per refresh; `undefined`: GitHub was not asked. */
+type RepoEvidence = EvidenceItem[] | undefined;
+
+/** One evidence item per project; a project imported from a repository is that repository's item. */
+const projectEvidence = (
+  rows: { projectId: string; githubRepoId: number | null; name: string }[],
+): EvidenceItem[] => {
+  const byProject = new Map<string, EvidenceItem & { names: string[] }>();
+  for (const r of rows) {
+    const item = byProject.get(r.projectId) ?? {
+      id: r.githubRepoId === null ? `project:${r.projectId}` : `repo:${r.githubRepoId}`,
+      from: 'project' as const,
+      names: [],
+    };
+    item.names.push(r.name);
+    byProject.set(r.projectId, item);
+  }
+  return [...byProject.values()];
+};
+
+const skillOf = (p: Record<string, unknown>): string | null =>
+  typeof p.skill === 'string' ? p.skill : null;
+
+const evidenceOf = (p: Record<string, unknown>): SuggestionView['evidence'] => {
+  const n = (v: unknown) => (typeof v === 'number' ? v : 0);
+  return { total: n(p.evidence), repositories: n(p.repositories), projects: n(p.projects) };
+};
 
 const payloadOf = (row: SuggestionRow): Record<string, unknown> => row.payload ?? {};
 
@@ -83,6 +118,7 @@ export class SuggestionsService {
     private readonly dbs: DbService,
     private readonly connection: GithubConnectionService,
     private readonly profiles: ProfileService,
+    private readonly skills: SkillsService,
     @Inject(APP_CONFIG) private readonly cfg: AppConfig,
   ) {}
 
@@ -130,17 +166,30 @@ export class SuggestionsService {
     const state = await readPollState(this.dbs.db, user.id);
     let github: RefreshResponse['github'] = 'not_connected';
     let fresh: { profile: GithubProfile; etag: string | null } | undefined;
+    let repoEvidence: RepoEvidence;
 
     if (state?.status === 'connected') {
       if (!(await claimRefresh(this.dbs.db, user.id, floor))) {
         github = 'throttled';
       } else {
         try {
-          const { gh, token } = await this.connection.requireConnected(user, identity);
+          const { gh, token, githubUserId } = await this.connection.requireConnected(
+            user,
+            identity,
+          );
           const usable = state.etag !== null && state.snapshot !== null;
           let read;
           try {
             read = await gh.github.getProfile(token, usable ? state.etag : null);
+            try {
+              repoEvidence = await this.readRepoEvidence(gh.github, token, githubUserId);
+            } catch (err) {
+              // The profile was read a moment ago: a token refused now was revoked in
+              // between (a disconnect). Sync decides from the connection row; the
+              // repositories are simply not known this time.
+              if (!(err instanceof GithubNotLinkedError)) throw err;
+              gh.tokens.forget(user.auth0Id);
+            }
           } catch (err) {
             if (err instanceof GithubNotLinkedError) gh.tokens.forget(user.auth0Id);
             throw err;
@@ -164,6 +213,7 @@ export class SuggestionsService {
       startedGeneration: state?.generation ?? null,
       previousPolledAt: state?.polledAt ?? null,
       fresh,
+      repoEvidence,
     });
     if (outcome.githubDropped === 'gone') github = 'not_connected';
     // Connected again, as another connection: nothing of this read was applied; try again.
@@ -178,6 +228,35 @@ export class SuggestionsService {
       created: outcome.created,
       openCount: await openCount(this.dbs.db, user.id),
     };
+  }
+
+  /**
+   * The student's own public repositories (not forks) as evidence for skills:
+   * one page of the newest 100, each with its primary language and topics, and
+   * for the SUGGESTIONS_LANGUAGE_REPOS newest also GitHub's list of languages.
+   * At most 2 + that many calls (the profile read is the first).
+   */
+  private async readRepoEvidence(
+    github: GithubClient,
+    token: GithubAccessToken,
+    githubUserId: string,
+  ): Promise<EvidenceItem[]> {
+    const page = await github.listRepos(token, { page: 1, perPage: REPO_PAGE });
+    const own = page.items.filter((r) => !r.fork && r.ownerId === Number(githubUserId));
+    const items: EvidenceItem[] = [];
+    for (const [i, repo] of own.entries()) {
+      const languages =
+        i < this.cfg.SUGGESTIONS_LANGUAGE_REPOS
+          ? ((await github.listLanguages(token, repo)).languages ?? [])
+          : [];
+      items.push({
+        id: `repo:${repo.id}`,
+        from: 'repository',
+        // Languages before topics: GitHub's spelling of a language ("TypeScript") wins.
+        names: [...(repo.language === null ? [] : [repo.language]), ...languages, ...repo.topics],
+      });
+    }
+    return items;
   }
 
   /**
@@ -197,6 +276,7 @@ export class SuggestionsService {
       startedGeneration: number | null;
       previousPolledAt: Date | null;
       fresh: { profile: GithubProfile; etag: string | null } | undefined;
+      repoEvidence: RepoEvidence;
     },
   ): Promise<{ created: number; githubDropped: false | 'gone' | 'replaced' }> {
     const userId = user.id;
@@ -222,6 +302,26 @@ export class SuggestionsService {
         : (read.fresh?.profile ?? (row?.snapshot ? { name: null, ...row.snapshot } : null));
       const lastSynced = await linkedinLastSynced(trx, userId);
       const wanted = this.wanted(profile, snapshot, identity, lastSynced);
+      // Skills: the repositories only when GitHub was asked just now; the projects always.
+      const have = await skillNamesOf(trx, userId);
+      const projectItems = projectEvidence(await projectTechnologies(trx, userId));
+      const offered = skillsToOffer(
+        [...(githubOk ? (read.repoEvidence ?? []) : []), ...projectItems],
+        have,
+      );
+      for (const w of offered) {
+        wanted.push({
+          kind: 'skill.add',
+          source: 'github',
+          dedupeKey: w.dedupeKey,
+          payload: {
+            skill: w.name,
+            evidence: w.evidence,
+            repositories: w.repositories,
+            projects: w.projects,
+          },
+        });
+      }
 
       const known = await statusesOfKeys(
         trx,
@@ -237,10 +337,19 @@ export class SuggestionsService {
 
       const wantedKeys = new Set(wanted.map((w) => w.dedupeKey));
       const open = await openOfSources(trx, userId, ['github', 'linkedin']);
+      // Without a fresh read of the repositories, an open skill is kept unless the
+      // profile has it now: what the repositories show is only known after a read.
+      const haveKeys = new Set(have.map(skillKey));
+      const repositoriesKnown = githubOk && read.repoEvidence !== undefined;
+      const gone = (r: SuggestionRow) =>
+        !wantedKeys.has(r.dedupeKey) &&
+        (r.kind !== 'skill.add' ||
+          repositoriesKnown ||
+          haveKeys.has(skillKey(skillOf(payloadOf(r)) ?? '')));
       await supersede(
         trx,
         userId,
-        open.filter((r) => !wantedKeys.has(r.dedupeKey)).map((r) => r.id),
+        open.filter(gone).map((r) => r.id),
       );
 
       const total = await openCount(trx, userId);
@@ -295,7 +404,8 @@ export class SuggestionsService {
     const memo: AvatarMemo = {};
     type Outcome =
       | { kind: 'done'; applied: ResolveResponse['applied']; released: string[] }
-      | { kind: 'invalid' };
+      | { kind: 'invalid' }
+      | { kind: 'stale' };
     const outcome = await inTransaction(this.dbs.db, async (trx): Promise<Outcome> => {
       await lockUser(trx, user.id);
       const row = await lockSuggestion(trx, user.id, id);
@@ -309,6 +419,21 @@ export class SuggestionsService {
       if (row.kind === 'linkedin.reimport') {
         await resolve(trx, user.id, id, 'accepted');
         return { kind: 'done', applied: null, released: [] };
+      }
+      if (row.kind === 'skill.add') {
+        const skill = skillOf(payloadOf(row)) ?? '';
+        const before = await skillNamesOf(trx, user.id);
+        const after = await this.skills.addIn(trx, user.id, skill);
+        if (after.length === before.length) {
+          // Already on the profile (the registry matches case and accents like the list does).
+          await supersede(trx, user.id, [id]);
+          return { kind: 'stale' };
+        }
+        await resolve(trx, user.id, id, 'accepted');
+        // The spelling written, which the registry may have fixed differently.
+        const had = new Set(before.map(skillKey));
+        const written = after.find((n) => !had.has(skillKey(n))) ?? skill;
+        return { kind: 'done', applied: { field: 'skills', value: written }, released: [] };
       }
       const stored = payloadOf(row);
       const field = stored.field as ProfileField;
@@ -327,6 +452,9 @@ export class SuggestionsService {
     });
     if (outcome.kind === 'invalid') {
       throw new ConflictError('SUGGESTION_INVALID', 'this value can no longer be written');
+    }
+    if (outcome.kind === 'stale') {
+      throw new ConflictError('SUGGESTION_STALE', 'this skill is already on the profile');
     }
     await this.profiles.releaseFiles(outcome.released);
     return { id, status: 'accepted', applied: outcome.applied };
@@ -347,6 +475,10 @@ export class SuggestionsService {
   }
 
   private applied(row: SuggestionRow): ResolveResponse['applied'] {
+    if (row.kind === 'skill.add') {
+      const skill = payloadOf(row).skill;
+      return typeof skill === 'string' ? { field: 'skills', value: skill } : null;
+    }
     const { field, value } = payloadOf(row) as { field?: unknown; value?: unknown };
     return typeof field === 'string' && typeof value === 'string' ? { field, value } : null;
   }
@@ -354,6 +486,7 @@ export class SuggestionsService {
   private view(row: SuggestionRow, user: UserRow): SuggestionView {
     const p = payloadOf(row) as { field?: string; value?: string; mode?: 'fill' | 'replace' };
     const isProfile = row.kind.startsWith('profile.');
+    const isSkill = row.kind === 'skill.add';
     return {
       id: row.id,
       kind: row.kind as SuggestionKind,
@@ -366,6 +499,8 @@ export class SuggestionsService {
           : null,
       proposed: isProfile ? (p.value ?? null) : null,
       mode: isProfile ? (p.mode ?? null) : null,
+      skill: isSkill ? skillOf(payloadOf(row)) : null,
+      evidence: isSkill ? evidenceOf(payloadOf(row)) : null,
       lastSyncedAt:
         row.kind === 'linkedin.reimport'
           ? ((payloadOf(row) as { lastSyncedAt?: string | null }).lastSyncedAt ?? null)

@@ -353,6 +353,8 @@ const integrations = {
  */
 const suggestions = {
   SUGGESTIONS_MIN_INTERVAL_S: z.coerce.number().int().min(0).max(86_400).default(900),
+  /** How many of the newest own repositories get a `/languages` call per refresh (0: none). */
+  SUGGESTIONS_LANGUAGE_REPOS: z.coerce.number().int().min(0).max(30).default(5),
   SUGGESTIONS_MAX_OPEN: z.coerce.number().int().min(1).max(500).default(50),
   SUGGESTIONS_PAGE_SIZE: z.coerce.number().int().min(1).max(100).default(20),
   SUGGESTIONS_PAGE_MAX: z.coerce.number().int().min(1).max(100).default(50),

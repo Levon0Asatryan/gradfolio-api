@@ -15,6 +15,7 @@ export const SUGGESTION_KINDS = [
   'profile.links.github',
   'profile.links.website',
   'linkedin.reimport',
+  'skill.add',
 ] as const;
 export type SuggestionKind = (typeof SUGGESTION_KINDS)[number];
 
@@ -37,6 +38,22 @@ export const suggestionSchema = z
     mode: z.enum(['fill', 'replace']).nullable().meta({
       description: '`fill`: the field is empty now; `replace`: it holds a different value.',
     }),
+    skill: z.string().nullable().meta({
+      description: '`skill.add` only: the skill an accept would add to the profile.',
+    }),
+    evidence: z
+      .object({
+        total: z.number().int(),
+        repositories: z.number().int(),
+        projects: z.number().int(),
+      })
+      .nullable()
+      .meta({
+        description:
+          '`skill.add` only, as of when it was offered: how many of the student’s own public ' +
+          'repositories and projects show the skill. `total` counts a project imported from a ' +
+          'repository once.',
+      }),
     lastSyncedAt: z.string().nullable().meta({
       description: '`linkedin.reimport` only: the last confirmed export import, ISO 8601.',
     }),
