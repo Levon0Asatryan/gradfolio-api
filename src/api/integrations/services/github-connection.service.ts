@@ -294,7 +294,7 @@ export class GithubConnectionService {
       // Still refused after a fresh sign-in: nothing was connected, so the
       // reservation goes instead of blocking the next try until it is stale.
       if (err instanceof GithubNotLinkedError) {
-        await this.releaseReservation(user.id, claims.githubUserId);
+        await this.releaseReservation(user.id, claims.githubUserId, reserved);
       }
       throw err;
     }
@@ -595,11 +595,17 @@ export class GithubConnectionService {
   }
 
   /** Undoes this link's reservation, if it is still the one this request made. */
-  private async releaseReservation(userId: string, githubUserId: string): Promise<void> {
+  private async releaseReservation(
+    userId: string,
+    githubUserId: string,
+    generation?: number,
+  ): Promise<void> {
     await inTransaction(this.dbs.db, async (trx) => {
       await lockUser(trx, userId);
       const row = await lockGithubRow(trx, userId);
       if (row?.status !== 'linking' || row.externalUserId !== githubUserId) return;
+      // A late caller must not clear a newer reservation for the same GitHub id.
+      if (generation !== undefined && row.generation !== generation) return;
       await writeGithubRow(trx, userId, row, {
         status: 'not_connected',
         externalUserId: null,

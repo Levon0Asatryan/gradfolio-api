@@ -3069,7 +3069,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: "GITHUB_NOT_LINKED: GitHub refused the token Auth0 holds (sign in with GitHub again); GITHUB_ACCOUNT_IN_USE: another Gradfolio account has this GitHub account; GITHUB_LINK_IN_PROGRESS: a link started moments ago is still running; GITHUB_STATE_CHANGED: GitHub was connected or disconnected by another request at the same moment (nothing was changed by this one; reload and retry)"
+          description: "GITHUB_ACCOUNT_IN_USE: another Gradfolio account has this GitHub account; GITHUB_LINK_IN_PROGRESS: a link started moments ago is still running; GITHUB_STATE_CHANGED: GitHub was connected or disconnected by another request at the same moment (nothing was changed by this one; reload and retry)"
           content:
             application/json:
               schema:

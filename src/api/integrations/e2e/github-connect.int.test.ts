@@ -1247,6 +1247,47 @@ describe('disconnect (revoke first, D9)', () => {
       expect(again.body.state).toBe('link_required');
     });
 
+    it('a refused link that returns late does not release a newer reservation (barrier)', async () => {
+      const http = await start();
+      const s = await connected(http, 'github|124', '124');
+      gh.tokens.delete(auth0.githubTokenFor('124'));
+      await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+      const nonce1 = await nonceFor(http, s);
+      const nonce2 = await nonceFor(http, s);
+
+      // The first link reserved, and GitHub's answer on the dead token is in flight.
+      const gate1 = gh.holdNextUser();
+      const first = http
+        .post('/v1/me/integrations/github/link')
+        .set(s.auth)
+        .send({ idToken: await idToken('124', nonce1) })
+        .then((r) => r);
+      await gate1.arrived;
+      // Its reservation goes stale and is settled from GitHub's word: released.
+      await ageReservation(s.id);
+      await http.get('/v1/me/integrations').set(s.auth).expect(200);
+      expect(await githubRow(s.id)).toMatchObject({ status: 'not_connected' });
+
+      // The student signs in again; the retry reserves anew, its GitHub answer in flight.
+      signInAgain(s.sub, '124', 'gho_SENTINEL_fresh_124');
+      const gate2 = gh.holdNextUser();
+      const retry = http
+        .post('/v1/me/integrations/github/link')
+        .set(s.auth)
+        .send({ idToken: await idToken('124', nonce2) })
+        .then((r) => r);
+      await gate2.arrived;
+      expect(await githubRow(s.id)).toMatchObject({ status: 'linking' });
+
+      // The first returns, refused: the retry's reservation stands.
+      gate1.release();
+      expect((await first).status).toBe(409);
+      expect(await githubRow(s.id)).toMatchObject({ status: 'linking' });
+      gate2.release();
+      expect((await retry).status).toBe(200);
+      expect(await githubRow(s.id)).toMatchObject({ status: 'connected' });
+    });
+
     it('two Connects at once on a dead token both offer the sign-in (barrier)', async () => {
       const http = await start();
       const s = await connected(http, 'github|121', '121');

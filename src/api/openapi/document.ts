@@ -530,8 +530,7 @@ function integrationOperations(): Operation[] {
       responses: {
         '200': { description: 'Connected, or a link is required', schema: connectResponseSchema },
         '409': error(
-          'GITHUB_NOT_LINKED: GitHub refused the token Auth0 holds (sign in with GitHub again); ' +
-            `GITHUB_ACCOUNT_IN_USE: another Gradfolio account has this GitHub account; ${inProgress}`,
+          `GITHUB_ACCOUNT_IN_USE: another Gradfolio account has this GitHub account; ${inProgress}`,
         ),
         '429': error('RATE_LIMITED or GITHUB_RATE_LIMITED; see the Retry-After header'),
         '502': error('GITHUB_UNAVAILABLE: GitHub failed or timed out'),
