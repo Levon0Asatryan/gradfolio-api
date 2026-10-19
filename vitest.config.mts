@@ -123,7 +123,11 @@ export default defineConfig({
         // Repository changes: the row locks, the snapshot compare at accept and the
         // import-backed accept, proved by suggestions/e2e/project-suggestions.int.test.ts
         // (barriers included); the rules are unit tested (project-rules.test.ts).
+        // Education and organisation entries: the accept's lock, the no-duplicate check and the
+        // section write, proved by suggestions/e2e/education-suggestions.int.test.ts; the rules
+        // are unit tested (education-rules.test.ts).
         'src/api/suggestions/repositories/*.ts',
+        'src/api/suggestions/services/education-suggestions.service.ts',
         'src/api/suggestions/services/suggestions.service.ts',
         'src/api/suggestions/services/project-suggestions.service.ts',
         'src/api/suggestions/*.controller.ts',
