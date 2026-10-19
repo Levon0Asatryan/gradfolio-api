@@ -61,6 +61,13 @@ lives there.
 
 ### Status and reports
 
+- **Claim before you start.** When a task chat starts on a task, its row goes to
+  `in progress` in the module's task table, in a small docs PR, before the chat writes
+  any code. Anyone who looks sees the task is taken. A task with no `in progress` row is
+  free.
+- **Keep it current.** `review` when the PR opens, `done` when it is merged and deployed,
+  back to `todo` if the chat is dropped (say why in the docs PR).
+
 - **The task table in a module's README is the status of record for its tasks.** The
   module chat updates it in small docs PRs as tasks move: `todo` → `in progress` →
   `review` → `done`.
