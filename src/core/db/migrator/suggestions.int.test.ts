@@ -41,7 +41,7 @@ describe('0009_suggestions', () => {
       `INSERT INTO integrations (id, user_id, integration_type, status, external_user_id, external_login)
        VALUES ('a', 'u1', 'github', 'connected', '42', 'kept-login')`,
     );
-    expect(await up(conn, o)).toEqual(['0009_suggestions']);
+    expect(await up(conn, o, '0009_suggestions')).toEqual(['0009_suggestions']);
     const [rows] = await conn.query(
       'SELECT status, external_login, suggestions_polled_at, profile_etag, profile_snapshot FROM integrations',
     );
@@ -58,8 +58,8 @@ describe('0009_suggestions', () => {
 
   it('applies twice with nothing left, and down then up gives the same schema', async () => {
     const o = await opts();
-    await up(conn, o);
-    expect(await up(conn, o)).toEqual([]);
+    await up(conn, o, '0009_suggestions');
+    expect(await up(conn, o, '0009_suggestions')).toEqual([]);
     const first = await dumpSchema(conn);
     expect(first).toContain('CREATE TABLE `suggestions`');
     expect(first).toContain('uq_suggestions_user_key');
@@ -69,7 +69,7 @@ describe('0009_suggestions', () => {
     expect(reverted).not.toContain('suggestions');
     expect(reverted).not.toContain('profile_etag');
 
-    await up(conn, o);
+    await up(conn, o, '0009_suggestions');
     expect(await dumpSchema(conn)).toBe(first);
   });
 

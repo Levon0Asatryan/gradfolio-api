@@ -15,7 +15,9 @@ export type RejectionReason =
   | `claim:${string}`
   | 'invalid'
   /** A `github|<id>` subject whose GitHub account another Gradfolio account linked. */
-  | 'linked-elsewhere';
+  | 'linked-elsewhere'
+  /** A subject whose account was deleted, within the tombstone's lifetime. */
+  | 'account-deleted';
 
 /** 401 for any missing, malformed or invalid access token. */
 export class UnauthenticatedError extends AppError {

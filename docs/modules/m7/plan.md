@@ -289,15 +289,31 @@ application, a privilege increase (the app can then delete any user in the tenan
   up again, and the GitHub sign-in alone no longer reaches the old account.
 - **Off:** as §2.7. What remains is the login, and, after an unlink, a harmless standalone
   `github|<id>` user.
-- **Precondition for turning it on: a deletion tombstone, not built.** After the Auth0 user is gone, a
-  still-valid access token (up to an hour) can still provision a `users` row from its claims (name,
-  email, avatar): a public, never-removed account bound to a login that no longer exists. That row
-  outlives the token. The fix is a small table of deleted `sub`s, refused by provisioning for the
-  token's lifetime. Until it exists, the API **boots with the flag on but logs a warning at every
-  start** (`AUTH0_DELETE_USERS is on without a deletion tombstone …`) rather than refusing: the owner
-  decides, and the warning cannot be missed in Cloud Run's log. Queue row M7-T13 says the same. Tracker
-  row proposed: "M7 follow-up: deletion tombstone by sub for the access token's lifetime; precondition
-  of AUTH0_DELETE_USERS".
+- **Precondition for turning it on: the deletion tombstone (built, M7-T23).** After the Auth0 user is
+  gone, a still-valid access token (up to an hour) could still provision a `users` row from its claims
+  (name, email, avatar): a public, never-removed account bound to a login that no longer exists.
+  - **Table:** `deleted_subjects (auth0_id PK, expires_at)`, migration 0010. The account-deletion
+    transaction inserts the caller's `sub` after the user row is deleted, with
+    `expires_at = NOW() + ACCOUNT_TOMBSTONE_TTL_S` (default 7200 s: the 3600 s access-token lifetime
+    of `docs/ops/auth0-setup.md` plus a margin), and deletes every entry already past its
+    `expires_at` first. That is the purge: deletions are the only writers, so the table holds at
+    most one token lifetime of them. An expired entry is inert before it is purged.
+  - **Check:** with the flag on, `UsersService.resolve` refuses a listed, unexpired `sub` with
+    `401 UNAUTHENTICATED` (log reason `account-deleted`) and creates no row. The check runs in the
+    provisioning transaction **after** the upsert and throws to roll it back. The upsert queues behind a
+    deletion that holds the user row; the deletion lists the `sub` before it commits; so the row is
+    either deleted with the account or never commits. Same lock order as the deletion (user row, then
+    tombstone), so no deadlock between them.
+  - **Always written, read only with the flag on.** With the flag off the login survives, and a fresh
+    token for it is a legitimate sign-in (Q7: a blank account, the frontend signs the user out). A check
+    by `sub` cannot tell an old token from a new one, so it would lock that student out for two hours.
+    With the flag on the login is gone and nothing can mint a token for that `sub`.
+  - **Boot:** with the flag on and no `deleted_subjects` table the API **refuses to start** (migration 0010
+    not applied). It replaces the warning of #89.
+  - **Proved by removal** (`account-tombstone.int.test.ts`): the check, the write in the deletion
+    transaction, the purge, the expiry condition and the boot check each fail a named test when removed.
+    The race is forced by a barrier (an uncommitted account row, the provisioning insert queued behind it,
+    then the deletion commits).
 
 ## 3. Import, re-sync, README (7.3–7.5)
 
