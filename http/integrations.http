@@ -20,6 +20,7 @@ Authorization: Bearer {{accessToken}}
 # 200 {"state":"connected","login":"…"} when you sign in with GitHub (or linked it);
 # else {"state":"link_required","nonce":"…","expiresAt":"…"}: start Auth0's
 # /authorize with connection=github and that nonce, then send the id_token below.
+# Also the answer when GitHub refuses the token Auth0 holds (a dead token), for any login.
 POST {{baseUrl}}/v1/me/integrations/github/connect
 Authorization: Bearer {{accessToken}}
 

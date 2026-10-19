@@ -167,13 +167,12 @@ export class GithubConnectionService {
       ghUser = await this.githubUser(gh, user.auth0Id, found);
     } catch (err) {
       if (!(err instanceof GithubNotLinkedError)) throw err;
-      // A login that is the GitHub one has no secondary sign-in to offer (Auth0
-      // refuses to link a user to itself): signing in again replaces the token.
-      if (user.auth0Id.startsWith('github|')) throw err;
       // GitHub refuses the token Auth0 holds (revoked at GitHub, or stale): only a
       // fresh GitHub sign-in replaces it. Answering 409 again would leave the
       // student no way to start one, so a flag left from that token is cleared
-      // and the link is offered, as when the identity is gone.
+      // and the sign-in is offered, as when the identity is gone. A login that is
+      // the GitHub one is offered it too: Auth0 links nothing to itself, but the
+      // sign-in replaces the token, and `link` finishes from that (M7-T36).
       this.logger.info({ userId: user.id }, 'github token refused at connect; link offered');
       if (row?.status === 'connected') {
         await this.markDisconnected(user.id, identity, versionOf(row));
@@ -217,7 +216,11 @@ export class GithubConnectionService {
       }
       if (row?.status === 'linking') throw linkInProgress();
       // That GitHub login already is a Gradfolio account: linking would orphan it.
-      if (await accountExists(trx, claims.sub)) throw accountInUse();
+      // The caller's own login is not another account: a GitHub-login student
+      // signing in again to replace a dead token (M7-T36).
+      if (claims.sub !== user.auth0Id && (await accountExists(trx, claims.sub))) {
+        throw accountInUse();
+      }
       try {
         return await writeGithubRow(trx, user.id, row, {
           status: 'linking',
@@ -284,7 +287,17 @@ export class GithubConnectionService {
     // The identity that was linked, not whichever GitHub identity comes first.
     const found = await gh.tokens.tokenFor(user.auth0Id, undefined, claims.githubUserId);
     if (found === null) throw new IntegrationUnavailableError('linked identity not visible yet');
-    const ghUser = await this.githubUser(gh, user.auth0Id, found);
+    let ghUser: GithubUser;
+    try {
+      ghUser = await this.githubUser(gh, user.auth0Id, found);
+    } catch (err) {
+      // Still refused after a fresh sign-in: nothing was connected, so the
+      // reservation goes instead of blocking the next try until it is stale.
+      if (err instanceof GithubNotLinkedError) {
+        await this.releaseReservation(user.id, claims.githubUserId, reserved);
+      }
+      throw err;
+    }
     await this.markConnected(user.id, ghUser, reserved);
     this.logger.info({ userId: user.id }, 'github linked');
     return { state: 'connected', login: ghUser.login };
@@ -582,11 +595,17 @@ export class GithubConnectionService {
   }
 
   /** Undoes this link's reservation, if it is still the one this request made. */
-  private async releaseReservation(userId: string, githubUserId: string): Promise<void> {
+  private async releaseReservation(
+    userId: string,
+    githubUserId: string,
+    generation?: number,
+  ): Promise<void> {
     await inTransaction(this.dbs.db, async (trx) => {
       await lockUser(trx, userId);
       const row = await lockGithubRow(trx, userId);
       if (row?.status !== 'linking' || row.externalUserId !== githubUserId) return;
+      // A late caller must not clear a newer reservation for the same GitHub id.
+      if (generation !== undefined && row.generation !== generation) return;
       await writeGithubRow(trx, userId, row, {
         status: 'not_connected',
         externalUserId: null,

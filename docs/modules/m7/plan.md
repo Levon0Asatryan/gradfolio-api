@@ -222,7 +222,11 @@ the marker existed it left a connected row whose token is dead: the next GitHub 
 which already maps to `409 GITHUB_NOT_LINKED` (§3.1), and a repeated `DELETE` finds the grant gone
 and finishes. Reconnecting needs one fresh GitHub login, which replaces the dead token Auth0 holds
 (§2.1 step 6); `connect` with a token GitHub refuses clears a stale flag and offers that login
-(`link_required`) for a login that is not itself the GitHub one. Projects already imported stay (`source = 'github'`); re-sync then answers
+(`link_required`), for any login (M7-T36; M7-T27 left the GitHub login on a `409` loop). For a login that is
+itself the GitHub one, `link` finds the identity already held (nothing to link), does not count the caller's
+own `github|<id>` as another account, reads the new token, and a token still refused after the sign-in is
+`409 GITHUB_NOT_LINKED` with the reservation released. Not verified: that Auth0 replaces the stored token on
+that sign-in (the 2026-10-19 11:59 log says yes; M7-T50 confirms). Projects already imported stay (`source = 'github'`); re-sync then answers
 `409 GITHUB_NOT_CONNECTED`. The Auth0 identity is **not** unlinked (a GitHub-only user would lose
 their login; `update:users` is already a wide scope): the card says so.
 
