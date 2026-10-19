@@ -28,7 +28,7 @@ Out: UI (T43).
 
 ## Decisions
 
-Made: ids not content; one transaction. **Levon decides:** nothing.
+Made: complete items, not ids (plan §4.3); one transaction. **Levon decides:** nothing.
 
 ## Acceptance
 
