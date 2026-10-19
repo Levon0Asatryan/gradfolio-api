@@ -226,6 +226,15 @@ describe('accept and dismiss', () => {
     expect((await entryRows(http, alice, 'all'))[0]!.status).toBe('superseded');
   });
 
+  it('a disconnect deletes the open suggestion', async () => {
+    const { http, alice } = await setup();
+    h.gh.emails.set(100, [{ email: POLY, verified: true }]);
+    await refresh(http, alice).expect(200);
+    expect(await entryRows(http, alice)).toHaveLength(1);
+    await http.delete('/v1/me/integrations/github').set(alice.auth).expect(200);
+    expect(await entryRows(http, alice)).toEqual([]);
+  });
+
   it('a dismissed suggestion is not offered again', async () => {
     const { http, alice } = await setup();
     h.gh.emails.set(100, [{ email: POLY, verified: true }]);
