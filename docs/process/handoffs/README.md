@@ -11,19 +11,20 @@ wrote them.
   [../handoff-template.md](../handoff-template.md).
 - **The status of record is [../tracker.md](../tracker.md)**, not these reports.
 
-| Milestone     | Prompt                       | Report                       | Other                                                                                |
-| ------------- | ---------------------------- | ---------------------------- | ------------------------------------------------------------------------------------ |
-| M1 data layer | [prompt](m1/prompt.md)       | in the tracker (M1)          | [follow-up prompt](m1/followup-prompt.md), [follow-up report](m1/followup-report.md) |
-| FE setup      | [prompt](fe-setup/prompt.md) | [report](fe-setup/report.md) |                                                                                      |
-| M2 auth       | [prompt](m2/prompt.md)       | [report](m2/report.md)       |                                                                                      |
-| M3 profiles   | [prompt](m3/prompt.md)       | [report](m3/report.md)       | [UI redesign plan](m3/ui-redesign-plan.md)                                           |
-| Deploy (GCP)  | [prompt](deploy/prompt.md)   | [report](deploy/report.md)   |                                                                                      |
-| M4 projects   | [prompt](m4/prompt.md)       | [report](m4/report.md)       |                                                                                      |
-| M5 teams      | [prompt](m5/prompt.md)       | [report](m5/report.md)       | [Teams page addendum](m5/teams-addendum.md)                                          |
-| M6 discovery  | [prompt](m6/prompt.md)       | [report](m6/report.md)       |                                                                                      |
+| Milestone                            | Prompt                       | Report                         | Other                                                                                                                                      |
+| ------------------------------------ | ---------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| M1 data layer                        | [prompt](m1/prompt.md)       | in the tracker (M1)            | [follow-up prompt](m1/followup-prompt.md), [follow-up report](m1/followup-report.md)                                                       |
+| FE setup                             | [prompt](fe-setup/prompt.md) | [report](fe-setup/report.md)   |                                                                                                                                            |
+| M2 auth                              | [prompt](m2/prompt.md)       | [report](m2/report.md)         |                                                                                                                                            |
+| M3 profiles                          | [prompt](m3/prompt.md)       | [report](m3/report.md)         | [UI redesign plan](m3/ui-redesign-plan.md)                                                                                                 |
+| Deploy (GCP)                         | [prompt](deploy/prompt.md)   | [report](deploy/report.md)     |                                                                                                                                            |
+| M4 projects                          | [prompt](m4/prompt.md)       | [report](m4/report.md)         |                                                                                                                                            |
+| M5 teams                             | [prompt](m5/prompt.md)       | [report](m5/report.md)         | [Teams page addendum](m5/teams-addendum.md)                                                                                                |
+| M6 discovery                         | [prompt](m6/prompt.md)       | [report](m6/report.md)         |                                                                                                                                            |
+| M7 GitHub and LinkedIn (in progress) | [prompt](m7/prompt.md)       | [interim report](m7/report.md) | [progress](m7/progress.md), [GitHub import addendum](m7/import-addendum.md), [findings for the main chat](m7/findings-for-orchestrator.md) |
 
 **Still in the workspace root while in use:**
 
-- `m7-prompt.md`, and `m7-report.md` once it exists: they move here when M7 closes.
+- `m7-report.md`, the live M7 report (a snapshot is in `m7/`; the final one replaces it when M7 closes).
 - `manual-testing.md`, Levon's queue of manual tests and actions. The lead chats edit
   it live, so it stays outside the repo.
