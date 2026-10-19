@@ -30,6 +30,11 @@ export interface Certifications {
   userId: string;
 }
 
+export interface DeletedSubjects {
+  auth0Id: string;
+  expiresAt: Date;
+}
+
 export interface Education {
   degree: string;
   description: string | null;
@@ -218,6 +223,7 @@ export interface UserSkills {
 export interface DB {
   activities: Activities;
   certifications: Certifications;
+  deletedSubjects: DeletedSubjects;
   education: Education;
   experience: Experience;
   integrationNonces: IntegrationNonces;

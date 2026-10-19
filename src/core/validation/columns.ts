@@ -100,6 +100,7 @@ export const COLUMN_LIMITS = {
   'activities.translation_key': chars(255),
   'activities.details': TEXT,
 
+  'deleted_subjects.auth0_id': chars(255),
   'suggestions.id': chars(36),
   'suggestions.user_id': chars(36),
   'suggestions.kind': chars(40),
