@@ -7,7 +7,7 @@ import { inTransaction } from '../../../core/db/transaction.js';
 import { lockUser } from '../../../core/db/user-lock.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../core/errors/app-error.js';
 import { GithubNotLinkedError } from '../../../core/github/errors.js';
-import type { GithubProfile } from '../../../core/github/github-client.js';
+import type { GithubProfile, GithubSocialAccount } from '../../../core/github/github-client.js';
 import type { GithubAccessToken } from '../../../core/github/github-access-token.js';
 import type { GithubClient } from '../../../core/github/github-client.js';
 import { SkillsService } from '../../profiles/services/skills.service.js';
@@ -48,8 +48,10 @@ import {
 import {
   currentOf,
   fromGithubProfile,
+  fromGithubSocialAccounts,
   fromLinkedinClaims,
   patchOf,
+  SOCIAL_FIELDS,
   type ProfileField,
   type ProfileNow,
   quarterOf,
@@ -66,6 +68,9 @@ interface Row {
   dedupeKey: string;
   payload: Record<string, unknown>;
 }
+
+/** GitHub's social accounts, read per refresh; `undefined`: GitHub was not asked. */
+type SocialAccounts = GithubSocialAccount[] | undefined;
 
 /** The newest repositories' evidence is read per refresh; `undefined`: GitHub was not asked. */
 type RepoEvidence = EvidenceItem[] | undefined;
@@ -87,6 +92,9 @@ const projectEvidence = (
   return [...byProject.values()];
 };
 
+const isSocialKind = (kind: string): boolean =>
+  Object.values(SOCIAL_FIELDS).some((f) => `profile.${f}` === kind);
+
 const skillOf = (p: Record<string, unknown>): string | null =>
   typeof p.skill === 'string' ? p.skill : null;
 
@@ -105,6 +113,8 @@ const profileNow = (u: UserRow): ProfileNow => ({
   avatarUrl: u.avatarUrl,
   github: u.github,
   website: u.website,
+  linkedin: u.linkedin,
+  twitter: u.twitter,
 });
 
 /**
@@ -168,6 +178,7 @@ export class SuggestionsService {
     let github: RefreshResponse['github'] = 'not_connected';
     let fresh: { profile: GithubProfile; etag: string | null } | undefined;
     let repoEvidence: RepoEvidence;
+    let social: SocialAccounts;
 
     if (state?.status === 'connected') {
       if (!(await claimRefresh(this.dbs.db, user.id, floor))) {
@@ -184,6 +195,7 @@ export class SuggestionsService {
             read = await gh.github.getProfile(token, usable ? state.etag : null);
             try {
               repoEvidence = await this.readRepoEvidence(gh.github, token, githubUserId);
+              social = (await gh.github.listSocialAccounts(token)).accounts;
             } catch (err) {
               // The profile was read a moment ago: a token refused now was revoked in
               // between (a disconnect). Sync decides from the connection row; the
@@ -215,6 +227,7 @@ export class SuggestionsService {
       previousPolledAt: state?.polledAt ?? null,
       fresh,
       repoEvidence,
+      social,
     });
     if (outcome.githubDropped === 'gone') github = 'not_connected';
     // Connected again, as another connection: nothing of this read was applied; try again.
@@ -278,6 +291,7 @@ export class SuggestionsService {
       previousPolledAt: Date | null;
       fresh: { profile: GithubProfile; etag: string | null } | undefined;
       repoEvidence: RepoEvidence;
+      social: SocialAccounts;
     },
   ): Promise<{ created: number; githubDropped: false | 'gone' | 'replaced' }> {
     const userId = user.id;
@@ -303,6 +317,17 @@ export class SuggestionsService {
         : (read.fresh?.profile ?? (row?.snapshot ? { name: null, ...row.snapshot } : null));
       const lastSynced = await linkedinLastSynced(trx, userId);
       const wanted = this.wanted(profile, snapshot, identity, lastSynced);
+      // Links: only from a read made just now (nothing of them is stored).
+      if (githubOk && read.social !== undefined) {
+        for (const w of fromGithubSocialAccounts(read.social, profile)) {
+          wanted.push({
+            kind: w.kind,
+            source: w.source,
+            dedupeKey: w.dedupeKey,
+            payload: { field: w.field, value: w.value, mode: w.mode },
+          });
+        }
+      }
       // Skills: the repositories only when GitHub was asked just now; the projects always.
       const have = await skillNamesOf(trx, userId);
       const projectItems = projectEvidence(await projectTechnologies(trx, userId));
@@ -343,11 +368,23 @@ export class SuggestionsService {
       const haveKeys = new Set(have.map(skillKey));
       // Not connected: there are no repositories, which is known.
       const repositoriesKnown = !githubOk || read.repoEvidence !== undefined;
+      // The same for a social link: kept unless its field was filled meanwhile.
+      const socialKnown = !githubOk || read.social !== undefined;
+      const socialFieldFilled = (r: SuggestionRow) => {
+        const field = payloadOf(r).field;
+        return (
+          typeof field !== 'string' ||
+          !Object.values(SOCIAL_FIELDS).includes(field as never) ||
+          currentOf(profile, field as ProfileField) !== null
+        );
+      };
       const gone = (r: SuggestionRow) =>
         !wantedKeys.has(r.dedupeKey) &&
-        (r.kind !== 'skill.add' ||
-          repositoriesKnown ||
-          haveKeys.has(skillKey(skillOf(payloadOf(r)) ?? '')));
+        (r.kind === 'skill.add'
+          ? repositoriesKnown || haveKeys.has(skillKey(skillOf(payloadOf(r)) ?? ''))
+          : isSocialKind(r.kind)
+            ? socialKnown || socialFieldFilled(r)
+            : true);
       await supersede(
         trx,
         userId,
@@ -407,7 +444,7 @@ export class SuggestionsService {
     type Outcome =
       | { kind: 'done'; applied: ResolveResponse['applied']; released: string[] }
       | { kind: 'invalid' }
-      | { kind: 'stale' };
+      | { kind: 'stale'; what: 'skill' | 'link' };
     const outcome = await inTransaction(this.dbs.db, async (trx): Promise<Outcome> => {
       await lockUser(trx, user.id);
       const row = await lockSuggestion(trx, user.id, id);
@@ -429,7 +466,7 @@ export class SuggestionsService {
         if (after.length === before.length) {
           // Already on the profile (the registry matches case and accents like the list does).
           await supersede(trx, user.id, [id]);
-          return { kind: 'stale' };
+          return { kind: 'stale', what: 'skill' };
         }
         await resolve(trx, user.id, id, 'accepted');
         // The spelling written, which the registry may have fixed differently.
@@ -442,6 +479,14 @@ export class SuggestionsService {
       const stored = payloadOf(row);
       const field = stored.field as ProfileField;
       const value = stored.value;
+      if (isSocialKind(row.kind)) {
+        // Fill only: a link the student typed since the offer is never replaced.
+        const now = await currentProfile(trx, user.id);
+        if (now === undefined || currentOf(now, field) !== null) {
+          await supersede(trx, user.id, [id]);
+          return { kind: 'stale', what: 'link' };
+        }
+      }
       const patch = updateProfileSchema.safeParse(
         typeof value === 'string' ? patchOf(field, value) : {},
       );
@@ -458,7 +503,12 @@ export class SuggestionsService {
       throw new ConflictError('SUGGESTION_INVALID', 'this value can no longer be written');
     }
     if (outcome.kind === 'stale') {
-      throw new ConflictError('SUGGESTION_STALE', 'this skill is already on the profile');
+      throw new ConflictError(
+        'SUGGESTION_STALE',
+        outcome.what === 'skill'
+          ? 'this skill is already on the profile'
+          : 'this link is already set on the profile',
+      );
     }
     await this.profiles.releaseFiles(outcome.released);
     return { id, status: 'accepted', applied: outcome.applied };

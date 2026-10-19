@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { AccessTokenIdentity } from '../../../core/auth/access-token.js';
-import type { GithubProfile } from '../../../core/github/github-client.js';
+import type { GithubProfile, GithubSocialAccount } from '../../../core/github/github-client.js';
 import { cutBytes, cutChars } from '../../integrations/utils/github-fields.js';
 import { updateProfileSchema } from '../../profiles/dto/profile.dto.js';
 import { FALLBACK_NAME, prefillFrom } from '../../users/utils/prefill.js';
@@ -15,7 +15,15 @@ import type { SuggestionKind } from '../dto/suggestion.dto.js';
  */
 
 export type ProfileField =
-  'name' | 'headline' | 'bio' | 'location' | 'avatarUrl' | 'links.github' | 'links.website';
+  | 'name'
+  | 'headline'
+  | 'bio'
+  | 'location'
+  | 'avatarUrl'
+  | 'links.github'
+  | 'links.website'
+  | 'links.linkedin'
+  | 'links.twitter';
 
 /** The caller's profile fields as stored. */
 export interface ProfileNow {
@@ -26,6 +34,8 @@ export interface ProfileNow {
   avatarUrl: string | null;
   github: string | null;
   website: string | null;
+  linkedin: string | null;
+  twitter: string | null;
 }
 
 export interface Wanted {
@@ -45,6 +55,8 @@ const KIND: Record<ProfileField, SuggestionKind> = {
   avatarUrl: 'profile.avatarUrl',
   'links.github': 'profile.links.github',
   'links.website': 'profile.links.website',
+  'links.linkedin': 'profile.links.linkedin',
+  'links.twitter': 'profile.links.twitter',
 };
 
 export const currentOf = (now: ProfileNow, field: ProfileField): string | null => {
@@ -56,6 +68,8 @@ export const currentOf = (now: ProfileNow, field: ProfileField): string | null =
     avatarUrl: now.avatarUrl,
     'links.github': now.github,
     'links.website': now.website,
+    'links.linkedin': now.linkedin,
+    'links.twitter': now.twitter,
   }[field];
   return v === null || v.trim() === '' ? null : v;
 };
@@ -125,6 +139,37 @@ export function fromGithubProfile(profile: GithubProfile, now: ProfileNow): Want
     ),
   ];
   return found.filter((w): w is Wanted => w !== undefined);
+}
+
+/**
+ * GitHub's provider name -> the profile field that holds it. Providers the
+ * profile has no field for (YouTube, Mastodon …) are not offered. GitHub
+ * names X's `twitter`.
+ */
+export const SOCIAL_FIELDS = {
+  linkedin: 'links.linkedin',
+  twitter: 'links.twitter',
+} as const satisfies Record<string, ProfileField>;
+
+/**
+ * The social accounts GitHub lists, for the empty link fields only: a filled
+ * field is never replaced. One suggestion per field (the first account of a
+ * provider); a URL the profile's write rules refuse (`javascript:`, too long)
+ * is dropped by `candidate`.
+ */
+export function fromGithubSocialAccounts(
+  accounts: readonly GithubSocialAccount[],
+  now: ProfileNow,
+): Wanted[] {
+  const found = new Map<ProfileField, Wanted>();
+  for (const a of accounts) {
+    if (!Object.hasOwn(SOCIAL_FIELDS, a.provider)) continue;
+    const field = SOCIAL_FIELDS[a.provider as keyof typeof SOCIAL_FIELDS];
+    if (found.has(field)) continue;
+    const w = candidate('github', field, a.url, now, { fillOnly: true });
+    if (w !== undefined) found.set(field, w);
+  }
+  return [...found.values()];
 }
 
 /** A LinkedIn sign-in's name and photo, when they are not what the profile holds. */

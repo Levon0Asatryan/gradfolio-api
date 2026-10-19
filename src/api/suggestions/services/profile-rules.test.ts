@@ -4,6 +4,7 @@ import type { GithubProfile } from '../../../core/github/github-client.js';
 import {
   currentOf,
   fromGithubProfile,
+  fromGithubSocialAccounts,
   fromLinkedinClaims,
   patchOf,
   type ProfileNow,
@@ -19,6 +20,8 @@ const empty: ProfileNow = {
   avatarUrl: null,
   github: null,
   website: null,
+  linkedin: null,
+  twitter: null,
 };
 const gh: GithubProfile = {
   name: 'Ani P.',
@@ -136,5 +139,80 @@ describe('helpers', () => {
   it('quarterOf is UTC', () => {
     expect(quarterOf(new Date('2026-01-01T00:00:00Z'))).toBe('2026-Q1');
     expect(quarterOf(new Date('2026-12-31T23:59:59Z'))).toBe('2026-Q4');
+  });
+});
+
+describe('GitHub social accounts to link suggestions', () => {
+  const accounts = [
+    { provider: 'linkedin', url: 'https://www.linkedin.com/in/ani-p' },
+    { provider: 'twitter', url: 'https://x.com/ani_p' },
+    { provider: 'youtube', url: 'https://youtube.com/@ani' },
+    { provider: 'mastodon', url: 'https://mastodon.social/@ani' },
+  ];
+
+  it('fills LinkedIn and X, and offers nothing for a provider without a profile field', () => {
+    const w = fromGithubSocialAccounts(accounts, empty);
+    expect(w.map((x) => x.kind).sort()).toEqual([
+      'profile.links.linkedin',
+      'profile.links.twitter',
+    ]);
+    expect(w.find((x) => x.field === 'links.linkedin')).toMatchObject({
+      value: 'https://www.linkedin.com/in/ani-p',
+      mode: 'fill',
+      source: 'github',
+    });
+  });
+
+  it('never replaces a filled field, whatever GitHub holds', () => {
+    const w = fromGithubSocialAccounts(accounts, {
+      ...empty,
+      linkedin: 'https://linkedin.com/in/other',
+      twitter: 'https://x.com/ani_p',
+    });
+    expect(w).toEqual([]);
+  });
+
+  it('drops an unsafe, malformed or over-long URL, and takes the next account of the provider', () => {
+    expect(
+      fromGithubSocialAccounts(
+        [
+          { provider: 'linkedin', url: 'javascript:alert(1)' },
+          { provider: 'twitter', url: 'data:text/html,x' },
+        ],
+        empty,
+      ),
+    ).toEqual([]);
+    expect(
+      fromGithubSocialAccounts(
+        [
+          { provider: 'linkedin', url: `https://linkedin.com/in/${'a'.repeat(600)}` },
+          { provider: 'linkedin', url: 'not a url' },
+          { provider: 'linkedin', url: 'https://linkedin.com/in/ok' },
+        ],
+        empty,
+      ).map((x) => x.value),
+    ).toEqual(['https://linkedin.com/in/ok']);
+  });
+
+  it('does not treat an inherited property name as a provider', () => {
+    expect(
+      fromGithubSocialAccounts(
+        [
+          { provider: 'constructor', url: 'https://example.com/x' },
+          { provider: '__proto__', url: 'https://example.com/y' },
+        ],
+        empty,
+      ),
+    ).toEqual([]);
+  });
+
+  it('keys by provider, source and value, so a changed URL is a new suggestion', () => {
+    const a = fromGithubSocialAccounts([accounts[0]!], empty)[0]!;
+    const b = fromGithubSocialAccounts(
+      [{ provider: 'linkedin', url: 'https://linkedin.com/in/new' }],
+      empty,
+    )[0]!;
+    expect(a.dedupeKey).toMatch(/^profile:links\.linkedin:github:[0-9a-f]{16}$/);
+    expect(a.dedupeKey).not.toBe(b.dedupeKey);
   });
 });

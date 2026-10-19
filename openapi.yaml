@@ -3867,7 +3867,7 @@ paths:
       tags:
         - suggestions
       summary: The caller’s suggestions, newest first
-      description: Open ones by default (`status=all` adds the answered). A `profile.*` suggestion names the `field`, what it holds now (`current`) and what an accept would write (`proposed`). A `skill.add` suggestion names the `skill` and the `evidence` (public repositories and projects that show it). `openCount` is the caller’s open suggestions in all.
+      description: "Open ones by default (`status=all` adds the answered). A `profile.*` suggestion names the `field`, what it holds now (`current`) and what an accept would write (`proposed`). A `profile.links.linkedin` / `profile.links.twitter` suggestion (from GitHub’s social accounts) is always `mode: fill`: offered to an empty field only. A `skill.add` suggestion names the `skill` and the `evidence` (public repositories and projects that show it). `openCount` is the caller’s open suggestions in all."
       security:
         - bearerAuth: []
       parameters:
@@ -4007,7 +4007,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: "SUGGESTION_RESOLVED: it was already dismissed, superseded or accepted; SUGGESTION_INVALID: the value can no longer be written (it is superseded); SUGGESTION_STALE: the skill is already on the profile (it is superseded)"
+          description: "SUGGESTION_RESOLVED: it was already dismissed, superseded or accepted; SUGGESTION_INVALID: the value can no longer be written (it is superseded); SUGGESTION_STALE: the skill is already on the profile, or the link field was filled since the offer (it is superseded)"
           content:
             application/json:
               schema:
@@ -4061,7 +4061,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: "SUGGESTION_RESOLVED: it was already dismissed, superseded or accepted; SUGGESTION_INVALID: the value can no longer be written (it is superseded); SUGGESTION_STALE: the skill is already on the profile (it is superseded)"
+          description: "SUGGESTION_RESOLVED: it was already dismissed, superseded or accepted; SUGGESTION_INVALID: the value can no longer be written (it is superseded); SUGGESTION_STALE: the skill is already on the profile, or the link field was filled since the offer (it is superseded)"
           content:
             application/json:
               schema:
@@ -7057,6 +7057,8 @@ components:
             - profile.avatarUrl
             - profile.links.github
             - profile.links.website
+            - profile.links.linkedin
+            - profile.links.twitter
             - linkedin.reimport
             - skill.add
         source:

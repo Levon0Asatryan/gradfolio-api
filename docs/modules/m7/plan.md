@@ -725,6 +725,24 @@ No migration: `suggestions.kind` is a VARCHAR. Differences from §6.2:
   fixes the spelling, `PROFILE_MAX_SKILLS` applies (400), a skill already there is
   `409 SUGGESTION_STALE` and the suggestion is superseded.
 
+### 6.6d As built in M7-T21 (`profile.links.linkedin`, `profile.links.twitter`)
+
+No migration. Differences from §6.2:
+
+- **Source:** `GET /user/social_accounts` (public data, no scope), one call per refresh that reads
+  GitHub (so the cost is 3 + N: profile, repository list, N language lists, social accounts), none when
+  throttled. Its answer is not stored: inside the floor the open link suggestions are kept (unless the
+  field is filled now); after a read, one GitHub no longer lists is superseded.
+- **Providers:** `linkedin` → `links.linkedin`, `twitter` (GitHub's name for X) → `links.twitter`.
+  The profile has no field for YouTube, Mastodon, Facebook and the rest, so they are not offered.
+  The first account of a provider whose URL the profile's write rules take is used.
+- **Fill only:** offered to an empty field, `mode: fill`, never `replace`. An accept re-checks under the
+  user lock: a field filled since the offer is `409 SUGGESTION_STALE` and the suggestion is
+  superseded. The URL passes `updateProfileSchema` (http/https only, 500 characters) before it is offered
+  and again on accept.
+- **Not verified:** the response shape and the provider names are GitHub's documentation, not a
+  recording of a real account (the fake serves them).
+
 ### 6.7 Cost
 
 One PR, migration 0009, about 35 tests, roughly the size of (b). **Needs:** PR (b) merged (the diff

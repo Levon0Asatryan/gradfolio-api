@@ -14,6 +14,8 @@ export const SUGGESTION_KINDS = [
   'profile.avatarUrl',
   'profile.links.github',
   'profile.links.website',
+  'profile.links.linkedin',
+  'profile.links.twitter',
   'linkedin.reimport',
   'skill.add',
 ] as const;
