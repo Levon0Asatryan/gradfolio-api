@@ -6,6 +6,7 @@ import { loadConfig } from '../core/config/index.js';
 import { describeError } from '../core/errors/describe.js';
 import { AppModule } from './api.module.js';
 import { configureApp, registerNotFoundFallback } from './bootstrap.js';
+import { checkGithubSettings } from './integrations/github-settings-check.js';
 import { DOCS_PATH, setupApiDocs } from './openapi/docs.js';
 
 async function bootstrap(): Promise<void> {
@@ -15,6 +16,7 @@ async function bootstrap(): Promise<void> {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
+  checkGithubSettings(app.get(Logger), cfg);
 
   configureApp(app, cfg);
 
