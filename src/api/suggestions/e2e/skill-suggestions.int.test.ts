@@ -160,6 +160,22 @@ describe('which skills are offered', () => {
     });
   });
 
+  it('works without GitHub connected: projects alone, and a skill the projects stop showing is superseded', async () => {
+    const { http } = await setup();
+    const loner = await h.student('auth0|no-github-skills');
+    const first = await createProject(db, loner, { technologies: ['Docker'] });
+    await createProject(db, loner, { technologies: ['Docker'] });
+    h.gh.requests.length = 0;
+    const res = await refresh(http, loner).expect(200);
+    expect(res.body).toMatchObject({ github: 'not_connected', created: 1 });
+    expect(h.gh.requests).toEqual([]);
+    expect(names(await skillRows(http, loner))).toEqual(['Docker']);
+
+    await db.deleteFrom('projects').where('id', '=', first.project.id).execute();
+    await refresh(http, loner).expect(200);
+    expect(await skillRows(http, loner)).toEqual([]);
+  });
+
   it('never offers another student’s project technologies', async () => {
     const { http, alice, bob } = await setup();
     await createProject(db, bob, { technologies: ['Docker'] });

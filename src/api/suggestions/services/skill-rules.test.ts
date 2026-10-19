@@ -66,7 +66,7 @@ describe('skills to offer', () => {
   });
 
   it('keys a skill by its normalised name, and skips a name too long for the key', () => {
-    expect(skillDedupeKey('  Node   JS ')).toBe('skill:add:node js');
+    expect(skillDedupeKey('  Node   JS ')).toBe('skill:node js');
     const long = 'x'.repeat(200);
     expect(offered([repo(1, long), repo(2, long)])).toEqual([]);
   });

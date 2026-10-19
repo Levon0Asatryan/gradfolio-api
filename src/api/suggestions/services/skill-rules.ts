@@ -34,7 +34,7 @@ export interface WantedSkill {
 /** Case-insensitive, like the skills namespace. */
 export const skillKey = (name: string): string => normalizeTerm(name).toLowerCase();
 
-export const skillDedupeKey = (name: string): string => `skill:add:${skillKey(name)}`;
+export const skillDedupeKey = (name: string): string => `skill:${skillKey(name)}`;
 
 /** Folds items with one id into one (names joined, both sources kept). */
 function merged(items: readonly EvidenceItem[]) {

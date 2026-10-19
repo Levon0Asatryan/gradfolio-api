@@ -337,10 +337,11 @@ export class SuggestionsService {
 
       const wantedKeys = new Set(wanted.map((w) => w.dedupeKey));
       const open = await openOfSources(trx, userId, ['github', 'linkedin']);
-      // Without a fresh read of the repositories, an open skill is kept unless the
-      // profile has it now: what the repositories show is only known after a read.
+      // Connected but not read just now (inside the floor), an open skill is kept unless
+      // the profile has it now: what the repositories show is only known after a read.
       const haveKeys = new Set(have.map(skillKey));
-      const repositoriesKnown = githubOk && read.repoEvidence !== undefined;
+      // Not connected: there are no repositories, which is known.
+      const repositoriesKnown = !githubOk || read.repoEvidence !== undefined;
       const gone = (r: SuggestionRow) =>
         !wantedKeys.has(r.dedupeKey) &&
         (r.kind !== 'skill.add' ||
