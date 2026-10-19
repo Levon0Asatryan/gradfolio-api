@@ -61,7 +61,7 @@ describe('entriesToOffer', () => {
       },
       {
         kind: 'experience.add',
-        dedupeKey: organizationKey('poly-club'),
+        dedupeKey: organizationKey('poly-club', 'Polytechnic Club'),
         payload: { field: 'experience', value: 'Polytechnic Club' },
       },
     ]);

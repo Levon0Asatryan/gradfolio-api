@@ -63,7 +63,9 @@ const holds = (held: readonly string[], name: string): boolean =>
 export const educationKey = (name: string): string =>
   `education:${createHash('sha256').update(foldName(name)).digest('hex').slice(0, 16)}`;
 
-export const organizationKey = (login: string): string => `experience:org:${login.toLowerCase()}`;
+/** The name is in the key: a renamed organisation is a new offer, and the old row is withdrawn. */
+export const organizationKey = (login: string, name: string): string =>
+  `experience:org:${login.toLowerCase()}:${createHash('sha256').update(foldName(name)).digest('hex').slice(0, 8)}`;
 
 /** The entries to offer, an institution first, then organisations in the config's order. */
 export function entriesToOffer(
@@ -88,7 +90,7 @@ export function entriesToOffer(
     if (seen.has(login) && !holds(held.organizations, name)) {
       wanted.push({
         kind: 'experience.add',
-        dedupeKey: organizationKey(login),
+        dedupeKey: organizationKey(login, name),
         payload: { field: 'experience', value: name },
       });
     }

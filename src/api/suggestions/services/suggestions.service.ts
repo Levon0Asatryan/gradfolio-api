@@ -615,7 +615,7 @@ export class SuggestionsService {
       if (row.status !== 'open') {
         throw new ConflictError('SUGGESTION_RESOLVED', 'this suggestion is no longer open');
       }
-      if (!isEntryKind(row.kind) && Object.values(overrides ?? {}).some((v) => v !== undefined)) {
+      if (!isEntryKind(row.kind) && overrides !== undefined) {
         throw new ValidationError([
           { path: 'overrides', message: 'only education.add and experience.add take overrides' },
         ]);

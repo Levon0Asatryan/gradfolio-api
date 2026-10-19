@@ -267,6 +267,7 @@ describe('accept and dismiss', () => {
     };
     const link = items.items.find((i) => i.kind === 'profile.links.linkedin')!;
     await accept(http, alice, link.id, { overrides: DEGREE }).expect(400);
+    await accept(http, alice, link.id, { overrides: {} }).expect(400);
     await accept(http, alice, link.id).expect(200);
   });
 });
@@ -290,6 +291,29 @@ describe('organisations', () => {
       await db.selectFrom('suggestions').select('payload').where('userId', '=', alice.id).execute(),
     );
     expect(stored).not.toContain('some-other-org');
+  });
+
+  it('a renamed organisation withdraws the old offer and makes a new one', async () => {
+    const { http, alice } = await setup(ORGS);
+    h.gh.orgs.set('alice', ['poly-club']);
+    await refresh(http, alice).expect(200);
+    // The row as an earlier configuration made it: another display name, so another key.
+    await db
+      .updateTable('suggestions')
+      .set({
+        dedupeKey: 'experience:org:poly-club:00000000',
+        payload: JSON.stringify({ field: 'experience', value: 'Old Name' }) as never,
+      })
+      .where('userId', '=', alice.id)
+      .execute();
+    expect((await entryRows(http, alice)).map((r) => r.proposed)).toEqual(['Old Name']);
+    await refresh(http, alice).expect(200);
+    expect((await entryRows(http, alice)).map((r) => r.proposed)).toEqual(['Polytechnic Club']);
+    const all = await entryRows(http, alice, 'all');
+    expect(all.map((r) => [r.proposed, r.status]).sort()).toEqual([
+      ['Old Name', 'superseded'],
+      ['Polytechnic Club', 'open'],
+    ]);
   });
 
   it('accept needs the title and start; adds the entry named by the organisation', async () => {
