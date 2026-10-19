@@ -34,7 +34,7 @@ Made: complete items, not ids (plan §4.3); one transaction. **Levon decides:** 
 
 First confirm adds the selected items only; the second adds nothing; a malformed or
 over-limit item is refused with a stable code and nothing is written; per-section counts
-(`added`, `duplicates`) are returned. Guards removed (transaction, dedupe, per-item
+(`added`, `skipped`) are returned. Guards removed (transaction, dedupe, per-item
 validation, ownership) fail named tests.
 
 ## Rules
