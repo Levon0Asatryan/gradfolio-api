@@ -60,6 +60,8 @@ brief, "queue M7-T1" always means a queue row.
 | M7-T23 | Deletion tombstone: precondition of `AUTH0_DELETE_USERS`                    | api     | —                 | 7.2     | done        | [T23](tasks/M7-T23-deletion-tombstone.md)      |
 | M7-T24 | Startup check: log which of the five GitHub settings is missing             | api     | —                 | 7.2     | done        | [T24](tasks/M7-T24-startup-check.md)           |
 | M7-T25 | Education and organisation suggestions from verified emails and orgs        | api     | queue M7-T10      | 7.13    | blocked     | [T25](tasks/M7-T25-education-suggestions.md)   |
+| M7-T27 | Stuck GitHub connection: refused token, Disconnect cannot finish            | api     | —                 | 7.2     | todo        | [T27](tasks/M7-T27-stuck-github-connection.md) |
+| M7-T28 | `GET /v1/me/suggestions?limit=100` answers 400                              | api, fe | —                 | 7.13    | todo        | [T28](tasks/M7-T28-suggestions-limit-400.md)   |
 | M7-T30 | Focus and announcement after Publish on cards and the project page          | fe      | —                 | 7.14    | done        | [T30](tasks/M7-T30-publish-focus.md)           |
 | M7-T31 | Import entry points: after connect, Projects → Add                          | fe      | —                 | 7.14    | done        | [T31](tasks/M7-T31-import-entry-points.md)     |
 | M7-T32 | Suggestions inbox: skills, links, project changes, notification             | fe      | T20 (T21, T22)    | 7.13    | todo        | [T32](tasks/M7-T32-suggestions-inbox.md)       |
