@@ -81,6 +81,12 @@ export interface FakeGithub {
   readonly profiles: Map<number, Record<string, string | null>>;
   /** `GET /user/social_accounts` per GitHub user id. */
   readonly socialAccounts: Map<number, { provider: string; url: string }[]>;
+  /** `GET /user/emails` per GitHub user id (fake addresses only). */
+  readonly emails: Map<number, { email: string; verified: boolean }[]>;
+  /** How `GET /user/emails` answers: `no-scope` is GitHub's 404 for a token without `user:email`. */
+  emailsMode: 'ok' | 'no-scope' | 'status-500' | 'bad-body';
+  /** `GET /users/{login}/orgs`: a login (lower case) -> its public organisation logins. */
+  readonly orgs: Map<string, string[]>;
   /** Repositories by id; `GET /user/repos`, `/repositories/{id}` and its README read them. */
   readonly repos: Map<number, FakeRepo>;
   /** How the repository routes answer, whatever the token. */
@@ -147,6 +153,9 @@ export async function startFakeGithub(): Promise<FakeGithub> {
     profiles: new Map<number, Record<string, string | null>>(),
     socialAccounts: new Map<number, { provider: string; url: string }[]>(),
     repoMode: 'ok' as RepoMode,
+    emails: new Map<number, { email: string; verified: boolean }[]>(),
+    emailsMode: 'ok' as 'ok' | 'no-scope' | 'status-500' | 'bad-body',
+    orgs: new Map<string, string[]>(),
   };
   const clientId = 'gh-oauth-client';
   const clientSecret = 'gh-SENTINEL-client-secret';
@@ -305,6 +314,34 @@ export async function startFakeGithub(): Promise<FakeGithub> {
         return send(res, 200, state.socialAccounts.get(me.id) ?? []);
       }
 
+      if (path === '/user/emails' && req.method === 'GET') {
+        const me = asUser();
+        if (!me) return send(res, 401, { message: 'Bad credentials' });
+        if (state.emailsMode === 'no-scope') return send(res, 404, { message: 'Not Found' });
+        if (state.emailsMode === 'status-500') return send(res, 500, { message: 'boom' });
+        // The right addresses in the wrong shape: a reader that echoes the body leaks them.
+        if (state.emailsMode === 'bad-body') {
+          return send(
+            res,
+            200,
+            (state.emails.get(me.id) ?? []).map((e) => ({ email: e.email, verified: 'yes' })),
+          );
+        }
+        return send(res, 200, state.emails.get(me.id) ?? []);
+      }
+
+      const orgsPath = /^\/users\/([^/]+)\/orgs$/.exec(path);
+      if (orgsPath && req.method === 'GET') {
+        const me = asUser();
+        if (!me) return send(res, 401, { message: 'Bad credentials' });
+        const logins = state.orgs.get(orgsPath[1]!.toLowerCase()) ?? [];
+        return send(
+          res,
+          200,
+          logins.map((login) => ({ login })),
+        );
+      }
+
       const langPath = /^\/repos\/([^/]+)\/([^/]+)\/languages$/.exec(path);
       if (langPath && req.method === 'GET') {
         const me = asUser();
@@ -430,6 +467,14 @@ export async function startFakeGithub(): Promise<FakeGithub> {
     repos: state.repos,
     profiles: state.profiles,
     socialAccounts: state.socialAccounts,
+    emails: state.emails,
+    get emailsMode() {
+      return state.emailsMode;
+    },
+    set emailsMode(m) {
+      state.emailsMode = m;
+    },
+    orgs: state.orgs,
     get repoMode() {
       return state.repoMode;
     },

@@ -19,6 +19,8 @@ export const SUGGESTION_KINDS = [
   'profile.links.twitter',
   'linkedin.reimport',
   'skill.add',
+  'education.add',
+  'experience.add',
   'project.new',
   'project.update',
 ] as const;
@@ -34,14 +36,14 @@ export const suggestionSchema = z
     status: z.enum(SUGGESTION_STATUSES),
     field: z.string().nullable().meta({
       description:
-        'The field an accept would change: a profile field for `profile.*` (`bio`, `links.github` …); `summary` (GitHub’s description) or `descriptionHtml` (the README) for `project.update`; null otherwise.',
+        'The field an accept would change: a profile field for `profile.*` (`bio`, `links.github` …); `summary` (GitHub’s description) or `descriptionHtml` (the README) for `project.update`; the section (`education`, `experience`) for `education.add` and `experience.add`; null otherwise.',
     }),
     current: z.string().nullable().meta({
       description: 'The field’s value now (open suggestions only); null when empty.',
     }),
     proposed: z.string().nullable().meta({
       description:
-        'The value an accept would write. For `project.update` the new description, or the new README as sanitized HTML.',
+        'The value an accept would write. For `project.update` the new description, or the new README as sanitized HTML. For `education.add` the institution, for `experience.add` the organisation: the entry also needs what `overrides` gives (see accept).',
     }),
     mode: z.enum(['fill', 'replace']).nullable().meta({
       description: '`fill`: the field is empty now; `replace`: it holds a different value.',
@@ -141,3 +143,36 @@ export const resolveResponseSchema = z
   })
   .meta({ id: 'SuggestionResolved' });
 export type ResolveResponse = z.infer<typeof resolveResponseSchema>;
+
+/**
+ * `POST /v1/me/suggestions/{id}/accept`. `overrides` completes an `education.add`
+ * (`degree`, `field`, `startYear` are required; `endYear`, `description`) or an
+ * `experience.add` (`title` and `start` are required; `end`, `summary`). The name offered
+ * is not overridable. Validated by the section's own create rules at accept. Any other
+ * kind takes no overrides.
+ */
+export const acceptOverridesSchema = z
+  .strictObject({
+    degree: z.string(),
+    field: z.string(),
+    startYear: z.number(),
+    endYear: z.number().nullable(),
+    description: z.string().nullable(),
+    title: z.string(),
+    start: z.string(),
+    end: z.string().nullable(),
+    summary: z.string(),
+  })
+  .partial()
+  .meta({ id: 'SuggestionAcceptOverrides' });
+export type AcceptOverrides = z.infer<typeof acceptOverridesSchema>;
+
+export const acceptBodySchema = z
+  .strictObject({
+    overrides: acceptOverridesSchema.optional().meta({
+      description:
+        'What an `education.add` (`degree`, `field`, `startYear`, optionally `endYear`, `description`) or an `experience.add` (`title`, `start` as YYYY-MM, optionally `end`, `summary`) needs from the student. The rules are those of `POST /v1/me/education` and `POST /v1/me/experience`; a missing or invalid value is a 400 naming `overrides.<field>`, and the suggestion stays open.',
+    }),
+  })
+  .meta({ id: 'SuggestionAccept' });
+export type AcceptBody = z.infer<typeof acceptBodySchema>;

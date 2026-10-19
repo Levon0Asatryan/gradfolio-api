@@ -23,6 +23,7 @@ import { GithubConnectionService } from '../../integrations/services/github-conn
 import { insertSuggestionsNotification } from '../../notifications/repositories/notification-write.repository.js';
 import type { UserRow } from '../../users/repositories/user.repository.js';
 import type {
+  AcceptOverrides,
   RefreshResponse,
   ResolveResponse,
   SuggestionKind,
@@ -30,6 +31,8 @@ import type {
   SuggestionQuery,
   SuggestionView,
 } from '../dto/suggestion.dto.js';
+import { EducationSuggestionsService, isEntryKind } from './education-suggestions.service.js';
+import type { EducationEvidence } from './education-rules.js';
 import { lockProjectStates } from '../repositories/project-change.repository.js';
 import {
   claimRefresh,
@@ -99,6 +102,9 @@ interface Listed {
 /** GitHub's social accounts, read per refresh; `undefined`: GitHub was not asked. */
 type SocialAccounts = GithubSocialAccount[] | undefined;
 
+/** What GitHub showed of the university (emails, organisations); `undefined`: not asked or not configured. */
+type EducationRead = EducationEvidence | undefined;
+
 /** The newest repositories' evidence is read per refresh; `undefined`: GitHub was not asked. */
 type RepoEvidence = EvidenceItem[] | undefined;
 
@@ -158,6 +164,7 @@ export class SuggestionsService {
     private readonly profiles: ProfileService,
     private readonly skills: SkillsService,
     private readonly changes: ProjectSuggestionsService,
+    private readonly entries: EducationSuggestionsService,
     @Inject(APP_CONFIG) private readonly cfg: AppConfig,
   ) {}
 
@@ -207,6 +214,7 @@ export class SuggestionsService {
     let fresh: { profile: GithubProfile; etag: string | null } | undefined;
     let repoEvidence: RepoEvidence;
     let social: SocialAccounts;
+    let education: EducationRead;
     let listed: Listed | undefined;
     let upstream: UpstreamByProject | undefined;
 
@@ -229,6 +237,7 @@ export class SuggestionsService {
               listed = { ...repos, githubUserId: Number(githubUserId) };
               upstream = await this.changes.readUpstream(gh.github, token, user.id, repos.page);
               social = (await gh.github.listSocialAccounts(token)).accounts;
+              education = await this.entries.read(gh.github, token);
             } catch (err) {
               // The profile was read a moment ago: a token refused now was revoked in
               // between (a disconnect). Sync decides from the connection row; the
@@ -261,6 +270,7 @@ export class SuggestionsService {
       fresh,
       repoEvidence,
       social,
+      education,
       listed,
       upstream,
     });
@@ -328,6 +338,7 @@ export class SuggestionsService {
       fresh: { profile: GithubProfile; etag: string | null } | undefined;
       repoEvidence: RepoEvidence;
       social: SocialAccounts;
+      education: EducationRead;
       listed: Listed | undefined;
       upstream: UpstreamByProject | undefined;
     },
@@ -365,6 +376,11 @@ export class SuggestionsService {
             payload: { field: w.field, value: w.value, mode: w.mode },
           });
         }
+      }
+      // Education and organisations (plan §6.6f): only from a read made just now.
+      const entryPlan = await this.entries.plan(trx, userId, read.education, githubOk);
+      for (const w of entryPlan.rows) {
+        wanted.push({ kind: w.kind, source: 'github', dedupeKey: w.dedupeKey, payload: w.payload });
       }
       // Skills: the repositories only when GitHub was asked just now; the projects always.
       const have = await skillNamesOf(trx, userId);
@@ -492,11 +508,13 @@ export class SuggestionsService {
           ? repositoriesKnown || haveKeys.has(skillKey(skillOf(payloadOf(r)) ?? ''))
           : isSocialKind(r.kind)
             ? socialKnown || socialFieldFilled(r)
-            : r.kind === 'project.new'
-              ? newGone(r)
-              : r.kind === 'project.update'
-                ? updateGone(r)
-                : true);
+            : isEntryKind(r.kind)
+              ? entryPlan.gone(r)
+              : r.kind === 'project.new'
+                ? newGone(r)
+                : r.kind === 'project.update'
+                  ? updateGone(r)
+                  : true);
       await supersede(
         trx,
         userId,
@@ -563,7 +581,12 @@ export class SuggestionsService {
   }
 
   /** `POST /v1/me/suggestions/{id}/accept`. */
-  async accept(user: UserRow, identity: AccessTokenIdentity, id: string): Promise<ResolveResponse> {
+  async accept(
+    user: UserRow,
+    identity: AccessTokenIdentity,
+    id: string,
+    overrides?: AcceptOverrides,
+  ): Promise<ResolveResponse> {
     const memo: AvatarMemo = {};
     type Outcome =
       | {
@@ -574,7 +597,7 @@ export class SuggestionsService {
         }
       | { kind: 'invalid' }
       | { kind: 'limit' }
-      | { kind: 'stale'; what: 'skill' | 'link' | 'project' }
+      | { kind: 'stale'; what: 'skill' | 'link' | 'project' | 'entry' }
       /** A `project.new`: imported after this transaction, with no lock held. */
       | { kind: 'import'; row: SuggestionRow };
     let outcome: Outcome = await inTransaction(this.dbs.db, async (trx): Promise<Outcome> => {
@@ -591,6 +614,20 @@ export class SuggestionsService {
       }
       if (row.status !== 'open') {
         throw new ConflictError('SUGGESTION_RESOLVED', 'this suggestion is no longer open');
+      }
+      if (!isEntryKind(row.kind) && overrides !== undefined) {
+        throw new ValidationError([
+          { path: 'overrides', message: 'only education.add and experience.add take overrides' },
+        ]);
+      }
+      if (isEntryKind(row.kind)) {
+        const done = await this.entries.applyIn(trx, user.id, row, overrides);
+        if (done.kind === 'stale') {
+          await supersede(trx, user.id, [id]);
+          return { kind: 'stale', what: 'entry' };
+        }
+        await resolve(trx, user.id, id, 'accepted');
+        return { kind: 'done', applied: done.applied, released: [] };
       }
       if (row.kind === 'linkedin.reimport') {
         await resolve(trx, user.id, id, 'accepted');
@@ -667,7 +704,9 @@ export class SuggestionsService {
           ? 'this skill is already on the profile'
           : outcome.what === 'link'
             ? 'this link is already set on the profile'
-            : 'the project or the repository changed since this was suggested',
+            : outcome.what === 'entry'
+              ? 'the profile already has this entry, or it is no longer offered'
+              : 'the project or the repository changed since this was suggested',
       );
     }
     // Only a `done` outcome is left; `import` was turned into one of the others above.
@@ -713,6 +752,7 @@ export class SuggestionsService {
     const isSkill = row.kind === 'skill.add';
     const isUpdate = row.kind === 'project.update';
     const isNew = row.kind === 'project.new';
+    const isEntry = isEntryKind(row.kind);
     const stored = payloadOf(row);
     const text = (v: unknown) => (typeof v === 'string' ? v : null);
     const repoId = stored.repoId;
@@ -721,12 +761,12 @@ export class SuggestionsService {
       kind: row.kind as SuggestionKind,
       source: row.source,
       status: row.status,
-      field: isProfile || isUpdate ? (p.field ?? null) : null,
+      field: isProfile || isUpdate || isEntry ? (p.field ?? null) : null,
       current:
         isProfile && row.status === 'open' && p.field !== undefined
           ? currentOf(profileNow(user), p.field as ProfileField)
           : null,
-      proposed: isProfile || isUpdate ? (p.value ?? null) : null,
+      proposed: isProfile || isUpdate || isEntry ? (p.value ?? null) : null,
       mode: isProfile ? (p.mode ?? null) : null,
       skill: isSkill ? skillOf(payloadOf(row)) : null,
       evidence: isSkill ? evidenceOf(payloadOf(row)) : null,

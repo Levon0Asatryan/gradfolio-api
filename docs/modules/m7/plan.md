@@ -594,7 +594,7 @@ compare rules: re-sync applies them on demand; suggestions store the same diff.
 | `project.new`: repo in the user's list that is not imported             | `GET /user/repos` (ETag)                     | Yes. Payload: the import preview. Accept = import as draft.                                                                          |
 | `project.update`: description, README, title, language changed upstream | repo + README of **imported** repos only     | Yes, bounded: only repos whose `pushed_at`/ETag changed. Accept applies the field if the project's value still equals the base hash. |
 | `skill.add`: a language on 2+ of the user's repos not in skills         | the list above                               | Yes. One suggestion per language, dedupe key `skill:<lowercase>`.                                                                    |
-| `education.add`: verified email domain matches a configured university  | token `email` + `email_verified`             | Yes, small. `UNIVERSITY_DOMAINS` config (`npua.am=…`). Payload lacks degree/field/years: accept requires them (`overrides`).         |
+| `education.add`: verified email domain matches a configured university  | token `email` + `email_verified`             | Yes, small. `UNIVERSITY_DOMAINS` config (§6.6f). Payload lacks degree/field/years: accept requires them (`overrides`).               |
 | `experience.add`: GitHub `company` or public org membership             | `GET /user` `company`, `/users/{login}/orgs` | Low confidence, noisy (free text). Needs title and dates from the student. **Recommended out of PR (d)**; listed so it is a choice.  |
 | `linkedin.reimport`: last export import over 90 days ago, or never      | `integrations.last_synced_at`                | Yes. A time-based reminder, dedupe key `linkedin:reimport:<year>-Q<n>`.                                                              |
 | `profile.name`, `profile.avatar`: LinkedIn/GitHub claim changed         | token claims vs `integrations.claims_hash`   | Yes, only when the claim differs from the **current** profile value.                                                                 |
@@ -799,6 +799,43 @@ Differences from §6.2, §6.3 and §6.5:
 - **Not verified:** the response shapes are GitHub's documentation, served by the fake, not a recording
   of a real account.
 
+### 6.6f As built in M7-T25 (`education.add`, `experience.add`)
+
+No migration: `suggestions.kind` is a VARCHAR. Levon's decisions (2026-10-19): `UNIVERSITY_DOMAINS=polytechnic.am`,
+the institution offered is `UNIVERSITY_NAME` ("National Polytechnic University of Armenia"), organisations are in but only
+for a configured list `UNIVERSITY_ORGS` (default empty), and only **verified** GitHub emails count.
+Differences from §6.2:
+
+- **Config:** `UNIVERSITY_DOMAINS` is now a comma-separated list of domains (it was `domain=Institution` pairs, never set);
+  an entry that is not a domain name is a boot error. `UNIVERSITY_NAME` is required with it. `UNIVERSITY_ORGS` is
+  `login` or `login=Display Name`, comma-separated, logins lower-cased.
+- **Domain match:** the part after the **last** `@`, lower-cased, equals a domain or ends with `.` + that domain, and has no
+  empty label. `evilpolytechnic.am`, `polytechnic.am.evil.com`, `student@polytechnic.am@evil.com` and `student@.polytechnic.am`
+  do not match (unit and integration tests).
+- **Emails:** `GET /user/emails` (the connection has the email scope). `GithubClient.hasVerifiedEmail(token, matches)` offers
+  **only verified** addresses to the predicate and returns a boolean: addresses never leave the client method, are never stored,
+  returned, logged or put in an error (a malformed body is reported as `GET emails bad body`). A 404 or non-rate-limit 403
+  (the scope is missing) is "not shown": no suggestion, no failure, an open one is kept.
+- **Organisations:** only when `UNIVERSITY_ORGS` is set: `GET /user` (who the token is) and `GET /users/{login}/orgs` (public,
+  first 100). Only the configured logins are kept, for the length of the refresh. Offered as `experience.add` with the
+  configured display name as the organisation (an organisation is experience here; education comes from the email only).
+- **Empty state:** offered only when the profile holds no `education.institution` (for an organisation: `experience.organization`)
+  equal to the name, compared without case, outer spaces or runs of spaces. Checked at the refresh and again at the accept.
+- **Keys:** `education:<hash16 of the folded name>`, `experience:org:<login>:<hash8 of the folded name>` (a renamed organisation is a new offer; the old row is withdrawn): an answered key is never reopened. Payload
+  `{field: 'education'|'experience', value: <name>}`; no address, no domain.
+- **Cost:** per refresh that reads GitHub, **+1 call** (`/user/emails`) when `UNIVERSITY_DOMAINS` is set, **+2** (`/user`,
+  `/users/{login}/orgs`) when `UNIVERSITY_ORGS` is set, none otherwise and none inside the floor (an open suggestion is kept
+  unless the profile holds the entry now or the configuration stopped offering it). With the decided config: `4 + N` calls.
+- **Accept:** `POST …/accept` takes an optional body `{overrides}`. `education.add`: `degree`, `field`, `startYear` required,
+  `endYear`, `description`; `experience.add`: `title`, `start` (YYYY-MM) required, `end`, `summary`. The name is not
+  overridable. The entry is written through the section's own create rules (`SectionService.createIn`: user lock, per-user cap
+  409 `LIMIT_REACHED`). A missing or invalid value is a 400 naming `overrides.<field>` and the suggestion stays open; an entry
+  for the name by now, or a configuration that no longer offers it, is 409 `SUGGESTION_STALE` and the suggestion is superseded.
+  Any other kind with overrides is a 400.
+- **Not verified:** the response shapes of `/user/emails` and `/users/{login}/orgs` are GitHub's documentation, served by the
+  fake, not a recording of a real account; whether the production OAuth token carries `user:email` (a missing scope is
+  handled as "not shown").
+
 ### 6.7 Cost
 
 One PR, migration 0009, about 35 tests, roughly the size of (b). **Needs:** PR (b) merged (the diff
@@ -832,7 +869,7 @@ takes the ZIP: that is replaced by items 8–10 because of the 4.5 MB body cap.
 `GITHUB_TOKEN_CACHE_S`, `GITHUB_PAGE_MAX`, `GITHUB_IMPORT_MAX_BATCH`, `GITHUB_README_MAX_BYTES`, `GITHUB_IMPORT_CONCURRENCY`,
 `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` (required by every GitHub route, D9 and §2.5),
 `IMPORT_MAX_*` (§4.2),
-`SUGGESTIONS_*`, `UNIVERSITY_DOMAINS`. A refine requires the M2M pair to be set together.
+`SUGGESTIONS_*`, `UNIVERSITY_DOMAINS` + `UNIVERSITY_NAME`, `UNIVERSITY_ORGS` (§6.6f). A refine requires the M2M pair to be set together.
 Production keeps booting with none of them, like `STORAGE_BUCKET`.
 
 ## 9. Migrations (additive, safe while the previous revision serves)

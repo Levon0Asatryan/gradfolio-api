@@ -19,6 +19,6 @@ import { SkillsController } from './skills.controller.js';
     SkillsController,
   ],
   providers: [ProfileService, SectionService, SkillsService],
-  exports: [ProfileService, SkillsService],
+  exports: [ProfileService, SectionService, SkillsService],
 })
 export class ProfilesModule {}

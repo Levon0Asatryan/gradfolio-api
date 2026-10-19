@@ -490,20 +490,45 @@ describe('suggestion settings (docs/modules/m7/plan.md §6)', () => {
       SUGGESTIONS_PAGE_SIZE: 20,
       SUGGESTIONS_PAGE_MAX: 100,
       LINKEDIN_REIMPORT_DAYS: 90,
-      UNIVERSITY_DOMAINS: {},
+      UNIVERSITY_DOMAINS: [],
+      UNIVERSITY_ORGS: {},
     });
   });
 
-  it('parses UNIVERSITY_DOMAINS as domain=Institution pairs, lower-cased, skipping bad ones', () => {
+  it('parses UNIVERSITY_DOMAINS as a lower-cased list, and needs a name with it', () => {
     const cfg = loadConfig({
       ...REQUIRED,
-      UNIVERSITY_DOMAINS:
-        ' NPUA.am = National Polytechnic University of Armenia, ,x=,=y,ysu.am=YSU = Main',
+      UNIVERSITY_DOMAINS: ' Polytechnic.AM , ,cs.example.edu',
+      UNIVERSITY_NAME: 'National Polytechnic University of Armenia',
     });
-    expect(cfg.UNIVERSITY_DOMAINS).toEqual({
-      'npua.am': 'National Polytechnic University of Armenia',
-      'ysu.am': 'YSU = Main',
+    expect(cfg.UNIVERSITY_DOMAINS).toEqual(['polytechnic.am', 'cs.example.edu']);
+    expect(cfg.UNIVERSITY_NAME).toBe('National Polytechnic University of Armenia');
+    expect(() => loadConfig({ ...REQUIRED, UNIVERSITY_DOMAINS: 'polytechnic.am' })).toThrow(
+      /UNIVERSITY_NAME/,
+    );
+  });
+
+  it.each(['@polytechnic.am', 'polytechnic', 'poly technic.am', 'a.am/evil', '*.polytechnic.am'])(
+    'refuses UNIVERSITY_DOMAINS entry %s',
+    (bad) => {
+      expect(() =>
+        loadConfig({ ...REQUIRED, UNIVERSITY_DOMAINS: bad, UNIVERSITY_NAME: 'X' }),
+      ).toThrow(/UNIVERSITY_DOMAINS/);
+    },
+  );
+
+  it('parses UNIVERSITY_ORGS as login or login=Name, lower-cased logins', () => {
+    const cfg = loadConfig({
+      ...REQUIRED,
+      UNIVERSITY_ORGS: ' Poly-Club = Polytechnic Club = Main , plain, ,=x',
     });
+    expect(cfg.UNIVERSITY_ORGS).toEqual({
+      'poly-club': 'Polytechnic Club = Main',
+      plain: 'plain',
+    });
+    expect(() => loadConfig({ ...REQUIRED, UNIVERSITY_ORGS: 'not a login' })).toThrow(
+      /UNIVERSITY_ORGS/,
+    );
   });
 
   it('refuses a default page size above the maximum', () => {

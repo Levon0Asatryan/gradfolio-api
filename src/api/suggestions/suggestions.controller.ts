@@ -1,11 +1,13 @@
-import { Controller, Get, HttpCode, Param, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query, Req } from '@nestjs/common';
 import type { AccessTokenIdentity } from '../../core/auth/access-token.js';
 import type { AuthenticatedRequest } from '../auth/auth.constants.js';
-import { zodQuery } from '../common/pipes/zod-validation.pipe.js';
+import { zodBody, zodQuery } from '../common/pipes/zod-validation.pipe.js';
 import { RateBudget } from '../rate-limit/decorators/rate-budget.decorator.js';
 import { CurrentUser } from '../users/decorators/current-user.decorator.js';
 import type { UserRow } from '../users/repositories/user.repository.js';
 import {
+  type AcceptBody,
+  acceptBodySchema,
   type RefreshResponse,
   type ResolveResponse,
   type SuggestionPage,
@@ -54,8 +56,9 @@ export class SuggestionsController {
     @CurrentUser() user: UserRow,
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
+    @Body(zodBody(acceptBodySchema.optional())) body: AcceptBody | undefined,
   ): Promise<ResolveResponse> {
-    return this.suggestions.accept(user, tokenOf(req), id);
+    return this.suggestions.accept(user, tokenOf(req), id, body?.overrides);
   }
 
   @Post(':id/dismiss')
