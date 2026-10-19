@@ -45,7 +45,7 @@ finding. The findings were re-landed in #104, #123 and task M7-T30.
 **Status legend:** `todo` (not started), `in progress` (a task chat is working on it),
 `review` (PR open), `done` (merged and deployed), `blocked` (waiting on something that is
 not a task; the Depends column says what). The module chat updates this table in a small
-docs PR whenever a task changes state. **Last updated: 2026-10-19** (in progress: T22; done: T20, T21, T23, T24, T30, T31).
+docs PR whenever a task changes state. **Last updated: 2026-10-19** (in progress: T27, T28; done: T20, T21, T22, T23, T24, T30, T31).
 
 The **Status** column is the status of record. **Depends on** lists tasks that must be
 **merged** first. Task IDs start at T20 because **M7-T1 to M7-T13 are Levon's queue rows**
@@ -56,12 +56,12 @@ brief, "queue M7-T1" always means a queue row.
 | ------ | --------------------------------------------------------------------------- | ------- | ----------------- | ------- | ----------- | ---------------------------------------------- |
 | M7-T20 | Skill suggestions from repo languages/topics and the student's own projects | api     | —                 | 7.13    | done        | [T20](tasks/M7-T20-skill-suggestions.md)       |
 | M7-T21 | Links suggestions from GitHub social accounts                               | api     | T20               | 7.13    | done        | [T21](tasks/M7-T21-links-suggestions.md)       |
-| M7-T22 | Repo-change suggestions and a notification (d2)                             | api     | T20               | 7.13    | in progress | [T22](tasks/M7-T22-repo-change-suggestions.md) |
+| M7-T22 | Repo-change suggestions and a notification (d2)                             | api     | T20               | 7.13    | done        | [T22](tasks/M7-T22-repo-change-suggestions.md) |
 | M7-T23 | Deletion tombstone: precondition of `AUTH0_DELETE_USERS`                    | api     | —                 | 7.2     | done        | [T23](tasks/M7-T23-deletion-tombstone.md)      |
 | M7-T24 | Startup check: log which of the five GitHub settings is missing             | api     | —                 | 7.2     | done        | [T24](tasks/M7-T24-startup-check.md)           |
 | M7-T25 | Education and organisation suggestions from verified emails and orgs        | api     | queue M7-T10      | 7.13    | blocked     | [T25](tasks/M7-T25-education-suggestions.md)   |
-| M7-T27 | Stuck GitHub connection: refused token, Disconnect cannot finish            | api     | —                 | 7.2     | todo        | [T27](tasks/M7-T27-stuck-github-connection.md) |
-| M7-T28 | `GET /v1/me/suggestions?limit=100` answers 400                              | api, fe | —                 | 7.13    | todo        | [T28](tasks/M7-T28-suggestions-limit-400.md)   |
+| M7-T27 | Stuck GitHub connection: refused token, Disconnect cannot finish            | api     | —                 | 7.2     | in progress | [T27](tasks/M7-T27-stuck-github-connection.md) |
+| M7-T28 | `GET /v1/me/suggestions?limit=100` answers 400                              | api, fe | —                 | 7.13    | in progress | [T28](tasks/M7-T28-suggestions-limit-400.md)   |
 | M7-T30 | Focus and announcement after Publish on cards and the project page          | fe      | —                 | 7.14    | done        | [T30](tasks/M7-T30-publish-focus.md)           |
 | M7-T31 | Import entry points: after connect, Projects → Add                          | fe      | —                 | 7.14    | done        | [T31](tasks/M7-T31-import-entry-points.md)     |
 | M7-T32 | Suggestions inbox: skills, links, project changes, notification             | fe      | T20 (T21, T22)    | 7.13    | todo        | [T32](tasks/M7-T32-suggestions-inbox.md)       |
@@ -83,6 +83,12 @@ Fix: raise the minimum or check it at boot. Proposed as M7-T26 (small, todo).
 and its two threads were answered and resolved, but the final head `3ed18fe` was never
 reviewed by Codex before the merge. Rule: a merge needs Codex on the current head. The
 fixes are small and are covered by tests; the gap is process, and is recorded here.
+
+**Follow-up from T22 (open, not yet a task):** PR #105 merged as `58d1c1a` with one Codex P2 open
+(`project-suggestions.service.ts`): accepting a `project.new` suggestion does not re-check
+that the repository is still owned, public, non-fork and non-archived, so an archived or
+transferred repo can still become a draft, while a refresh would have dropped the
+suggestion. Fix: re-check on accept and answer `SUGGESTION_STALE`. Proposed as M7-T29 (small).
 
 **Dropped as done:** connection-name limit 128 vs 64 (fe #108), the delete-account sign-out
 (fe #108), the discovery flake (fe #110), the profile-tab fixes (fe #123), account deletion
