@@ -612,7 +612,7 @@ function suggestionOperations(): Operation[] {
   const resolved = error(
     'SUGGESTION_RESOLVED: it was already dismissed, superseded or accepted; ' +
       'SUGGESTION_INVALID: the value can no longer be written (it is superseded); ' +
-      'SUGGESTION_STALE: the skill is already on the profile (it is superseded)',
+      'SUGGESTION_STALE: the skill is already on the profile, or the link field was filled since the offer (it is superseded)',
   );
   return [
     {
@@ -624,6 +624,8 @@ function suggestionOperations(): Operation[] {
       description:
         'Open ones by default (`status=all` adds the answered). A `profile.*` suggestion names ' +
         'the `field`, what it holds now (`current`) and what an accept would write (`proposed`). ' +
+        'A `profile.links.linkedin` / `profile.links.twitter` suggestion (from GitHub’s social ' +
+        'accounts) is always `mode: fill`: offered to an empty field only. ' +
         'A `skill.add` suggestion names the `skill` and the `evidence` (public repositories and ' +
         'projects that show it). `openCount` is the caller’s open suggestions in all.',
       query: suggestionQuerySchema,

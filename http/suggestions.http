@@ -5,7 +5,8 @@
 # @name refreshSuggestions
 # Reads GitHub's public profile (at most once per SUGGESTIONS_MIN_INTERVAL_S, by ETag)
 # and recomputes; also reads the newest public repositories (1 list call, plus one
-# /languages call for each of the newest SUGGESTIONS_LANGUAGE_REPOS, default 5) for skill.add.
+# /languages call for each of the newest SUGGESTIONS_LANGUAGE_REPOS, default 5) for skill.add,
+# and GET /user/social_accounts (1 call) for profile.links.linkedin / profile.links.twitter.
 # {"github":"refreshed|unchanged|throttled|not_connected",
 # "nextAllowedAt":…,"created":n,"openCount":n}. 409 GITHUB_NOT_LINKED, 429, 502.
 POST {{baseUrl}}/v1/me/suggestions/refresh
@@ -15,6 +16,8 @@ Authorization: Bearer {{accessToken}}
 # @name listSuggestions
 # Open ones; status=all adds the answered. `field`, `current`, `proposed`, `mode`
 # (fill | replace) for a profile suggestion; `lastSyncedAt` for the LinkedIn reminder;
+# profile.links.linkedin and profile.links.twitter are offered to an empty field only
+# (mode "fill"); other providers (YouTube, Mastodon …) are not offered.
 # `skill` and `evidence` {total, repositories, projects} for kind "skill.add".
 GET {{baseUrl}}/v1/me/suggestions?limit=20
 Authorization: Bearer {{accessToken}}
@@ -23,6 +26,7 @@ Authorization: Bearer {{accessToken}}
 # @name acceptSuggestion
 # Writes that one field through the profile's own rules (skill.add: appends the skill to
 # the profile's skills, 400 over PROFILE_MAX_SKILLS); idempotent when accepted.
+# A link is never replaced: 409 SUGGESTION_STALE when the field was filled since the offer.
 # 404 for another user's id; 409 SUGGESTION_RESOLVED / SUGGESTION_INVALID / SUGGESTION_STALE.
 POST {{baseUrl}}/v1/me/suggestions/{{suggestionId}}/accept
 Authorization: Bearer {{accessToken}}

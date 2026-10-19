@@ -283,7 +283,17 @@ export async function oldestOpen(trx: Transaction<DB>, userId: string, extra: nu
 export async function currentProfile(trx: Transaction<DB>, userId: string) {
   const u = await trx
     .selectFrom('users')
-    .select(['name', 'headline', 'bio', 'location', 'avatarUrl', 'github', 'website'])
+    .select([
+      'name',
+      'headline',
+      'bio',
+      'location',
+      'avatarUrl',
+      'github',
+      'website',
+      'linkedin',
+      'twitter',
+    ])
     .where('id', '=', userId)
     .executeTakeFirst();
   return u;

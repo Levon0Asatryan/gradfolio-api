@@ -136,6 +136,16 @@ const profileResponse = z.object({
   html_url: z.string().max(2000).nullable().optional(),
 });
 
+/** One of the account's linked social accounts (`GET /user/social_accounts`): public data. */
+export interface GithubSocialAccount {
+  provider: string;
+  url: string;
+}
+
+const socialAccountsResponse = z.array(
+  z.object({ provider: z.string().min(1).max(100), url: z.string().max(2000) }),
+);
+
 /** A README as GitHub rendered it, with where it lives in the repository. */
 export interface GithubReadme {
   html: string;
@@ -219,6 +229,24 @@ export class GithubClient {
         htmlUrl: p.html_url ?? null,
       },
     };
+  }
+
+  /**
+   * `GET /user/social_accounts`: the account's LinkedIn, X, YouTube … links, one
+   * call (up to 100 per page; GitHub lists at most four). Public data, no scope.
+   */
+  async listSocialAccounts(
+    token: GithubAccessToken,
+  ): Promise<{ accounts: GithubSocialAccount[]; rateLimit: GithubRateLimit }> {
+    const res = await this.send('user/social_accounts?per_page=100', {
+      method: 'GET',
+      headers: { authorization: `Bearer ${token.reveal()}` },
+    });
+    const rateLimit = rateLimitOf(res.headers);
+    if (res.status !== 200) throw mapFailure(res);
+    const parsed = socialAccountsResponse.safeParse(res.body);
+    if (!parsed.success) throw new GithubUnavailableError('GET social_accounts bad body');
+    return { accounts: parsed.data, rateLimit };
   }
 
   /**

@@ -198,8 +198,8 @@ describe('what a refresh costs GitHub, and its cap', () => {
     expect(calls.map((c) => c.path).sort()).toEqual(
       [nextRepo - 1, nextRepo - 2].map((id) => `/repos/alice/repo-${id}/languages`).sort(),
     );
-    // One profile read, one list of repositories, two language reads.
-    expect(h.gh.requests.filter((r) => r.method === 'GET')).toHaveLength(4);
+    // One profile read, one list of repositories, two language reads, one social-accounts read.
+    expect(h.gh.requests.filter((r) => r.method === 'GET')).toHaveLength(5);
     // Dockerfile is in two repositories' language lists only.
     expect(names(await skillRows(http, alice))).toEqual(['Dockerfile', 'TypeScript']);
   });
@@ -213,7 +213,7 @@ describe('what a refresh costs GitHub, and its cap', () => {
     h.gh.requests.length = 0;
     await refresh(http, alice).expect(200);
     expect(languageCalls()).toHaveLength(0);
-    expect(h.gh.requests.filter((r) => r.method === 'GET')).toHaveLength(2);
+    expect(h.gh.requests.filter((r) => r.method === 'GET')).toHaveLength(3);
 
     h.gh.requests.length = 0;
     const again = await refresh(http, alice).expect(200);
