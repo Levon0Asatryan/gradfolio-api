@@ -319,7 +319,14 @@ export async function startFakeGithub(): Promise<FakeGithub> {
         if (!me) return send(res, 401, { message: 'Bad credentials' });
         if (state.emailsMode === 'no-scope') return send(res, 404, { message: 'Not Found' });
         if (state.emailsMode === 'status-500') return send(res, 500, { message: 'boom' });
-        if (state.emailsMode === 'bad-body') return send(res, 200, { not: 'a list' });
+        // The right addresses in the wrong shape: a reader that echoes the body leaks them.
+        if (state.emailsMode === 'bad-body') {
+          return send(
+            res,
+            200,
+            (state.emails.get(me.id) ?? []).map((e) => ({ email: e.email, verified: 'yes' })),
+          );
+        }
         return send(res, 200, state.emails.get(me.id) ?? []);
       }
 
