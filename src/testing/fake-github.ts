@@ -79,6 +79,8 @@ export interface FakeGithub {
   resetAt: number;
   /** Public profile fields per GitHub user id (`bio`, `location`, `company`, `avatar_url`, `blog`, `html_url`). */
   readonly profiles: Map<number, Record<string, string | null>>;
+  /** `GET /user/social_accounts` per GitHub user id. */
+  readonly socialAccounts: Map<number, { provider: string; url: string }[]>;
   /** Repositories by id; `GET /user/repos`, `/repositories/{id}` and its README read them. */
   readonly repos: Map<number, FakeRepo>;
   /** How the repository routes answer, whatever the token. */
@@ -140,6 +142,7 @@ export async function startFakeGithub(): Promise<FakeGithub> {
     resetAt: Math.floor(Date.now() / 1000) + 120,
     repos: new Map<number, FakeRepo>(),
     profiles: new Map<number, Record<string, string | null>>(),
+    socialAccounts: new Map<number, { provider: string; url: string }[]>(),
     repoMode: 'ok' as RepoMode,
   };
   const clientId = 'gh-oauth-client';
@@ -293,6 +296,12 @@ export async function startFakeGithub(): Promise<FakeGithub> {
         );
       }
 
+      if (path === '/user/social_accounts' && req.method === 'GET') {
+        const me = asUser();
+        if (!me) return send(res, 401, { message: 'Bad credentials' });
+        return send(res, 200, state.socialAccounts.get(me.id) ?? []);
+      }
+
       const langPath = /^\/repos\/([^/]+)\/([^/]+)\/languages$/.exec(path);
       if (langPath && req.method === 'GET') {
         const me = asUser();
@@ -404,6 +413,7 @@ export async function startFakeGithub(): Promise<FakeGithub> {
     },
     repos: state.repos,
     profiles: state.profiles,
+    socialAccounts: state.socialAccounts,
     get repoMode() {
       return state.repoMode;
     },

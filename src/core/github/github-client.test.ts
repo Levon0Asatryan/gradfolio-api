@@ -196,6 +196,19 @@ describe('GithubClient', () => {
       ).rejects.toBeInstanceOf(GithubRateLimitedError);
     });
 
+    it('lists social accounts in one call; a refused token is not-linked', async () => {
+      gh.socialAccounts.set(583231, [
+        { provider: 'linkedin', url: 'https://linkedin.com/in/ani-p' },
+      ]);
+      const got = await client.listSocialAccounts(token);
+      expect(got.accounts).toEqual([
+        { provider: 'linkedin', url: 'https://linkedin.com/in/ani-p' },
+      ]);
+      expect(gh.requests.at(-1)!.path).toBe('/user/social_accounts');
+      const bad = new GithubAccessToken('not-a-token');
+      await expect(client.listSocialAccounts(bad)).rejects.toBeInstanceOf(GithubNotLinkedError);
+    });
+
     it('reads a repository by integer id; 404 is null; a limit or failure is an error', async () => {
       expect((await client.getRepo(token, 2)).repo).toMatchObject({ id: 2, defaultBranch: 'main' });
       expect((await client.getRepo(token, 99)).repo).toBeNull();
