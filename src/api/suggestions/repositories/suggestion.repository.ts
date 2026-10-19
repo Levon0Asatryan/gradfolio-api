@@ -156,6 +156,21 @@ export async function resolve(
   return Number(result.numUpdatedRows);
 }
 
+/** Replaces the payload of the caller's suggestion (an accept records what it wrote). */
+export async function setPayload(
+  trx: Transaction<DB>,
+  userId: string,
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  await trx
+    .updateTable('suggestions')
+    .set({ payload: toJsonColumn(payloadSchema, payload) })
+    .where('id', '=', id)
+    .where('userId', '=', userId)
+    .execute();
+}
+
 /** What a refresh needs of the caller's GitHub row. */
 export interface GithubPollState {
   status: 'connected' | 'not_connected' | 'linking';

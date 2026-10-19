@@ -648,7 +648,7 @@ function suggestionOperations(): Operation[] {
         '(default 5), one `GET …/languages` each, and offers a skill missing from the profile ' +
         '(compared case-insensitively) that at least two repositories or projects show. A ' +
         'refresh inside the floor reads nothing and keeps the open skill suggestions. LinkedIn: a sign-in’s name and photo, and a re-import ' +
-        'reminder. Without GitHub connected only the LinkedIn rules run.',
+        'reminder. Without GitHub connected the LinkedIn rules run and skills are offered from the caller’s projects alone.',
       responses: {
         '200': { description: 'What was done', schema: refreshResponseSchema },
         '409': error('GITHUB_NOT_LINKED: GitHub refused the token (sign in with GitHub again)'),

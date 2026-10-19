@@ -274,6 +274,12 @@ describe('accept and dismiss', () => {
     const [row] = await skillRows(http, alice);
     const res = await http.post(`/v1/me/suggestions/${row!.id}/accept`).set(alice.auth).expect(200);
     expect(res.body.applied).toEqual({ field: 'skills', value: 'TYPESCRIPT' });
+    // A retry reports what was stored, not the spelling first suggested.
+    const retry = await http
+      .post(`/v1/me/suggestions/${row!.id}/accept`)
+      .set(alice.auth)
+      .expect(200);
+    expect(retry.body.applied).toEqual({ field: 'skills', value: 'TYPESCRIPT' });
     expect(await skillsOf(http, alice)).toEqual(['TYPESCRIPT']);
   });
 

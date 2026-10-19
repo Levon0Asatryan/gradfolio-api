@@ -38,6 +38,7 @@ import {
   readPollState,
   resolve,
   restorePolled,
+  setPayload,
   skillNamesOf,
   statusesOfKeys,
   supersede,
@@ -434,6 +435,8 @@ export class SuggestionsService {
         // The spelling written, which the registry may have fixed differently.
         const had = new Set(before.map(skillKey));
         const written = after.find((n) => !had.has(skillKey(n))) ?? skill;
+        // A retry reports this spelling, not the one first suggested.
+        await setPayload(trx, user.id, id, { ...payloadOf(row), skill: written });
         return { kind: 'done', applied: { field: 'skills', value: written }, released: [] };
       }
       const stored = payloadOf(row);
