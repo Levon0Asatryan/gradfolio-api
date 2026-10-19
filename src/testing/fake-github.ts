@@ -87,6 +87,8 @@ export interface FakeGithub {
   repoMode: RepoMode;
   /** Holds the next `GET /repositories/{id}` answer, decided at arrival, until released. */
   holdNextRepo(): { arrived: Promise<void>; release(): void };
+  /** The same for the next `GET /repositories/{id}/readme`. */
+  holdNextReadme(): { arrived: Promise<void>; release(): void };
   /**
    * Holds the next `GET /user` answer, decided when the request arrived (as
    * GitHub answered then), until released: the answer is in flight while the
@@ -124,6 +126,7 @@ export async function startFakeGithub(): Promise<FakeGithub> {
   let grantGate: { arrived: () => void; released: Promise<void> } | undefined;
   let grantRequestGate: { arrived: () => void; released: Promise<void> } | undefined;
   let repoGate: { arrived: () => void; released: Promise<void> } | undefined;
+  let readmeGate: { arrived: () => void; released: Promise<void> } | undefined;
   const gate = () => {
     let arrived!: () => void;
     let release!: () => void;
@@ -326,6 +329,12 @@ export async function startFakeGithub(): Promise<FakeGithub> {
           held.arrived();
           await held.released;
         }
+        if (readmeGate && repoPath[2]) {
+          const held = readmeGate;
+          readmeGate = undefined;
+          held.arrived();
+          await held.released;
+        }
         if (state.repoMode !== 'ok') return repoFailure();
         const repo = state.repos.get(Number(repoPath[1]));
         if (repo === undefined || !visibleTo(repo, me)) {
@@ -423,6 +432,11 @@ export async function startFakeGithub(): Promise<FakeGithub> {
     holdNextRepo() {
       const g = gate();
       repoGate = g.held;
+      return g.handle;
+    },
+    holdNextReadme() {
+      const g = gate();
+      readmeGate = g.held;
       return g.handle;
     },
     get grantDropAfterProcessing() {

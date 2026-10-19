@@ -612,7 +612,9 @@ function suggestionOperations(): Operation[] {
   const resolved = error(
     'SUGGESTION_RESOLVED: it was already dismissed, superseded or accepted; ' +
       'SUGGESTION_INVALID: the value can no longer be written (it is superseded); ' +
-      'SUGGESTION_STALE: the skill is already on the profile, or the link field was filled since the offer (it is superseded)',
+      'SUGGESTION_STALE: the skill is already on the profile, the link field was filled since the offer, ' +
+      'the project’s field was edited (or re-synced) since, or the repository is already imported or gone (it is superseded); ' +
+      'LIMIT_REACHED: a `project.new` would exceed the per-user project cap (it stays open)',
   );
   return [
     {
@@ -627,7 +629,11 @@ function suggestionOperations(): Operation[] {
         'A `profile.links.linkedin` / `profile.links.twitter` suggestion (from GitHub’s social ' +
         'accounts) is always `mode: fill`: offered to an empty field only. ' +
         'A `skill.add` suggestion names the `skill` and the `evidence` (public repositories and ' +
-        'projects that show it). `openCount` is the caller’s open suggestions in all.',
+        'projects that show it). A `project.new` suggestion names the `repository` to import (and ' +
+        '`project.id` once accepted). A `project.update` suggestion names the `project`, the ' +
+        '`field` (`summary`: GitHub’s description; `descriptionHtml`: the README) and the ' +
+        '`proposed` value; it is offered only while the project’s field is still what the import ' +
+        'or last re-sync wrote. `openCount` is the caller’s open suggestions in all.',
       query: suggestionQuerySchema,
       responses: {
         '200': { description: 'One page', schema: suggestionPageSchema },
@@ -649,7 +655,13 @@ function suggestionOperations(): Operation[] {
         '(not forks): one `GET /user/repos` page and, for the newest SUGGESTIONS_LANGUAGE_REPOS ' +
         '(default 5), one `GET …/languages` each, and offers a skill missing from the profile ' +
         '(compared case-insensitively) that at least two repositories or projects show. A ' +
-        'refresh inside the floor reads nothing and keeps the open skill suggestions. LinkedIn: a sign-in’s name and photo, and a re-import ' +
+        'refresh inside the floor reads nothing and keeps the open skill suggestions. Repositories: ' +
+        'up to SUGGESTIONS_NEW_REPOS (default 5) of the newest own, not-imported repositories are offered as ' +
+        '`project.new`; for each imported project whose repository is on that page, a changed ' +
+        'description is offered as `project.update` at no extra call, and its README is read (one call each, ' +
+        'at most SUGGESTIONS_README_READS, default 10) only if the repository was pushed to since the import or ' +
+        'last re-sync. Stars and forks are never suggested. One notification (`suggestions_available`, ' +
+        '`count` and `kinds`) is written when a refresh opens repository suggestions, in the same transaction. LinkedIn: a sign-in’s name and photo, and a re-import ' +
         'reminder. Without GitHub connected the LinkedIn rules run and skills are offered from the caller’s projects alone.',
       responses: {
         '200': { description: 'What was done', schema: refreshResponseSchema },
@@ -669,12 +681,17 @@ function suggestionOperations(): Operation[] {
       description:
         'Writes that field through the profile’s own rules and marks the suggestion accepted, in ' +
         'one transaction. A `skill.add` appends the skill to the profile’s skills (at most ' +
-        'PROFILE_MAX_SKILLS, else 400). Idempotent for an accepted one. A reminder is only acknowledged.',
+        'PROFILE_MAX_SKILLS, else 400). A `project.new` imports the repository as a draft through ' +
+        'the import service (GitHub is read again) and answers with its `projectId`. A ' +
+        '`project.update` writes the field only if it still equals the snapshot of the last import, ' +
+        're-sync or accept, and moves the snapshot; a field the student changed is never overwritten: ' +
+        '409 `SUGGESTION_STALE`. Idempotent for an accepted one. A reminder is only acknowledged.',
       params: suggestionIdParamSchema,
       responses: {
         '200': { description: 'Accepted', schema: resolveResponseSchema },
         '404': notYours('suggestion'),
         '409': resolved,
+        '502': error('GITHUB_UNAVAILABLE: a `project.new` could not read GitHub'),
         ...authenticatedFailures,
       },
     },
@@ -1454,7 +1471,9 @@ export const OPERATIONS: readonly Operation[] = [
     summary: 'The caller’s notifications, newest first',
     description:
       'Keyset pagination: pass `nextCursor` back as `cursor`. Render the text from `type` ' +
-      'and `params` in the reader’s language; `link` and `invite` are computed at read time.',
+      'and `params` in the reader’s language; `link` and `invite` are computed at read time. ' +
+      '`suggestions_available`: a refresh opened repository suggestions; `params` are `count` and ' +
+      '`kinds`, and the list is `GET /v1/me/suggestions`.',
     bearer: true,
     query: notificationQuerySchema,
     responses: {

@@ -651,8 +651,10 @@ restorable.
 `accept` re-validates through the same services as manual entry. A field suggestion whose
 `baseHash` no longer matches the project's current value answers `409 SUGGESTION_STALE` and marks it
 `superseded`, so an accept can never overwrite what the user changed after the suggestion was made.
-The dashboard gets `openSuggestions` (a count). Not in the notifications bell (M5): a poll should
-not create rows people must also clear.
+The dashboard gets `openSuggestions` (a count). ~~Not in the notifications bell (M5): a poll should
+not create rows people must also clear.~~ **Changed by Levon, 2026-10-18** ("send a notification when
+the user changes a repo's README and suggest an update"): a refresh that opens repository suggestions
+writes **one** notification for the batch, never one per suggestion (§6.6e).
 
 ### 6.6 Privacy
 
@@ -743,6 +745,51 @@ No migration. Differences from §6.2:
 - **Not verified:** the response shape and the provider names are GitHub's documentation, not a
   recording of a real account (the fake serves them).
 
+### 6.6e As built in M7-T22 (`project.new`, `project.update`, the notification)
+
+Migration 0011: `notifications.type` gains `'suggestions_available'` (appended, no rebuild).
+Differences from §6.2, §6.3 and §6.5:
+
+- **`project.new`:** an own (owner is the connected GitHub user), public, not-fork, not-archived
+  repository on the page of 100 newest-pushed that the refresh already reads (§6.6c), not imported.
+  Only the newest `SUGGESTIONS_NEW_REPOS` (default 5; 0 turns it off) are offered, so a first refresh
+  does not flood the inbox; a dismissed one keeps its place in that window, so dismissing never
+  summons the next. Key `repo:<id>:new`. Withdrawn (superseded) when the repository is imported, or
+  stops being the student's own work; one that merely fell out of the newest few is kept. Accept = the
+  import service (`GithubImportService.import`, GitHub read again, nothing the suggestion stored is
+  trusted), then the answer in its own transaction. `project.id` of the accepted row is the draft.
+- **`project.update`:** `summary` (GitHub's description) and `descriptionHtml` (the README), compared
+  by the same hashes and the same create-rules candidate as the re-sync (§3.5). Offered only when GitHub's
+  value differs from the snapshot **and** the project's value still equals it; an edited field is the
+  re-sync's `conflict`, not a suggestion. A removed description or README (null) is never offered.
+  Title, repository URL and technologies are not offered. **Stars and forks are silent** (D8).
+  Key `project:<id>:<field>:<hash16 of the proposed value>`; the payload carries `baseHash` (the snapshot
+  hash it was made against).
+- **Accept (`project.update`)** takes the user lock, then the project's row lock, and writes the field
+  only when the snapshot is still `baseHash` and the field still hashes to it; otherwise
+  `409 SUGGESTION_STALE` and the suggestion is superseded. A successful accept moves the snapshot, so the
+  next re-sync sees nothing to do. The value passes the project create rules again.
+- **Cost:** no extra call for descriptions (the list carries them). A README is read (1 call each) only
+  for an imported project whose repository `pushed_at` is at or after its snapshot's `synced_at` less a
+  minute, at most `SUGGESTIONS_README_READS` (default 10), newest pushed first. A refresh is therefore
+  `3 + N` calls (profile, list, N languages, social accounts, §6.6d) plus at most 10 READMEs. Inside the
+  floor nothing is read and an open update is kept unless it is stale from the project alone.
+  A dismissed README suggestion is read again each refresh until a re-sync moves the snapshot (acceptable
+  at this scale). Not done: ETags on the list and the README (the list feeds the skill evidence, which is
+  not stored, so a 304 would leave it unknown; the README read is already limited to pushed
+  repositories). Repositories beyond the first 100 are not looked at.
+- **The notification:** one row, `type: suggestions_available`, `params {count, kinds}` (`kinds`: the
+  distinct `project.new` / `project.update`), written **in the refresh's transaction**, so it commits with
+  the suggestions it announces and a retry cannot announce them twice. Only repository suggestions are
+  announced (the goal of this task); skills, links, profile fields and the LinkedIn reminder are not.
+  After the cap superseded the oldest, `count` is what is still open. `link` is null: the inbox is
+  the frontend's (T32).
+- **Races:** the refresh reads the projects it decides on under their row locks, after the user lock, so a
+  re-sync or an edit committed while GitHub was being asked is seen (barrier tests). A disconnect that
+  completes meanwhile drops the answer, so nothing is opened or announced.
+- **Not verified:** the response shapes are GitHub's documentation, served by the fake, not a recording
+  of a real account.
+
 ### 6.7 Cost
 
 One PR, migration 0009, about 35 tests, roughly the size of (b). **Needs:** PR (b) merged (the diff
@@ -792,6 +839,8 @@ NULL)`. The seed has no tokens; the previous revision never writes them.
 - `project_github_imports` (§3.5).
 
 0009 (PR d): `suggestions`, `integrations.poll_etag/polled_at/claims_hash`.
+
+0011 (M7-T22): `notifications.type` gains `'suggestions_available'` (§6.6e).
 
 Each uses the runner's `skip-if` guard, so applying twice leaves nothing; `down` then `up` gives an
 identical `db:schema` dump (checked in the PR); timed on the 3,000-project perf seed.

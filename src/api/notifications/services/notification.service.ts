@@ -54,7 +54,7 @@ export class NotificationService {
     const actorIds = [
       ...new Set(
         shown
-          .map((r) => r.params?.actorId)
+          .map((r) => (r.params !== null && 'actorId' in r.params ? r.params.actorId : undefined))
           .filter((id): id is string => id !== undefined && id !== null && id !== ''),
       ),
     ];
@@ -71,19 +71,7 @@ export class NotificationService {
         id: r.id,
         type,
         title: r.title,
-        params:
-          r.params === null
-            ? null
-            : {
-                actorId:
-                  r.params.actorId != null && visibleActors.has(r.params.actorId)
-                    ? r.params.actorId
-                    : null,
-                actorName: r.params.actorName,
-                projectId: r.params.projectId,
-                projectTitle: r.params.projectTitle,
-                role: r.params.role ?? null,
-              },
+        params: this.paramsOf(r.params, visibleActors),
         read: r.isRead,
         createdAt: r.createdAt.toISOString(),
         link: projectId !== null && readable.has(projectId) ? `/projects/${projectId}` : null,
@@ -101,6 +89,22 @@ export class NotificationService {
         rows.length > limit && last !== undefined
           ? encodeTimeCursor({ t: last.createdAt.getTime(), id: last.id })
           : null,
+    };
+  }
+
+  /** The stored snapshot as the API shows it: a team actor only while their profile is visible to the reader. */
+  private paramsOf(
+    params: NotificationRow['params'],
+    visibleActors: ReadonlySet<string>,
+  ): Notification['params'] {
+    if (params === null) return null;
+    if ('count' in params) return { count: params.count, kinds: params.kinds };
+    return {
+      actorId: params.actorId != null && visibleActors.has(params.actorId) ? params.actorId : null,
+      actorName: params.actorName,
+      projectId: params.projectId,
+      projectTitle: params.projectTitle,
+      role: params.role ?? null,
     };
   }
 

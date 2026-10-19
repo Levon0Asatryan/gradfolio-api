@@ -24,6 +24,8 @@ const ENV = (over: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv => ({
   ...h.env(),
   RATE_LIMIT_INTEGRATION: '100',
   SUGGESTIONS_MIN_INTERVAL_S: '0',
+  // These tests are about profile, link and skill suggestions: no repository is offered as new.
+  SUGGESTIONS_NEW_REPOS: '0',
   ...over,
 });
 
@@ -170,6 +172,7 @@ describe('accept and dismiss', () => {
       id: row.id,
       status: 'accepted',
       applied: { field: 'links.linkedin', value: LINKEDIN },
+      projectId: null,
     });
     expect(await linksOf(alice)).toEqual({ linkedin: LINKEDIN, twitter: null });
     await http.post(`/v1/me/suggestions/${row.id}/accept`).set(alice.auth).expect(200);

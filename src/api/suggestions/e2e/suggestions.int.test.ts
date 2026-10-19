@@ -34,6 +34,8 @@ const OPEN = () => ({
   RATE_LIMIT_IMPORT: '100',
   RATE_LIMIT_INTEGRATION: '100',
   SUGGESTIONS_MIN_INTERVAL_S: '0',
+  // These tests are about profile, link and skill suggestions: no repository is offered as new.
+  SUGGESTIONS_NEW_REPOS: '0',
 });
 
 async function setup(over: NodeJS.ProcessEnv = {}) {
@@ -158,6 +160,7 @@ describe('accept and dismiss', () => {
       id: bio.id,
       status: 'accepted',
       applied: { field: 'bio', value: 'Builds things' },
+      projectId: null,
     });
     expect(await profileRow(alice.id)).toEqual({ ...before, bio: 'Builds things' });
     // Idempotent; the others are still open; a dismiss after an accept is a conflict.

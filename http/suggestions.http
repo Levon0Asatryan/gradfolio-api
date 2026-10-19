@@ -7,6 +7,12 @@
 # and recomputes; also reads the newest public repositories (1 list call, plus one
 # /languages call for each of the newest SUGGESTIONS_LANGUAGE_REPOS, default 5) for skill.add,
 # and GET /user/social_accounts (1 call) for profile.links.linkedin / profile.links.twitter.
+# For repository changes (project.new, project.update) it also reads: the page of repositories
+# above already carries each description, so a changed description costs no call; a README is
+# read (1 call each, at most SUGGESTIONS_README_READS, default 10) only for an imported project
+# whose repository was pushed to since its import or last re-sync. Stars and forks are not
+# suggested. A refresh that opens any repository suggestion writes ONE notification
+# (type suggestions_available, params {count, kinds}); see GET /v1/me/notifications.
 # {"github":"refreshed|unchanged|throttled|not_connected",
 # "nextAllowedAt":…,"created":n,"openCount":n}. 409 GITHUB_NOT_LINKED, 429, 502.
 POST {{baseUrl}}/v1/me/suggestions/refresh
@@ -19,6 +25,9 @@ Authorization: Bearer {{accessToken}}
 # profile.links.linkedin and profile.links.twitter are offered to an empty field only
 # (mode "fill"); other providers (YouTube, Mastodon …) are not offered.
 # `skill` and `evidence` {total, repositories, projects} for kind "skill.add".
+# project.new: `repository` {id, fullName}, `project` {id: null, title} (id set once accepted).
+# project.update: `project` {id, title}, `field` summary | descriptionHtml, `proposed`; offered
+# only while the project's field still equals what the import or last re-sync wrote.
 GET {{baseUrl}}/v1/me/suggestions?limit=20
 Authorization: Bearer {{accessToken}}
 
@@ -27,6 +36,10 @@ Authorization: Bearer {{accessToken}}
 # Writes that one field through the profile's own rules (skill.add: appends the skill to
 # the profile's skills, 400 over PROFILE_MAX_SKILLS); idempotent when accepted.
 # A link is never replaced: 409 SUGGESTION_STALE when the field was filled since the offer.
+# project.new: imports the repository as a draft (GitHub is read again) -> `projectId`.
+# project.update: writes the field only if it still equals the snapshot; a field the student
+# edited (or a re-sync moved) since is 409 SUGGESTION_STALE and is left as it is.
+# 409 LIMIT_REACHED when a project.new would exceed the per-user project cap.
 # 404 for another user's id; 409 SUGGESTION_RESOLVED / SUGGESTION_INVALID / SUGGESTION_STALE.
 POST {{baseUrl}}/v1/me/suggestions/{{suggestionId}}/accept
 Authorization: Bearer {{accessToken}}

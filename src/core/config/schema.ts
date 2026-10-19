@@ -355,6 +355,10 @@ const suggestions = {
   SUGGESTIONS_MIN_INTERVAL_S: z.coerce.number().int().min(0).max(86_400).default(900),
   /** How many of the newest own repositories get a `/languages` call per refresh (0: none). */
   SUGGESTIONS_LANGUAGE_REPOS: z.coerce.number().int().min(0).max(30).default(5),
+  /** How many not-yet-imported own repositories (newest pushed first) are offered as `project.new` (0: none). */
+  SUGGESTIONS_NEW_REPOS: z.coerce.number().int().min(0).max(20).default(5),
+  /** How many imported repositories' READMEs are read per refresh to look for a change (0: descriptions only). */
+  SUGGESTIONS_README_READS: z.coerce.number().int().min(0).max(30).default(10),
   SUGGESTIONS_MAX_OPEN: z.coerce.number().int().min(1).max(500).default(50),
   SUGGESTIONS_PAGE_SIZE: z.coerce.number().int().min(1).max(100).default(20),
   SUGGESTIONS_PAGE_MAX: z.coerce.number().int().min(1).max(100).default(50),

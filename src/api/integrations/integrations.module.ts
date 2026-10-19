@@ -54,6 +54,6 @@ export function createGithubConnect(cfg: AppConfig): GithubConnect | null {
     GithubSyncService,
     { provide: GITHUB_CONNECT, inject: [APP_CONFIG], useFactory: createGithubConnect },
   ],
-  exports: [GithubConnectionService],
+  exports: [GithubConnectionService, GithubImportService],
 })
 export class IntegrationsModule {}

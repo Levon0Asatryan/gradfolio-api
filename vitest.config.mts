@@ -120,8 +120,12 @@ export default defineConfig({
         // an answer, supersession under the user lock, and accept/dismiss against
         // each other are MySQL behaviour, proved by suggestions/e2e/suggestions.int.test.ts
         // (barriers included). The rules are pure and unit tested (profile-rules.test.ts).
+        // Repository changes: the row locks, the snapshot compare at accept and the
+        // import-backed accept, proved by suggestions/e2e/project-suggestions.int.test.ts
+        // (barriers included); the rules are unit tested (project-rules.test.ts).
         'src/api/suggestions/repositories/*.ts',
         'src/api/suggestions/services/suggestions.service.ts',
+        'src/api/suggestions/services/project-suggestions.service.ts',
         'src/api/suggestions/*.controller.ts',
         // The Google client. Its calls were run against the real bucket as the
         // runtime service account (docs/modules/m4/plan.md §3.3, PR (c) description).

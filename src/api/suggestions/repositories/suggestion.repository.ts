@@ -107,11 +107,12 @@ export async function insertOpen(
     payload: Record<string, unknown>;
     targetId?: string | null;
   },
-): Promise<void> {
+): Promise<string> {
+  const id = newId();
   await trx
     .insertInto('suggestions')
     .values({
-      id: newId(),
+      id,
       userId,
       kind: row.kind,
       source: row.source,
@@ -121,6 +122,7 @@ export async function insertOpen(
       status: 'open',
     })
     .execute();
+  return id;
 }
 
 /** Marks these (the caller's, open) suggestions superseded. */
@@ -136,6 +138,30 @@ export async function supersede(
     .where('userId', '=', userId)
     .where('status', '=', 'open')
     .where('id', 'in', [...ids])
+    .execute();
+}
+
+/**
+ * Accepted after the fact: an import that created the draft counts as the accept
+ * whatever became of the suggestion while GitHub was being asked (superseded because
+ * a refresh saw the new project, or dismissed by a click at the same moment).
+ */
+export async function markAccepted(
+  trx: Transaction<DB>,
+  userId: string,
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  await trx
+    .updateTable('suggestions')
+    .set({
+      status: 'accepted',
+      resolvedAt: sql<Date>`UTC_TIMESTAMP()`,
+      payload: toJsonColumn(payloadSchema, payload),
+    })
+    .where('id', '=', id)
+    .where('userId', '=', userId)
+    .where('status', '<>', 'accepted')
     .execute();
 }
 

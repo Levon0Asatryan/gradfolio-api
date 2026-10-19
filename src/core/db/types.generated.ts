@@ -97,7 +97,7 @@ export interface Notifications {
   referenceId: string | null;
   referenceType: string | null;
   title: string;
-  type: "comment" | "contact_request" | "general" | "project_verified" | "team_accepted" | "team_invite" | "team_left" | "team_rejected";
+  type: "comment" | "contact_request" | "general" | "project_verified" | "suggestions_available" | "team_accepted" | "team_invite" | "team_left" | "team_rejected";
   userId: string;
 }
 
