@@ -687,6 +687,27 @@ describe('project.new: a repository not imported yet', () => {
     expect(await projectsOf(alice.id)).toHaveLength(1);
   });
 
+  it('an accept that creates the draft stands though a dismiss landed meanwhile (barrier on a held repository answer)', async () => {
+    const { http, alice } = await setup();
+    own(alice, 79);
+    await refresh(http, alice).expect(200);
+    const [row] = await list(http, alice);
+
+    const gate = h.gh.holdNextRepo();
+    const accepting = accept(http, alice, row!.id).then((r) => r);
+    await gate.arrived;
+    await dismiss(http, alice, row!.id).expect(200);
+    gate.release();
+
+    const res = await accepting;
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('accepted');
+    const projects = await projectsOf(alice.id);
+    expect(projects).toHaveLength(1);
+    expect(res.body.projectId).toBe(projects[0]!.id);
+    expect(await list(http, alice, 'all')).toMatchObject([{ status: 'accepted' }]);
+  });
+
   it('is 409 SUGGESTION_STALE once the repository was imported another way, and withdrawn by a refresh', async () => {
     const { http, alice } = await setup();
     own(alice, 72);

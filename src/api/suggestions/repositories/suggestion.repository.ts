@@ -142,8 +142,9 @@ export async function supersede(
 }
 
 /**
- * Accepted after the fact: an import that created the project while the suggestion was
- * superseded meanwhile (a refresh saw the new project) still counts as accepted.
+ * Accepted after the fact: an import that created the draft counts as the accept
+ * whatever became of the suggestion while GitHub was being asked (superseded because
+ * a refresh saw the new project, or dismissed by a click at the same moment).
  */
 export async function markAccepted(
   trx: Transaction<DB>,
@@ -160,7 +161,7 @@ export async function markAccepted(
     })
     .where('id', '=', id)
     .where('userId', '=', userId)
-    .where('status', 'in', ['open', 'superseded'])
+    .where('status', '<>', 'accepted')
     .execute();
 }
 
