@@ -33,6 +33,7 @@ import {
   type SuggestionRow,
 } from '../repositories/suggestion.repository.js';
 import {
+  isOffered,
   mayHaveChanged,
   PROJECT_FIELDS,
   type ProjectField,
@@ -177,7 +178,8 @@ export class ProjectSuggestionsService {
 
   /**
    * Accept of a `project.new`: imports the repository as a draft through the import
-   * service (GitHub is read again; nothing the suggestion stored is trusted), then
+   * service (GitHub is read again; nothing the suggestion stored is trusted; a
+   * repository that no longer passes `isOffered` is stale, whatever the import allows), then
    * answers the suggestion in its own transaction. Called with no transaction open.
    */
   async acceptNew(
@@ -193,7 +195,8 @@ export class ProjectSuggestionsService {
         return { kind: 'stale' } as const;
       });
     }
-    const { results } = await this.imports.import(user, identity, [repoId]);
+    // Offered only for a repository that qualifies, so it must still qualify now.
+    const { results } = await this.imports.import(user, identity, [repoId], {}, isOffered);
     const result = results[0]!;
     return inTransaction(this.dbs.db, async (trx): Promise<ProjectOutcome> => {
       await lockUser(trx, user.id);

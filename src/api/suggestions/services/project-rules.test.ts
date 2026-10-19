@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { GithubRepo } from '../../../core/github/github-client.js';
 import { hashField } from '../../../core/github/snapshot.js';
 import {
+  isOffered,
   isUpdateStale,
   mayHaveChanged,
   newRepoRows,
@@ -42,6 +43,17 @@ const project = (over: Partial<ProjectNow> = {}): ProjectNow => ({
     descriptionHtml: hashField('descriptionHtml', '<p>old</p>'),
   },
   ...over,
+});
+
+describe('isOffered', () => {
+  it('is the one test of the offer, the refresh and the accept: own, public, not a fork, not archived', () => {
+    expect(isOffered(repo(1), 7)).toBe(true);
+    expect(isOffered(repo(1, { archived: true }), 7)).toBe(false);
+    expect(isOffered(repo(1, { private: true }), 7)).toBe(false);
+    expect(isOffered(repo(1, { fork: true }), 7)).toBe(false);
+    // Push access is enough to import, not to be offered.
+    expect(isOffered(repo(1, { ownerId: 99, canPush: true }), 7)).toBe(false);
+  });
 });
 
 describe('newRepoRows', () => {

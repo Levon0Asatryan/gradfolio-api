@@ -32,9 +32,12 @@ export const newRepoKey = (repoId: number): string => `repo:${repoId}:new`;
 export const updateKey = (projectId: string, field: ProjectField, upstreamHash: string): string =>
   `project:${projectId}:${field}:${upstreamHash.slice(0, 16)}`;
 
-/** The student's own work on GitHub: not a fork, not archived, owned by the connected account. */
+/**
+ * The student's own work on GitHub: public, not a fork, not archived, owned by the
+ * connected account. One test for the offer, the refresh that withdraws it and the accept.
+ */
 export const isOffered = (repo: GithubRepo, githubUserId: number): boolean =>
-  repo.ownerId === githubUserId && !repo.fork && !repo.archived;
+  repo.ownerId === githubUserId && !repo.private && !repo.fork && !repo.archived;
 
 /**
  * The repositories to offer as new: own, not imported, the newest `limit` in the

@@ -32,7 +32,14 @@ import { GithubConnectionService } from './github-connection.service.js';
 interface ImportResult {
   repoId: number;
   outcome: 'created' | 'exists' | 'skipped';
-  reason: 'not_found' | 'not_owner' | 'invalid_repository' | 'LIMIT_REACHED' | null;
+  reason:
+    | 'not_found'
+    | 'not_owner'
+    | 'invalid_repository'
+    | 'LIMIT_REACHED'
+    /** Only when the caller passed `eligible` (a suggestion's accept): the public API never gives it. */
+    | 'ineligible'
+    | null;
   projectId: string | null;
   notes: ReadmeNote[];
 }
@@ -55,6 +62,9 @@ type Prepared =
       github: CreateProject;
       notes: ReadmeNote[];
     };
+
+/** A caller's own test of the freshly read repository, applied before anything is stored. */
+export type Eligible = (repo: GithubRepo, githubUserId: number) => boolean;
 
 export type DraftOverrides = Partial<
   Pick<CreateProject, 'title' | 'summary' | 'technologies' | 'links'> & {
@@ -183,6 +193,7 @@ export class GithubImportService {
     identity: AccessTokenIdentity,
     repoIds: readonly number[],
     overrides: Readonly<Record<string, DraftOverrides>> = {},
+    eligible?: Eligible,
   ) {
     this.checkBatch(repoIds);
     const ctx = await this.context(user, identity);
@@ -191,7 +202,7 @@ export class GithubImportService {
     // GitHub is asked outside any transaction; nothing here holds a lock. An
     // override that fails the create rules throws before anything is written.
     const prepare = (repoId: number): Promise<Prepared> =>
-      this.prepareRepo(ctx, repoId, overrides[String(repoId)]);
+      this.prepareRepo(ctx, repoId, overrides[String(repoId)], eligible);
     const prepared = await mapLimit(
       repoIds,
       this.cfg.GITHUB_IMPORT_CONCURRENCY,
@@ -297,28 +308,44 @@ export class GithubImportService {
   /**
    * One repository as the draft it would become: read again from GitHub, owned
    * or pushable by the caller, README sanitized, validated by the project
-   * create rules. `overrides` are applied on top and validated the same way; one
+   * create rules; `eligible`, when given, may refuse it first. `overrides` are applied on top and validated the same way; one
    * that fails is a 400 naming `overrides.<repoId>.<field>`.
    */
   private async prepareRepo(
     ctx: Awaited<ReturnType<GithubImportService['context']>>,
     repoId: number,
     overrides: DraftOverrides | undefined,
+    eligible?: Eligible,
   ): Promise<Prepared> {
     const { gh, token, user } = ctx;
     const read = await this.github(gh, user, () => gh.github.getRepo(token, repoId));
     ctx.note(read.rateLimit);
-    const repo = read.repo;
+    let repo = read.repo;
     if (repo === null) return { kind: 'done', result: done(repoId, 'skipped', 'not_found') };
     // Anyone could otherwise import a famous repository as their own work.
     if (repo.ownerId !== Number(ctx.githubUserId) && !repo.canPush) {
       return { kind: 'done', result: done(repoId, 'skipped', 'not_owner') };
+    }
+    if (eligible !== undefined && !eligible(repo, Number(ctx.githubUserId))) {
+      return { kind: 'done', result: done(repoId, 'skipped', 'ineligible') };
     }
     const got = await this.github(gh, user, () =>
       gh.github.getReadme(token, repoId, this.cfg.GITHUB_README_MAX_BYTES),
     );
     // The limit as of the last call made: the README's, not the repository's.
     if (got.rateLimit !== null) ctx.note(got.rateLimit);
+    if (eligible !== undefined) {
+      // The README took time: the repository is read once more, and what is stored is
+      // what this read says.
+      const again = await this.github(gh, user, () => gh.github.getRepo(token, repoId));
+      ctx.note(again.rateLimit);
+      if (again.repo === null)
+        return { kind: 'done', result: done(repoId, 'skipped', 'not_found') };
+      if (!eligible(again.repo, Number(ctx.githubUserId))) {
+        return { kind: 'done', result: done(repoId, 'skipped', 'ineligible') };
+      }
+      repo = again.repo;
+    }
     const description = descriptionOf(repo, got.readme, this.cfg.PROJECT_DESCRIPTION_MAX_BYTES);
     const base = {
       ...fieldsOf(repo, description.html ?? null),

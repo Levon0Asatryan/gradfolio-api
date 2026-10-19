@@ -620,7 +620,7 @@ function suggestionOperations(): Operation[] {
     'SUGGESTION_RESOLVED: it was already dismissed, superseded or accepted; ' +
       'SUGGESTION_INVALID: the value can no longer be written (it is superseded); ' +
       'SUGGESTION_STALE: the skill is already on the profile, the link field was filled since the offer, ' +
-      'the project’s field was edited (or re-synced) since, or the repository is already imported or gone (it is superseded); ' +
+      'the project’s field was edited (or re-synced) since, or the repository is already imported, gone, or no longer your own public, non-fork, non-archived work (it is superseded); ' +
       'LIMIT_REACHED: a `project.new` would exceed the per-user project cap (it stays open)',
   );
   return [
@@ -689,7 +689,8 @@ function suggestionOperations(): Operation[] {
         'Writes that field through the profile’s own rules and marks the suggestion accepted, in ' +
         'one transaction. A `skill.add` appends the skill to the profile’s skills (at most ' +
         'PROFILE_MAX_SKILLS, else 400). A `project.new` imports the repository as a draft through ' +
-        'the import service (GitHub is read again) and answers with its `projectId`. A ' +
+        'the import service (GitHub is read again; the repository must still be the caller’s own public, ' +
+        'non-fork, non-archived work, else 409 `SUGGESTION_STALE` and no draft) and answers with its `projectId`. A ' +
         '`project.update` writes the field only if it still equals the snapshot of the last import, ' +
         're-sync or accept, and moves the snapshot; a field the student changed is never overwritten: ' +
         '409 `SUGGESTION_STALE`. Idempotent for an accepted one. A reminder is only acknowledged.',
