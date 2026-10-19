@@ -49,7 +49,11 @@ for (let i = 0; i < 60; i++) {
   } catch {}
   await new Promise((resolve) => setTimeout(resolve, 500));
 }
-if (!ready) throw new Error('QA API did not become ready; inspect state/api.log');
+if (!ready) {
+  api.kill();
+  await tenant.close();
+  throw new Error('QA API did not become ready; inspect state/api.log');
+}
 
 const tokens: Record<string, string> = {};
 for (const [label, sub, name] of [

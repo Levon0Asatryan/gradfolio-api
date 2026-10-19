@@ -384,9 +384,10 @@ await run(
     const me = await api('c', 'GET', '/me');
     await api('c', 'POST', '/me/onboarding/complete', {});
     const c = pages.c;
-    let logout = false;
-    await c.route('**/auth/logout**', async (route) => {
-      logout = true;
+    // The local /auth/logout handler runs for real; only the hop to the fake Auth0 tenant is stubbed.
+    let auth0Hops = 0;
+    await c.route('https://e2e.example.auth0.com/**', async (route) => {
+      auth0Hops++;
       await route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Signed out</h1>' });
     });
     await c.goto('/account');
@@ -394,8 +395,14 @@ await run(
     const dialog = c.getByRole('dialog');
     await dialog.getByRole('checkbox').check();
     await dialog.getByRole('button', { name: 'Delete account', exact: true }).click();
-    await expect.poll(() => logout).toBe(true);
+    await expect.poll(() => auth0Hops).toBeGreaterThan(0);
     await api(null, 'GET', `/users/${me.id}`, undefined, 404);
+    const session = (await contexts.c.cookies()).filter((cookie) => cookie.name === '__session');
+    assert.equal(session.length, 0, 'logout must clear the __session cookie');
+    auth0Hops = 0;
+    await c.goto('/account');
+    await expect.poll(() => auth0Hops).toBeGreaterThan(0);
+    await expect(c.getByRole('button', { name: 'Delete my account', exact: true })).toHaveCount(0);
   },
 );
 await run('FULL-21', 'missing, malformed and expired access tokens are rejected', async () => {
