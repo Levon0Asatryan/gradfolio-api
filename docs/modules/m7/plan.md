@@ -205,7 +205,8 @@ gone (the docs list `422`, **never seen**; production, 2026-10-19: a token GitHu
 from the delete with valid client credentials, and a `404` is also what an unknown client id gets). So
 any other 4xx is followed by `GET /user` with the token: a `401` there means the token is dead, which is
 what revocation is for, and the disconnect completes (`result: token_refused`); anything else leaves the
-grant standing. No linked identity in Auth0 also counts. Anything else (5xx, timeout, `401` on our client
+grant standing. Other tokens the student may hold for the app are not ours (Auth0 stores one per identity) and
+GitHub offers no grant delete without a valid token; the student removes those under Settings → Applications. No linked identity in Auth0 also counts. Anything else (5xx, timeout, `401` on our client
 credentials) answers `502 GITHUB_REVOKE_FAILED` and **changes nothing**, so the card still shows
 "connected" and the student retries. 2. Then, in one transaction: flag off, `external_*` and `last_synced_at` cleared, open
 suggestions with source `github` deleted, token cache entry dropped; `{ "status": "not_connected" }`.

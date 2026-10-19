@@ -583,7 +583,9 @@ function integrationOperations(): Operation[] {
         'Revokes the GitHub app grant first (every token of it, including the one Auth0 holds); ' +
         'only once GitHub confirms, or there is nothing left to revoke, is GitHub disconnected. ' +
         'A token GitHub itself refuses (`GET /user` answers 401) counts as revoked, whatever the ' +
-        'grant delete answered. ' +
+        'grant delete answered: the API holds no other token, and GitHub deletes a grant only ' +
+        'for a valid one. Any other authorization the student made at GitHub stays until they ' +
+        'remove it under Settings, Applications. ' +
         'A revocation GitHub refuses changes nothing (502): retry. One whose outcome is unknown ' +
         '(timeout, dropped connection, 5xx) also answers 502, but the grant may still be deleted: ' +
         'the card then shows not_connected and a retry answers 409 GITHUB_LINK_IN_PROGRESS until ' +
