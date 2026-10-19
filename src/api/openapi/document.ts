@@ -523,10 +523,10 @@ function integrationOperations(): Operation[] {
         'linked it), GitHub confirms its token and the account is connected: `state: ' +
         'connected`. Otherwise `state: link_required` with a single-use nonce for a secondary ' +
         'GitHub sign-in (see `link`); so is the case where GitHub refuses the token Auth0 holds ' +
-        '(revoked at GitHub, or stale) for a login that is not itself the GitHub one: a flag ' +
-        'left from that token is cleared first. A login that is the GitHub one answers 409 ' +
-        'GITHUB_NOT_LINKED (sign in with GitHub again). Public repositories only (D6). A ' +
-        'connected GitHub counts toward `verified`.',
+        '(revoked at GitHub, or stale), for any login: a flag left from that token is cleared ' +
+        'first, and the sign-in replaces the token. `link` finishes it, including for a login ' +
+        'that is itself the GitHub one. Public repositories only (D6). A connected GitHub ' +
+        'counts toward `verified`.',
       responses: {
         '200': { description: 'Connected, or a link is required', schema: connectResponseSchema },
         '409': error(
@@ -562,7 +562,8 @@ function integrationOperations(): Operation[] {
         '409': error(
           'GITHUB_ACCOUNT_IN_USE: that GitHub account is a Gradfolio account of its own, or ' +
             'another account holds it; GITHUB_ALREADY_CONNECTED; GITHUB_LINK_REFUSED: Auth0 ' +
-            `refused the link; ${inProgress}; GITHUB_NOT_LINKED`,
+            `refused the link; ${inProgress}; GITHUB_NOT_LINKED: the token Auth0 holds after the ` +
+            'sign-in is still refused by GitHub',
         ),
         '429': error('RATE_LIMITED or GITHUB_RATE_LIMITED; see the Retry-After header'),
         '502': error('GITHUB_UNAVAILABLE: GitHub failed while confirming the new link'),
