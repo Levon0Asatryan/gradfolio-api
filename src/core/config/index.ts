@@ -11,7 +11,9 @@ export {
   configSchema,
   databaseConfigSchema,
   githubIntegrationSettings,
+  GITHUB_SETTING_NAMES,
   parseByteSize,
+  unsetGithubSettings,
 } from './schema.js';
 
 function parse<T>(schema: ZodType<T>, env: NodeJS.ProcessEnv): T {

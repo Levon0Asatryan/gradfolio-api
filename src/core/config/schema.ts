@@ -544,6 +544,20 @@ export interface GithubIntegrationSettings {
   githubClientSecret: string;
 }
 
+/** The env names of the five GitHub connect credentials, in the order the schema declares them. */
+export const GITHUB_SETTING_NAMES = [
+  'AUTH0_CLIENT_ID',
+  'AUTH0_M2M_CLIENT_ID',
+  'AUTH0_M2M_CLIENT_SECRET',
+  'GITHUB_CLIENT_ID',
+  'GITHUB_CLIENT_SECRET',
+] as const satisfies readonly (keyof AppConfig)[];
+
+/** The names of the GitHub connect credentials that are unset. Names only, never values. */
+export function unsetGithubSettings(cfg: AppConfig): string[] {
+  return GITHUB_SETTING_NAMES.filter((name) => cfg[name] === undefined);
+}
+
 /** The GitHub connect credentials, or undefined when any is unset (every GitHub route 503s). */
 export function githubIntegrationSettings(cfg: AppConfig): GithubIntegrationSettings | undefined {
   const {
