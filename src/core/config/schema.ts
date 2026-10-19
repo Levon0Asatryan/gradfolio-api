@@ -262,6 +262,11 @@ const notifications = {
   ACTIVITIES_PAGE_MAX: z.coerce.number().int().min(1).max(200).default(50),
 };
 
+/** A DNS name of two or more labels, as a mail domain is. */
+const DOMAIN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+/** A GitHub login: letters, digits and single hyphens, at most 39 characters. */
+const GITHUB_LOGIN = /^[a-z0-9]([a-z0-9-]{0,37}[a-z0-9])?$/;
+
 /** An optional, non-empty setting: unset (or blank) means the feature is off. */
 const optionalSetting = (max: number) =>
   z
@@ -375,21 +380,49 @@ const suggestions = {
     .max(SUGGESTIONS_PAGE_CEILING)
     .default(SUGGESTIONS_PAGE_CEILING),
   LINKEDIN_REIMPORT_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
+  /**
+   * Mail domains of the university, comma-separated (`polytechnic.am`). An address matches
+   * a domain when its part after the last `@` is that domain or a subdomain of it
+   * (`student@cs.polytechnic.am`), compared case-insensitively. Empty: no education
+   * suggestion (M7-T25).
+   */
   UNIVERSITY_DOMAINS: z
     .string()
     .default('')
-    .transform(
-      (v) =>
-        Object.fromEntries(
-          v
-            .split(',')
-            .map((pair) => pair.split('='))
-            .map(
-              ([domain, ...name]) => [domain?.trim().toLowerCase(), name.join('=').trim()] as const,
-            )
-            .filter(([domain, name]) => domain !== undefined && domain !== '' && name !== ''),
-        ) as Record<string, string>,
-    ),
+    .transform((v) =>
+      v
+        .split(',')
+        .map((d) => d.trim().toLowerCase())
+        .filter((d) => d !== ''),
+    )
+    .refine((all) => all.every((d) => DOMAIN.test(d)), {
+      message: 'must be comma-separated domain names such as polytechnic.am',
+    }),
+  /** The institution an education suggestion offers; required when UNIVERSITY_DOMAINS is set. */
+  UNIVERSITY_NAME: optionalSetting(500),
+  /**
+   * GitHub organisations offered as experience, comma-separated: `login` or
+   * `login=Display Name` (the name defaults to the login). Keys are lower-cased.
+   * Empty: no organisation is read or offered (M7-T25).
+   */
+  UNIVERSITY_ORGS: z
+    .string()
+    .default('')
+    .transform((v) => {
+      const orgs: Record<string, string> = {};
+      for (const pair of v.split(',')) {
+        const [login = '', ...name] = pair.split('=');
+        const key = login.trim().toLowerCase();
+        if (key !== '') orgs[key] = name.join('=').trim() || login.trim();
+      }
+      return orgs;
+    })
+    .refine((all) => Object.keys(all).every((l) => GITHUB_LOGIN.test(l)), {
+      message: 'must be GitHub logins, optionally `login=Display Name`',
+    })
+    .refine((all) => Object.values(all).every((n) => [...n].length <= 500), {
+      message: 'a display name must be at most 500 characters',
+    }),
 };
 
 /** MySQL 8.4. */
@@ -538,6 +571,10 @@ export const configSchema = z
   .refine((c) => c.SEARCH_GROUP_SIZE <= c.DISCOVERY_PAGE_MAX, {
     message: 'must not exceed DISCOVERY_PAGE_MAX',
     path: ['SEARCH_GROUP_SIZE'],
+  })
+  .refine((c) => c.UNIVERSITY_DOMAINS.length === 0 || c.UNIVERSITY_NAME !== undefined, {
+    message: 'is required when UNIVERSITY_DOMAINS is set',
+    path: ['UNIVERSITY_NAME'],
   })
   .refine((c) => c.SUGGESTIONS_PAGE_SIZE <= c.SUGGESTIONS_PAGE_MAX, {
     message: 'must not exceed SUGGESTIONS_PAGE_MAX',
