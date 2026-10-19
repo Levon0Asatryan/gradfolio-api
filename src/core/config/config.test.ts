@@ -488,7 +488,7 @@ describe('suggestion settings (docs/modules/m7/plan.md §6)', () => {
       SUGGESTIONS_MAX_OPEN: 50,
       SUGGESTIONS_LANGUAGE_REPOS: 5,
       SUGGESTIONS_PAGE_SIZE: 20,
-      SUGGESTIONS_PAGE_MAX: 50,
+      SUGGESTIONS_PAGE_MAX: 100,
       LINKEDIN_REIMPORT_DAYS: 90,
       UNIVERSITY_DOMAINS: {},
     });

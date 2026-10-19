@@ -2,6 +2,7 @@ import { createConnection } from 'mysql2/promise';
 import { describe, expect, it } from 'vitest';
 import { waitForLockWaiters } from '../../../testing/barrier.js';
 import { testDatabaseUrl } from '../../../testing/database.js';
+import { buildOpenApiDocument } from '../../openapi/document.js';
 import { createUser } from '../../../testing/factories.js';
 import { githubConnectHarness, type Http, type Student } from '../../../testing/github-connect.js';
 import { db } from '../../../testing/team.js';
@@ -113,6 +114,27 @@ describe('refresh and list', () => {
     for (const bad of ['cursor=garbage', 'limit=0', 'limit=101', 'status=nope', 'x=1']) {
       expect((await http.get(`/v1/me/suggestions?${bad}`).set(alice.auth)).status, bad).toBe(400);
     }
+  });
+
+  it('accepts the limit its published contract allows at most (production 400, 2026-10-19)', async () => {
+    const { http, alice } = await setup();
+    // The document the frontend copies: what it says is the most `limit` can be.
+    const doc = buildOpenApiDocument() as {
+      paths: Record<
+        string,
+        { get?: { parameters?: { name: string; schema?: { maximum?: number } }[] } }
+      >;
+    };
+    const published = doc.paths['/v1/me/suggestions']?.get?.parameters?.find(
+      (p) => p.name === 'limit',
+    )?.schema?.maximum;
+    expect(published).toBeTypeOf('number');
+    const res = await http.get(`/v1/me/suggestions?limit=${published}`).set(alice.auth);
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    // One more is refused, on the field.
+    const over = await http.get(`/v1/me/suggestions?limit=${published! + 1}`).set(alice.auth);
+    expect(over.status).toBe(400);
+    expect(over.body.details).toEqual([expect.objectContaining({ path: 'limit' })]);
   });
 
   it('answers without GitHub connected: only the LinkedIn rules, no GitHub call', async () => {
