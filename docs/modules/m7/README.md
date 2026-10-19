@@ -45,7 +45,7 @@ finding. The findings were re-landed in #104, #123 and task M7-T30.
 **Status legend:** `todo` (not started), `in progress` (a task chat is working on it),
 `review` (PR open), `done` (merged and deployed), `blocked` (waiting on something that is
 not a task; the Depends column says what). The module chat updates this table in a small
-docs PR whenever a task changes state. **Last updated: 2026-10-19** (done: T20–T24, T25 (api #114), T27, T28, T30, T29 (api #111), T31, T34 (fe #132), T36 (api #112); in progress: T32, T33, T35; free: T50, T52; blocked: T40–T43, T51).
+docs PR whenever a task changes state. **Last updated: 2026-10-19** (done: T20–T24, T25 (api #114), T27, T28, T30, T29 (api #111), T31, T34 (fe #132), T33 (fe #133), T35 (fe #134), T36 (api #112); in progress: T32; free: T50, T52; blocked: T40–T43, T51).
 
 The **Status** column is the status of record. **Depends on** lists tasks that must be
 **merged** first. Task IDs start at T20 because **M7-T1 to M7-T13 are Levon's queue rows**
@@ -64,12 +64,12 @@ brief, "queue M7-T1" always means a queue row.
 | M7-T28 | `GET /v1/me/suggestions?limit=100` answers 400                              | api, fe | —                 | 7.13    | done        | [T28](tasks/M7-T28-suggestions-limit-400.md)       |
 | M7-T29 | Re-check the repository when accepting a `project.new` suggestion           | api     | —                 | 7.13    | done        | [T29](tasks/M7-T29-project-new-recheck.md)         |
 | M7-T34 | Offer the import after every successful connect, and keep offering it       | fe      | —                 | 7.14    | done        | [T34](tasks/M7-T34-offer-import-after-connect.md)  |
-| M7-T35 | Import dialog wording when only profile data is imported                    | fe      | —                 | 7.14    | in progress | [T35](tasks/M7-T35-profile-only-import-wording.md) |
+| M7-T35 | Import dialog wording when only profile data is imported                    | fe      | —                 | 7.14    | done        | [T35](tasks/M7-T35-profile-only-import-wording.md) |
 | M7-T36 | Reconnect after a dead token: connect re-runs the GitHub sign-in            | api, fe | —                 | 7.2     | done        | [T36](tasks/M7-T36-reconnect-after-dead-token.md)  |
 | M7-T30 | Focus and announcement after Publish on cards and the project page          | fe      | —                 | 7.14    | done        | [T30](tasks/M7-T30-publish-focus.md)               |
 | M7-T31 | Import entry points: after connect, Projects → Add                          | fe      | —                 | 7.14    | done        | [T31](tasks/M7-T31-import-entry-points.md)         |
 | M7-T32 | Suggestions inbox: skills, links, project changes, notification             | fe      | T20 (T21, T22)    | 7.13    | in progress | [T32](tasks/M7-T32-suggestions-inbox.md)           |
-| M7-T33 | One source for the Auth0 settings read by the app                           | fe      | —                 | 7.11    | in progress | [T33](tasks/M7-T33-auth0-settings-source.md)       |
+| M7-T33 | One source for the Auth0 settings read by the app                           | fe      | —                 | 7.11    | done        | [T33](tasks/M7-T33-auth0-settings-source.md)       |
 | M7-T40 | LinkedIn export: real headers, synthetic fixtures, parser                   | api     | queue M7-T1       | 7.6     | blocked     | [T40](tasks/M7-T40-linkedin-parser.md)             |
 | M7-T41 | LinkedIn ZIP upload, guards and preview                                     | api     | T40               | 7.7     | blocked     | [T41](tasks/M7-T41-linkedin-upload-preview.md)     |
 | M7-T42 | LinkedIn confirm: selected items become profile rows                        | api     | T41               | 7.8     | blocked     | [T42](tasks/M7-T42-linkedin-confirm.md)            |
