@@ -7,7 +7,17 @@ export default tseslint.config(
   // `.claude/workflows/*.js` runs in Claude Code's workflow runtime, not in
   // this project: its `agent`, `pipeline`, `phase` and `log` are injected
   // globals and it is outside tsconfig, so type-aware linting cannot parse it.
-  { ignores: ['dist/**', 'coverage/**', 'node_modules/**', '.claude/**', 'scripts/**/*.mjs'] },
+  {
+    // The standalone QA harness runs outside the application's src tsconfig.
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      'node_modules/**',
+      '.claude/**',
+      'scripts/**/*.mjs',
+      'scripts/qa/**',
+    ],
+  },
 
   js.configs.recommended,
 
