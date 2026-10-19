@@ -705,6 +705,26 @@ repositories and the profile data. Its API, on top of §3 and §6:
 - The Profile data section is PR (d1)'s suggestions list; a company is offered only to an empty
   headline.
 
+### 6.6c As built in M7-T20 (`skill.add`)
+
+No migration: `suggestions.kind` is a VARCHAR. Differences from §6.2:
+
+- **Evidence:** the student's own public repositories (`GET /user/repos`, newest 100, not forks, owner
+  is the connected GitHub user) with their primary language and topics, and for the newest
+  `SUGGESTIONS_LANGUAGE_REPOS` (default 5) also `GET /repos/{o}/{r}/languages`; plus the technologies
+  of all the student's own projects (drafts too). A project imported from a repository and that
+  repository are one item. A skill is offered when at least two items show it
+  (`SKILL_MIN_EVIDENCE`) and the profile lacks it (case-insensitive); the best-evidenced ten at most.
+- **Key** `skill:<lowercase>`: a dismissed skill is never offered again (the skill is the value, so
+  there is no "new value"). Source is `github` for every `skill.add`; `evidence` in the list says how
+  many repositories and projects show it, so the UI need not claim GitHub for a project-only skill.
+- **Refresh cost:** at most 2 + N calls to GitHub (profile, repository list, N language lists), none
+  when throttled. Inside the floor the repositories are not read, so open skill suggestions are kept
+  (unless the profile has the skill now) rather than superseded. Not connected: projects only.
+- **Accept** appends the skill in the user-locked transaction (`SkillsService.addIn`): the registry
+  fixes the spelling, `PROFILE_MAX_SKILLS` applies (400), a skill already there is
+  `409 SUGGESTION_STALE` and the suggestion is superseded.
+
 ### 6.7 Cost
 
 One PR, migration 0009, about 35 tests, roughly the size of (b). **Needs:** PR (b) merged (the diff

@@ -486,6 +486,7 @@ describe('suggestion settings (docs/modules/m7/plan.md §6)', () => {
     expect(loadConfig(REQUIRED)).toMatchObject({
       SUGGESTIONS_MIN_INTERVAL_S: 900,
       SUGGESTIONS_MAX_OPEN: 50,
+      SUGGESTIONS_LANGUAGE_REPOS: 5,
       SUGGESTIONS_PAGE_SIZE: 20,
       SUGGESTIONS_PAGE_MAX: 50,
       LINKEDIN_REIMPORT_DAYS: 90,

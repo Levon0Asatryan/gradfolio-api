@@ -175,6 +175,27 @@ describe('GithubClient', () => {
       expect(last.nextPage).toBeNull();
     });
 
+    it('reads topics, and the languages of one repository by validated owner and name', async () => {
+      gh.repos.set(4, repo(4, { topics: ['cli', 'tooling'], languages: { Go: 900, Makefile: 3 } }));
+      const page = await client.listRepos(token, { page: 1, perPage: 10 });
+      expect(page.items.find((r) => r.id === 4)!.topics).toEqual(['cli', 'tooling']);
+      expect(page.items.find((r) => r.id === 1)!.topics).toEqual([]);
+
+      const got = await client.listLanguages(token, { ownerLogin: 'ani-p', name: 'r4' });
+      expect(got.languages).toEqual(['Go', 'Makefile']);
+      expect(gh.requests.at(-1)!.path).toBe('/repos/ani-p/r4/languages');
+      expect(
+        (await client.listLanguages(token, { ownerLogin: 'ani-p', name: 'nope' })).languages,
+      ).toBeNull();
+      await expect(
+        client.listLanguages(token, { ownerLogin: 'ani-p', name: '../user' }),
+      ).rejects.toThrow(/plain names/);
+      gh.repoMode = 'rate-limited';
+      await expect(
+        client.listLanguages(token, { ownerLogin: 'ani-p', name: 'r4' }),
+      ).rejects.toBeInstanceOf(GithubRateLimitedError);
+    });
+
     it('reads a repository by integer id; 404 is null; a limit or failure is an error', async () => {
       expect((await client.getRepo(token, 2)).repo).toMatchObject({ id: 2, defaultBranch: 'main' });
       expect((await client.getRepo(token, 99)).repo).toBeNull();

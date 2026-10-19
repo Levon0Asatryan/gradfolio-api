@@ -611,7 +611,8 @@ function suggestionOperations(): Operation[] {
   const base = { tag: 'suggestions', bearer: true } as const;
   const resolved = error(
     'SUGGESTION_RESOLVED: it was already dismissed, superseded or accepted; ' +
-      'SUGGESTION_INVALID: the value can no longer be written (it is superseded)',
+      'SUGGESTION_INVALID: the value can no longer be written (it is superseded); ' +
+      'SUGGESTION_STALE: the skill is already on the profile (it is superseded)',
   );
   return [
     {
@@ -623,7 +624,8 @@ function suggestionOperations(): Operation[] {
       description:
         'Open ones by default (`status=all` adds the answered). A `profile.*` suggestion names ' +
         'the `field`, what it holds now (`current`) and what an accept would write (`proposed`). ' +
-        '`openCount` is the caller’s open suggestions in all.',
+        'A `skill.add` suggestion names the `skill` and the `evidence` (public repositories and ' +
+        'projects that show it). `openCount` is the caller’s open suggestions in all.',
       query: suggestionQuerySchema,
       responses: {
         '200': { description: 'One page', schema: suggestionPageSchema },
@@ -641,8 +643,12 @@ function suggestionOperations(): Operation[] {
         'Reads GitHub at most once per SUGGESTIONS_MIN_INTERVAL_S (conditionally by ETag; a ' +
         'refresh inside the floor uses the stored profile and says `throttled`), then opens ' +
         'what is new, supersedes what GitHub no longer says, and never reopens an answered ' +
-        'suggestion with the same value. LinkedIn: a sign-in’s name and photo, and a re-import ' +
-        'reminder. Without GitHub connected only the LinkedIn rules run.',
+        'suggestion with the same value. It also reads the caller’s newest public repositories ' +
+        '(not forks): one `GET /user/repos` page and, for the newest SUGGESTIONS_LANGUAGE_REPOS ' +
+        '(default 5), one `GET …/languages` each, and offers a skill missing from the profile ' +
+        '(compared case-insensitively) that at least two repositories or projects show. A ' +
+        'refresh inside the floor reads nothing and keeps the open skill suggestions. LinkedIn: a sign-in’s name and photo, and a re-import ' +
+        'reminder. Without GitHub connected the LinkedIn rules run and skills are offered from the caller’s projects alone.',
       responses: {
         '200': { description: 'What was done', schema: refreshResponseSchema },
         '409': error('GITHUB_NOT_LINKED: GitHub refused the token (sign in with GitHub again)'),
@@ -660,7 +666,8 @@ function suggestionOperations(): Operation[] {
       summary: 'Apply a suggestion: write the one field it names',
       description:
         'Writes that field through the profile’s own rules and marks the suggestion accepted, in ' +
-        'one transaction. Idempotent for an accepted one. A reminder is only acknowledged.',
+        'one transaction. A `skill.add` appends the skill to the profile’s skills (at most ' +
+        'PROFILE_MAX_SKILLS, else 400). Idempotent for an accepted one. A reminder is only acknowledged.',
       params: suggestionIdParamSchema,
       responses: {
         '200': { description: 'Accepted', schema: resolveResponseSchema },

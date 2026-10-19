@@ -16,6 +16,7 @@ const repo: GithubRepo = {
   fullName: 'ani-p/tracker',
   description: '  Tracks things  ',
   language: 'Python',
+  topics: [],
   stars: 1,
   forks: 0,
   htmlUrl: 'https://github.com/ani-p/tracker',

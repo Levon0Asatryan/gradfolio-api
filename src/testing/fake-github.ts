@@ -39,6 +39,10 @@ export interface FakeRepo {
   ownerLogin: string;
   description: string | null;
   language: string | null;
+  /** Topics the repository lists. */
+  topics?: string[];
+  /** `GET /repos/{o}/{r}/languages`: language -> bytes. Absent: only `language`. */
+  languages?: Record<string, number>;
   stars: number;
   forks: number;
   private: boolean;
@@ -240,6 +244,7 @@ export async function startFakeGithub(): Promise<FakeGithub> {
         full_name: `${r.ownerLogin}/${r.name}`,
         description: r.description,
         language: r.language,
+        topics: r.topics ?? [],
         stargazers_count: r.stars,
         forks_count: r.forks,
         html_url: `https://github.com/${r.ownerLogin}/${r.name}`,
@@ -286,6 +291,20 @@ export async function startFakeGithub(): Promise<FakeGithub> {
             ? { link: `<http://fake/user/repos?page=${page + 1}&per_page=${perPage}>; rel="next"` }
             : {},
         );
+      }
+
+      const langPath = /^\/repos\/([^/]+)\/([^/]+)\/languages$/.exec(path);
+      if (langPath && req.method === 'GET') {
+        const me = asUser();
+        if (!me) return send(res, 401, { message: 'Bad credentials' });
+        if (state.repoMode !== 'ok') return repoFailure();
+        const repo = [...state.repos.values()].find(
+          (r) => r.ownerLogin === langPath[1] && r.name === langPath[2],
+        );
+        if (repo === undefined || !visibleTo(repo, me)) {
+          return send(res, 404, { message: 'Not Found' });
+        }
+        return send(res, 200, repo.languages ?? (repo.language ? { [repo.language]: 1000 } : {}));
       }
 
       const repoPath = /^\/repositories\/(\d+)(\/readme)?$/.exec(path);

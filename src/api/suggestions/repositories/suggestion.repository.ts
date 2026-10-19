@@ -156,6 +156,21 @@ export async function resolve(
   return Number(result.numUpdatedRows);
 }
 
+/** Replaces the payload of the caller's suggestion (an accept records what it wrote). */
+export async function setPayload(
+  trx: Transaction<DB>,
+  userId: string,
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  await trx
+    .updateTable('suggestions')
+    .set({ payload: toJsonColumn(payloadSchema, payload) })
+    .where('id', '=', id)
+    .where('userId', '=', userId)
+    .execute();
+}
+
 /** What a refresh needs of the caller's GitHub row. */
 export interface GithubPollState {
   status: 'connected' | 'not_connected' | 'linking';
@@ -272,4 +287,28 @@ export async function currentProfile(trx: Transaction<DB>, userId: string) {
     .where('id', '=', userId)
     .executeTakeFirst();
   return u;
+}
+
+/** The caller's listed skills, in their order. */
+export async function skillNamesOf(trx: Transaction<DB>, userId: string): Promise<string[]> {
+  const rows = await trx
+    .selectFrom('userSkills')
+    .select('skillName')
+    .where('userId', '=', userId)
+    .orderBy('sortOrder')
+    .execute();
+  return rows.map((r) => r.skillName);
+}
+
+/** The technologies of each of the caller's own projects (drafts too), one row per technology. */
+export function projectTechnologies(
+  trx: Transaction<DB>,
+  userId: string,
+): Promise<{ projectId: string; githubRepoId: number | null; name: string }[]> {
+  return trx
+    .selectFrom('projects')
+    .innerJoin('projectTechnologies', 'projectTechnologies.projectId', 'projects.id')
+    .select(['projects.id as projectId', 'projects.githubRepoId', 'projectTechnologies.name'])
+    .where('projects.userId', '=', userId)
+    .execute();
 }
