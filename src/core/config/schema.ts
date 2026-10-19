@@ -18,6 +18,8 @@ function envBoolean(defaultValue: 'true' | 'false') {
  */
 const BYTE_SIZE = /^([1-9]\d*)(kb|mb)$/;
 const MAX_BODY_BYTES = 8 * 1024 * 1024;
+/** The most suggestions one list page can hold: the `limit` ceiling of the published API. */
+export const SUGGESTIONS_PAGE_CEILING = 100;
 
 export function parseByteSize(value: string): number | undefined {
   const match = BYTE_SIZE.exec(value);
@@ -360,8 +362,18 @@ const suggestions = {
   /** How many imported repositories' READMEs are read per refresh to look for a change (0: descriptions only). */
   SUGGESTIONS_README_READS: z.coerce.number().int().min(0).max(30).default(10),
   SUGGESTIONS_MAX_OPEN: z.coerce.number().int().min(1).max(500).default(50),
-  SUGGESTIONS_PAGE_SIZE: z.coerce.number().int().min(1).max(100).default(20),
-  SUGGESTIONS_PAGE_MAX: z.coerce.number().int().min(1).max(100).default(50),
+  SUGGESTIONS_PAGE_SIZE: z.coerce.number().int().min(1).max(SUGGESTIONS_PAGE_CEILING).default(20),
+  /**
+   * The most `limit` a list may ask for. It defaults to the ceiling the API
+   * document publishes: a lower value makes the deployment refuse what the
+   * document, and the frontend built from it, allow (production 400, M7-T28).
+   */
+  SUGGESTIONS_PAGE_MAX: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(SUGGESTIONS_PAGE_CEILING)
+    .default(SUGGESTIONS_PAGE_CEILING),
   LINKEDIN_REIMPORT_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
   UNIVERSITY_DOMAINS: z
     .string()

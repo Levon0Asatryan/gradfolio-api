@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SUGGESTIONS_PAGE_CEILING } from '../../../core/config/schema.js';
 
 /**
  * Suggestions (docs/modules/m7/plan.md §6): proposals the student accepts or dismisses.
@@ -99,7 +100,7 @@ export type SuggestionPage = z.infer<typeof suggestionPageSchema>;
 export const suggestionQuerySchema = z.strictObject({
   status: z.enum(['open', 'all']).default('open'),
   cursor: z.string().max(200).optional(),
-  limit: z.coerce.number().int().min(1).max(100).optional(),
+  limit: z.coerce.number().int().min(1).max(SUGGESTIONS_PAGE_CEILING).optional(),
 });
 export type SuggestionQuery = z.output<typeof suggestionQuerySchema>;
 
