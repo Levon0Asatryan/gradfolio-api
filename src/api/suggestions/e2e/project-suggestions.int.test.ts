@@ -477,6 +477,35 @@ describe('refresh around the reads', () => {
     }
   });
 
+  it('an edit committed after the refresh began its transaction is seen, not offered over (barrier on the project row)', async () => {
+    const { http, alice } = await setup();
+    const projectId = await imported(http, alice, 60, { readme: '<p>v1</p>' });
+    h.gh.repos.get(60)!.readme = '<p>v2</p>';
+    pushed(60);
+
+    const holder = await createConnection({ uri: testDatabaseUrl() });
+    try {
+      await holder.query('START TRANSACTION');
+      await holder.query('SELECT id FROM projects WHERE id = ? FOR UPDATE', [projectId]);
+      // The refresh has the user lock and has read the profile; it waits for the project.
+      const refreshing = refresh(http, alice).then((r) => r);
+      await waitForLockWaiters(1);
+      await holder.query('UPDATE projects SET description_html = ? WHERE id = ?', [
+        '<p>typed meanwhile</p>',
+        projectId,
+      ]);
+      await holder.query('COMMIT');
+
+      const res = await refreshing;
+      expect(res.status).toBe(200);
+      expect(res.body.created).toBe(0);
+      expect(await list(http, alice, 'all')).toEqual([]);
+      expect(await notificationsOf(http, alice)).toEqual([]);
+    } finally {
+      await holder.end();
+    }
+  });
+
   it('a disconnect while GitHub is being asked leaves nothing: no suggestion, no notification (barrier)', async () => {
     const { http, alice } = await setup();
     await imported(http, alice, 52, { readme: '<p>v1</p>' });
