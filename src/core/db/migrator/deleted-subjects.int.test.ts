@@ -37,7 +37,7 @@ describe('0010_deleted_subjects', () => {
     const o = await opts();
     await up(conn, o, '0009_suggestions');
     await conn.query(`INSERT INTO users (id, auth0_id, name) VALUES ('u1', 'auth0|m', 'Kept')`);
-    expect(await up(conn, o)).toEqual(['0010_deleted_subjects']);
+    expect(await up(conn, o, '0010_deleted_subjects')).toEqual(['0010_deleted_subjects']);
     const [users] = await conn.query('SELECT name FROM users');
     expect(users).toEqual([{ name: 'Kept' }]);
     const [rows] = await conn.query('SELECT COUNT(*) AS n FROM deleted_subjects');
@@ -46,15 +46,15 @@ describe('0010_deleted_subjects', () => {
 
   it('applies twice with nothing left, and down then up gives the same schema', async () => {
     const o = await opts();
-    await up(conn, o);
-    expect(await up(conn, o)).toEqual([]);
+    await up(conn, o, '0010_deleted_subjects');
+    expect(await up(conn, o, '0010_deleted_subjects')).toEqual([]);
     const first = await dumpSchema(conn);
     expect(first).toContain('CREATE TABLE `deleted_subjects`');
 
     expect(await down(conn, o)).toEqual(['0010_deleted_subjects']);
     expect(await dumpSchema(conn)).not.toContain('deleted_subjects');
 
-    await up(conn, o);
+    await up(conn, o, '0010_deleted_subjects');
     expect(await dumpSchema(conn)).toBe(first);
   });
 

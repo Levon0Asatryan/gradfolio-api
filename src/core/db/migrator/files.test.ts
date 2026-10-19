@@ -141,7 +141,7 @@ describe('the migrations in this repository', () => {
     expect(unguarded).toEqual([]);
   });
 
-  it('run exactly 0003’s backfills, 0006’s and 0008’s clean-ups as DML; every other step is DDL', async () => {
+  it('run exactly 0003’s backfills, 0006’s, 0008’s and 0011’s clean-ups as DML; every other step is DDL', async () => {
     const dml = (await loadMigrations()).flatMap((m) =>
       (['up', 'down'] as const).flatMap((d) =>
         m[d].filter(isDml).map((s) => `${m.name}.${d}.${s.index}`),
@@ -154,6 +154,7 @@ describe('the migrations in this repository', () => {
       '0006_team_notifications.down.3',
       '0008_github_connect.up.4',
       '0008_github_connect.down.6',
+      '0011_suggestions_notification.down.1',
     ]);
   });
 
