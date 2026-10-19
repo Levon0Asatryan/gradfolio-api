@@ -43,7 +43,7 @@ finding. The findings were re-landed in #104, #123 and task M7-T30.
 **Status legend:** `todo` (not started), `in progress` (a task chat is working on it),
 `review` (PR open), `done` (merged and deployed), `blocked` (waiting on something that is
 not a task; the Depends column says what). The module chat updates this table in a small
-docs PR whenever a task changes state. **Last updated: 2026-10-19** (T24 done, PR #98; the rest todo or blocked; T30 has an unpushed fix commit but no chat).
+docs PR whenever a task changes state. **Last updated: 2026-10-19** (T21 and T24 done, PR #100 and #98; the rest todo or blocked; T30 has an unpushed fix commit but no chat).
 
 The **Status** column is the status of record. **Depends on** lists tasks that must be
 **merged** first. Task IDs start at T20 because **M7-T1 to M7-T13 are Levon's queue rows**
@@ -53,7 +53,7 @@ brief, "queue M7-T1" always means a queue row.
 | ID     | Task                                                                        | Repo    | Depends on        | Tracker | Status  | Brief                                          |
 | ------ | --------------------------------------------------------------------------- | ------- | ----------------- | ------- | ------- | ---------------------------------------------- |
 | M7-T20 | Skill suggestions from repo languages/topics and the student's own projects | api     | —                 | 7.13    | done    | [T20](tasks/M7-T20-skill-suggestions.md)       |
-| M7-T21 | Links suggestions from GitHub social accounts                               | api     | T20               | 7.13    | todo    | [T21](tasks/M7-T21-links-suggestions.md)       |
+| M7-T21 | Links suggestions from GitHub social accounts                               | api     | T20               | 7.13    | done    | [T21](tasks/M7-T21-links-suggestions.md)       |
 | M7-T22 | Repo-change suggestions and a notification (d2)                             | api     | T20               | 7.13    | todo    | [T22](tasks/M7-T22-repo-change-suggestions.md) |
 | M7-T23 | Deletion tombstone: precondition of `AUTH0_DELETE_USERS`                    | api     | —                 | 7.2     | done    | [T23](tasks/M7-T23-deletion-tombstone.md)      |
 | M7-T24 | Startup check: log which of the five GitHub settings is missing             | api     | —                 | 7.2     | done    | [T24](tasks/M7-T24-startup-check.md)           |
