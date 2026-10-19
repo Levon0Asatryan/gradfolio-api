@@ -43,8 +43,8 @@ finding. The findings were re-landed in #104, #123 and task M7-T30.
 **Status legend:** `todo` (not started), `in progress` (a task chat is working on it),
 `review` (PR open), `done` (merged and deployed), `blocked` (waiting on something that is
 not a task; the Depends column says what). The module chat updates this table in a small
-docs PR whenever a task changes state. **Last updated: 2026-10-19** (T20 and T23 in
-progress by Levon's choice; the rest todo or blocked; T30 has an unpushed fix commit but no chat).
+docs PR whenever a task changes state. **Last updated: 2026-10-19** (T20 in
+progress; the rest todo or blocked; T30 has an unpushed fix commit but no chat).
 
 The **Status** column is the status of record. **Depends on** lists tasks that must be
 **merged** first. Task IDs start at T20 because **M7-T1 to M7-T13 are Levon's queue rows**
@@ -56,7 +56,7 @@ brief, "queue M7-T1" always means a queue row.
 | M7-T20 | Skill suggestions from repo languages/topics and the student's own projects | api     | —                 | 7.13    | in progress | [T20](tasks/M7-T20-skill-suggestions.md)       |
 | M7-T21 | Links suggestions from GitHub social accounts                               | api     | T20               | 7.13    | todo        | [T21](tasks/M7-T21-links-suggestions.md)       |
 | M7-T22 | Repo-change suggestions and a notification (d2)                             | api     | T20               | 7.13    | todo        | [T22](tasks/M7-T22-repo-change-suggestions.md) |
-| M7-T23 | Deletion tombstone: precondition of `AUTH0_DELETE_USERS`                    | api     | —                 | 7.2     | in progress | [T23](tasks/M7-T23-deletion-tombstone.md)      |
+| M7-T23 | Deletion tombstone: precondition of `AUTH0_DELETE_USERS`                    | api     | —                 | 7.2     | done        | [T23](tasks/M7-T23-deletion-tombstone.md)      |
 | M7-T24 | Startup check: log which of the five GitHub settings is missing             | api     | —                 | 7.2     | todo        | [T24](tasks/M7-T24-startup-check.md)           |
 | M7-T25 | Education and organisation suggestions from verified emails and orgs        | api     | queue M7-T10      | 7.13    | blocked     | [T25](tasks/M7-T25-education-suggestions.md)   |
 | M7-T30 | Focus and announcement after Publish on cards and the project page          | fe      | —                 | 7.14    | todo        | [T30](tasks/M7-T30-publish-focus.md)           |
@@ -70,6 +70,11 @@ brief, "queue M7-T1" always means a queue row.
 | M7-T50 | Real GitHub run on production                                               | api, fe | T20, T30, T31     | 7.1–7.5 | todo        | [T50](tasks/M7-T50-github-real-run.md)         |
 | M7-T51 | Real LinkedIn run on production                                             | api, fe | T43, queue M7-T1  | 7.6–7.9 | blocked     | [T51](tasks/M7-T51-linkedin-real-run.md)       |
 | M7-T52 | Verification records and the module report                                  | api, fe | all above         | —       | todo        | [T52](tasks/M7-T52-verification.md)            |
+
+**Follow-up from T23 (open, not yet a task):** Codex P2 on `src/core/config/schema.ts`:
+`ACCOUNT_TOMBSTONE_TTL_S` accepts values below the access-token lifetime plus the clock
+tolerance, so a token can outlive its tombstone. The merged PR left the thread unanswered.
+Fix: raise the minimum or check it at boot. Proposed as M7-T26 (small, todo).
 
 **Dropped as done:** connection-name limit 128 vs 64 (fe #108), the delete-account sign-out
 (fe #108), the discovery flake (fe #110), the profile-tab fixes (fe #123), account deletion
