@@ -15,7 +15,7 @@ export default tseslint.config(
       'node_modules/**',
       '.claude/**',
       'scripts/**/*.mjs',
-      'docs/qa/scripts/**',
+      'scripts/qa/**',
     ],
   },
 

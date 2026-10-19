@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { startTestTenant } from '../../../src/testing/jwks.ts';
+import { startTestTenant } from '../../src/testing/jwks.ts';
 import { requireQaDatabase } from './qa-database.mjs';
 
 // Isolated QA only: real API/MySQL and SDK session cookies, with the existing

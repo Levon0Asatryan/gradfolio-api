@@ -9,11 +9,11 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 
-root = Path(__file__).resolve().parents[4]
+root = Path(__file__).resolve().parents[3]
 language = sys.argv[1] if len(sys.argv) > 1 else 'hy'
 if language not in ('hy', 'en'):
     raise ValueError('Expected report language hy or en')
-source = root / f'gradfolio-api/docs/qa/final-report-{language}-2026-10-17.md'
+source = root / f'gradfolio-api/docs/qa/report-{language}-2026-10-17.md'
 output = root / f'output/pdf/gradfolio-qa-final-{language}-2026-10-17.pdf'
 output.parent.mkdir(parents=True, exist_ok=True)
 pdfmetrics.registerFont(TTFont('QA', 'C:/Windows/Fonts/arial.ttf'))

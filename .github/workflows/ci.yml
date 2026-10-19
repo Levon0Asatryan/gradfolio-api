@@ -47,7 +47,7 @@ jobs:
       # The thresholds are a floor; running them here stops it slipping.
       - run: npm run test:coverage
       - name: QA scripts reject non-test databases
-        run: node --test docs/qa/scripts/qa-database.test.mjs
+        run: node --test scripts/qa/qa-database.test.mjs
 
   # Behaviour that depends on MySQL is tested against MySQL 8.4, never a
   # stand-in: session time zone, real driver errors, utf8mb4.
