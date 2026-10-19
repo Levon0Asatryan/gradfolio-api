@@ -715,6 +715,7 @@ function suggestionOperations(): Operation[] {
       bodyOptional: true,
       responses: {
         '200': { description: 'Accepted', schema: resolveResponseSchema },
+        '400': validationFailed,
         '404': notYours('suggestion'),
         '409': resolved,
         '502': error('GITHUB_UNAVAILABLE: a `project.new` could not read GitHub'),

@@ -297,11 +297,12 @@ describe('organisations', () => {
     const { http, alice } = await setup(ORGS);
     h.gh.orgs.set('alice', ['poly-club']);
     await refresh(http, alice).expect(200);
-    // The row as an earlier configuration made it: another display name, so another key.
+    // The row as the login-only key made it (before the name was in the key): a row with that
+    // key and another name would be kept as already known, whatever the name now is.
     await db
       .updateTable('suggestions')
       .set({
-        dedupeKey: 'experience:org:poly-club:00000000',
+        dedupeKey: 'experience:org:poly-club',
         payload: JSON.stringify({ field: 'experience', value: 'Old Name' }) as never,
       })
       .where('userId', '=', alice.id)

@@ -96,6 +96,17 @@ describe('entriesToOffer', () => {
   });
 });
 
+describe('organizationKey', () => {
+  it('differs per display name for one login, and ignores case and spacing of the name', () => {
+    expect(organizationKey('poly-club', 'Polytechnic Club')).not.toBe(
+      organizationKey('poly-club', 'Polytechnic Society'),
+    );
+    expect(organizationKey('Poly-Club', ' polytechnic  CLUB ')).toBe(
+      organizationKey('poly-club', 'Polytechnic Club'),
+    );
+  });
+});
+
 describe('entryIsGone', () => {
   const edu = { kind: 'education.add', payload: { field: 'education', value: NAME } };
   const known = { institution: false, organizations: false };

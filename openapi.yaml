@@ -4000,6 +4000,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuggestionResolved"
+        "400":
+          description: "VALIDATION_FAILED: the body does not fit the schema (see `details`)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: "UNAUTHENTICATED: no access token, or one that is invalid or expired"
           content:

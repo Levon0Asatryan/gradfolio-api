@@ -821,7 +821,7 @@ Differences from §6.2:
   configured display name as the organisation (an organisation is experience here; education comes from the email only).
 - **Empty state:** offered only when the profile holds no `education.institution` (for an organisation: `experience.organization`)
   equal to the name, compared without case, outer spaces or runs of spaces. Checked at the refresh and again at the accept.
-- **Keys:** `education:<hash16 of the folded name>`, `experience:org:<login>`: an answered key is never reopened. Payload
+- **Keys:** `education:<hash16 of the folded name>`, `experience:org:<login>:<hash8 of the folded name>` (a renamed organisation is a new offer; the old row is withdrawn): an answered key is never reopened. Payload
   `{field: 'education'|'experience', value: <name>}`; no address, no domain.
 - **Cost:** per refresh that reads GitHub, **+1 call** (`/user/emails`) when `UNIVERSITY_DOMAINS` is set, **+2** (`/user`,
   `/users/{login}/orgs`) when `UNIVERSITY_ORGS` is set, none otherwise and none inside the floor (an open suggestion is kept
