@@ -1029,7 +1029,7 @@ describe('disconnect (revoke first, D9)', () => {
     expect(await githubRow(s.id)).toMatchObject({ status: 'not_connected', externalUserId: null });
   });
 
-  it('a grant GitHub says is already gone (422) still disconnects; a 404 changes nothing', async () => {
+  it('a grant GitHub says is already gone (422) still disconnects; a 404 for a live token changes nothing', async () => {
     const http = await start();
     const s = await connected(http, 'github|10422', '10422');
     gh.grantStatus = 404;
@@ -1038,6 +1038,113 @@ describe('disconnect (revoke first, D9)', () => {
     gh.grantStatus = 422;
     await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
     expect(await githubRow(s.id)).toMatchObject({ status: 'not_connected' });
+  });
+
+  describe('a token GitHub refuses (production, 2026-10-19)', () => {
+    it('reads answer 409 and log the status; Disconnect completes, again and again', async () => {
+      const http = await start();
+      const s = await connected(http, 'github|111', '111');
+      gh.tokens.delete(auth0.githubTokenFor('111'));
+
+      logs.clear();
+      const read = await http.get('/v1/me/github/repos').set(s.auth).expect(409);
+      expect(read.body.code).toBe('GITHUB_NOT_LINKED');
+      // Reading does not clear the row (proposal in the PR: it could).
+      expect(await githubRow(s.id)).toMatchObject({ status: 'connected' });
+      expect(logs.lines().find((l) => l.msg === 'request rejected')).toMatchObject({
+        code: 'GITHUB_NOT_LINKED',
+        upstreamStatus: 401,
+      });
+
+      await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+      expect(await githubRow(s.id)).toMatchObject({
+        status: 'not_connected',
+        externalUserId: null,
+      });
+      expect(await verifiedOf(s.id)).toBe(false);
+      expect(logs.lines().find((l) => l.msg === 'github grant revoked')).toMatchObject({
+        result: 'token_refused',
+      });
+      // The delete was asked once, then GitHub's word on the token.
+      expect(gh.requests.filter((r) => r.method === 'DELETE').map((r) => r.path)).toEqual([
+        `/applications/${gh.clientId}/grant`,
+      ]);
+
+      await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+      expect(gh.requests.filter((r) => r.method === 'DELETE')).toHaveLength(1);
+      expect(logs.text()).not.toMatch(/SENTINEL/);
+    });
+
+    it('a failed revoke of a live token logs the status GitHub gave', async () => {
+      const http = await start();
+      const s = await connected(http, 'github|113', '113');
+      gh.grantStatus = 404;
+      logs.clear();
+      await http.delete('/v1/me/integrations/github').set(s.auth).expect(502);
+      expect(logs.lines().find((l) => l.msg === 'request failed')).toMatchObject({
+        code: 'GITHUB_REVOKE_FAILED',
+        upstreamStatus: 404,
+        cause: 'github revoke failed: DELETE grant 404; token check 200',
+      });
+      expect(await githubRow(s.id)).toMatchObject({ status: 'connected' });
+    });
+
+    it('a marker left by an unknown outcome settles as disconnected once the token is dead', async () => {
+      const http = await start();
+      const s = await connected(http, 'github|114', '114');
+      gh.grantStatus = 503;
+      const failed = await http.delete('/v1/me/integrations/github').set(s.auth).expect(502);
+      expect(failed.body.message).toContain('may still be processing');
+      expect(await githubRow(s.id)).toMatchObject({ status: 'linking' });
+      logs.clear();
+
+      // Nothing can be in flight any more, and GitHub has dropped the token.
+      gh.grantStatus = undefined;
+      gh.tokens.delete(auth0.githubTokenFor('114'));
+      await ageReservation(s.id);
+      await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+      expect(await githubRow(s.id)).toMatchObject({
+        status: 'not_connected',
+        externalUserId: null,
+      });
+    });
+
+    it('a 5xx on a live token stays unsettled: the marker is not cleared by the probe', async () => {
+      const http = await start();
+      const s = await connected(http, 'github|115', '115');
+      gh.grantStatus = 503;
+      await http.delete('/v1/me/integrations/github').set(s.auth).expect(502);
+      expect(gh.requests.filter((r) => r.path === '/user')).toEqual([]);
+      expect(await githubRow(s.id)).toMatchObject({ status: 'linking', externalUserId: '115' });
+    });
+
+    it('Connect again offers a fresh GitHub sign-in instead of repeating the 409', async () => {
+      const http = await start();
+      const s = await connected(http, 'auth0|linked-116', '116');
+      gh.tokens.delete(auth0.githubTokenFor('116'));
+
+      const res = await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(200);
+      expect(res.body.state).toBe('link_required');
+      expect(await githubRow(s.id)).toMatchObject({ status: 'not_connected' });
+      expect(await verifiedOf(s.id)).toBe(false);
+
+      // The same for a student who disconnected and kept the dead token at Auth0.
+      const again = await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(200);
+      expect(again.body.state).toBe('link_required');
+
+      // A second student is untouched.
+      const bob = await connected(http, 'github|117', '117');
+      expect(await githubRow(bob.id)).toMatchObject({ status: 'connected' });
+    });
+
+    it('a GitHub login keeps the 409: a link cannot add its own identity, signing in again does', async () => {
+      const http = await start();
+      const s = await connected(http, 'github|118', '118');
+      gh.tokens.delete(auth0.githubTokenFor('118'));
+      const res = await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(409);
+      expect(res.body.code).toBe('GITHUB_NOT_LINKED');
+      expect(await githubRow(s.id)).toMatchObject({ status: 'connected' });
+    });
   });
 
   it('no GitHub identity left at Auth0 counts as revoked; a second disconnect revokes nothing', async () => {

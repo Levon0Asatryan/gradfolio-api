@@ -107,16 +107,86 @@ describe('GithubClient', () => {
       expect(await client.deleteGrant(gh.clientId, gh.clientSecret, token)).toBe('already_gone');
     });
 
-    it('a 404 is not proof of anything: the revocation failed', async () => {
-      gh.grantStatus = 404;
-      await expect(client.deleteGrant(gh.clientId, gh.clientSecret, token)).rejects.toBeInstanceOf(
-        GithubRevokeFailedError,
-      );
+    it('a 404 for a token GitHub itself refuses is a dead token: the grant is gone', async () => {
+      gh.tokens.clear();
+      expect(await client.deleteGrant(gh.clientId, gh.clientSecret, token)).toBe('token_refused');
+      // The delete came first, then GitHub's word on the token.
+      expect(gh.requests.map((r) => `${r.method} ${r.path}`)).toEqual([
+        `DELETE /applications/${gh.clientId}/grant`,
+        'GET /user',
+      ]);
+      expect(gh.requests[1]!.authorization).toBe('Bearer gho_SENTINEL_client');
     });
 
-    it('a second delete of the same grant is already gone', async () => {
+    it('a 404 for a token GitHub still accepts fails the revocation, nothing changed, status logged', async () => {
+      gh.grantStatus = 404;
+      const err = (await client
+        .deleteGrant(gh.clientId, gh.clientSecret, token)
+        .catch((e: unknown) => e)) as GithubRevokeFailedError;
+      expect(err).toBeInstanceOf(GithubRevokeFailedError);
+      expect(err.refused).toBe(true);
+      expect(err.upstreamStatus).toBe(404);
+      expect(err.logDetail).toBe('github revoke failed: DELETE grant 404; token check 200');
+      expect(gh.revoked).toEqual([]);
+    });
+
+    it('a client id GitHub does not know (404) with a live token fails the revocation', async () => {
+      const err = (await client
+        .deleteGrant('unknown-client', gh.clientSecret, token)
+        .catch((e: unknown) => e)) as GithubRevokeFailedError;
+      expect(err).toBeInstanceOf(GithubRevokeFailedError);
+      expect(err.refused).toBe(true);
+      expect(err.upstreamStatus).toBe(404);
+      expect(gh.tokens.has('gho_SENTINEL_client')).toBe(true);
+    });
+
+    it('a refused delete with no answer about the token is a failure, not a revocation', async () => {
+      gh.grantStatus = 404;
+      gh.userMode = 'hang';
+      const err = (await client
+        .deleteGrant(gh.clientId, gh.clientSecret, token)
+        .catch((e: unknown) => e)) as GithubRevokeFailedError;
+      expect(err).toBeInstanceOf(GithubRevokeFailedError);
+      expect(err.refused).toBe(true);
+      expect(err.logDetail).toBe('github revoke failed: DELETE grant 404; token check unanswered');
+    });
+
+    it('a 5xx stays an unknown outcome, with its status, and asks nothing about the token', async () => {
+      gh.grantStatus = 503;
+      gh.tokens.clear();
+      const err = (await client
+        .deleteGrant(gh.clientId, gh.clientSecret, token)
+        .catch((e: unknown) => e)) as GithubRevokeFailedError;
+      expect(err).toBeInstanceOf(GithubRevokeFailedError);
+      expect(err.refused).toBe(false);
+      expect(err.upstreamStatus).toBe(503);
+      expect(gh.requests.map((r) => r.path)).toEqual([`/applications/${gh.clientId}/grant`]);
+    });
+
+    it('logs the upstream status (a number) of every failing read, and never the token', async () => {
+      const status = async (call: Promise<unknown>) =>
+        (await call.catch((e: unknown) => e)) as { upstreamStatus?: number; logDetail?: string };
+      gh.tokens.clear();
+      for (const call of [
+        client.authenticatedUser(token),
+        client.getProfile(token, null),
+        client.listRepos(token, { page: 1, perPage: 10 }),
+      ]) {
+        const err = await status(call);
+        expect(err.upstreamStatus).toBe(401);
+        expect(err.logDetail).not.toContain('SENTINEL');
+      }
+      gh.userMode = 'status-500';
+      expect((await status(client.authenticatedUser(token))).upstreamStatus).toBe(500);
+      gh.userMode = 'status-418';
+      expect((await status(client.authenticatedUser(token))).upstreamStatus).toBe(418);
+      gh.userMode = 'hang';
+      expect((await status(client.authenticatedUser(token))).upstreamStatus).toBeUndefined();
+    });
+
+    it('a second delete of the same grant finds the token dead', async () => {
       await client.deleteGrant(gh.clientId, gh.clientSecret, token);
-      expect(await client.deleteGrant(gh.clientId, gh.clientSecret, token)).toBe('already_gone');
+      expect(await client.deleteGrant(gh.clientId, gh.clientSecret, token)).toBe('token_refused');
     });
 
     it('anything else fails the revocation: 5xx, timeout, our own credentials refused', async () => {

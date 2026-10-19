@@ -11,6 +11,8 @@ export class AppError extends Error {
    * without quoting it (a library's text, a token's claims).
    */
   logDetail?: string;
+  /** The HTTP status an upstream (GitHub) answered, for the log only: a number, never a body. */
+  upstreamStatus?: number;
 
   constructor(
     readonly code: string,

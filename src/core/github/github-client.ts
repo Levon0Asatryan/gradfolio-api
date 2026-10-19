@@ -42,8 +42,13 @@ export interface GithubUser {
   login: string;
 }
 
-/** Whether a grant delete removed the grant now, or found none to remove. */
-export type RevokeResult = 'revoked' | 'already_gone';
+/**
+ * How a grant delete ended without failing: removed now (`revoked`), GitHub
+ * says there is none (`already_gone`), or GitHub refused the delete but also
+ * refuses the token itself (`token_refused`): the token is dead, which is what
+ * revocation is for.
+ */
+export type RevokeResult = 'revoked' | 'already_gone' | 'token_refused';
 
 /** The API version every request pins (GitHub's `X-GitHub-Api-Version`). */
 export const GITHUB_API_VERSION = '2022-11-28';
@@ -160,12 +165,13 @@ const userResponse = z.object({
 });
 
 /**
- * The status GitHub gives a grant delete for a grant that no longer exists.
- * **Unverified** against the real service (docs/modules/m7/plan.md §2.3, §2.1 step 6):
- * GitHub's documentation lists 422. Nothing else counts as gone: a 404 could
- * as well be a client id GitHub does not know, and reading that as "revoked"
- * would report a disconnect while the token stays alive. The tenant spike
- * records the real status, and this list follows it.
+ * The status GitHub documents for a grant delete when no grant exists (422);
+ * never seen from the real service. What was seen (production, 2026-10-19): for a
+ * token GitHub refuses (`GET /user` 401), the delete with valid client credentials
+ * answered **404**. A 404 is also what a client id GitHub does not know would get,
+ * and reading that as "revoked" would report a disconnect while the token stays
+ * alive, so a 4xx other than this list proves nothing alone: `deleteGrant` asks
+ * GitHub about the token itself and counts the grant gone only when that is a 401.
  */
 export const GRANT_ALREADY_GONE = [422] as const;
 
@@ -279,8 +285,33 @@ export class GithubClient {
     }
     if (res.status === 204) return 'revoked';
     if ((GRANT_ALREADY_GONE as readonly number[]).includes(res.status)) return 'already_gone';
-    // A 5xx may have been processed; any other answer says the grant stands.
-    throw new GithubRevokeFailedError(`DELETE grant ${res.status}`, res.status < 500);
+    // A 5xx may have been processed: the outcome is unknown.
+    if (res.status >= 500) {
+      throw new GithubRevokeFailedError(`DELETE grant ${res.status}`, false, res.status);
+    }
+    // Any other answer says the delete did not happen. If GitHub also refuses the
+    // token, there is nothing left to revoke; otherwise the grant stands.
+    const probe = await this.tokenStatus(token);
+    if (probe === 401) return 'token_refused';
+    throw new GithubRevokeFailedError(
+      `DELETE grant ${res.status}; token check ${probe ?? 'unanswered'}`,
+      true,
+      res.status,
+    );
+  }
+
+  /** GitHub's status for `GET /user` with the token, or null when it gave no answer. */
+  private async tokenStatus(token: GithubAccessToken): Promise<number | null> {
+    try {
+      const res = await this.send('user', {
+        method: 'GET',
+        headers: { authorization: `Bearer ${token.reveal()}` },
+      });
+      return res.status;
+    } catch (err) {
+      if (err instanceof GithubUnavailableError) return null;
+      throw err;
+    }
   }
 
   /**
@@ -491,7 +522,7 @@ export function rateLimitOf(headers: Headers): GithubRateLimit {
 
 /** The error for a response that is not the success the caller expected. */
 export function mapFailure(res: UpstreamResponse, nowMs: number = Date.now()): Error {
-  if (res.status === 401) return new GithubNotLinkedError('github 401');
+  if (res.status === 401) return new GithubNotLinkedError('github 401', 401);
   if (res.status === 403 || res.status === 429) {
     const exhausted = res.headers.get('x-ratelimit-remaining') === '0';
     if (exhausted || res.headers.has('retry-after')) {
@@ -500,5 +531,5 @@ export function mapFailure(res: UpstreamResponse, nowMs: number = Date.now()): E
       );
     }
   }
-  return new GithubUnavailableError(`github ${res.status}`);
+  return new GithubUnavailableError(`github ${res.status}`, res.status);
 }

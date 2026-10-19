@@ -14,6 +14,8 @@ export interface MappedError {
   body: ErrorResponse;
   /** The cause, for the log only. */
   logDetail: string;
+  /** The status an upstream answered, when the failure is one of its answers. */
+  upstreamStatus?: number;
   isServerFault: boolean;
   /** Headers the response must carry. */
   headers?: Readonly<Record<string, string>>;
@@ -103,6 +105,7 @@ export function toErrorResponse(err: unknown): MappedError {
       status: err.status,
       body,
       logDetail: err.logDetail ?? describeError(err),
+      ...(err.upstreamStatus === undefined ? {} : { upstreamStatus: err.upstreamStatus }),
       isServerFault: err.status >= 500,
       ...(err.headers ? { headers: err.headers } : {}),
     };

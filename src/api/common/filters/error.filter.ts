@@ -17,7 +17,8 @@ export class ErrorFilter implements ExceptionFilter {
     const res = http.getResponse<Response>();
     const req = http.getRequest<Request>();
 
-    const { status, body, logDetail, isServerFault, headers } = toErrorResponse(err);
+    const { status, body, logDetail, upstreamStatus, isServerFault, headers } =
+      toErrorResponse(err);
 
     const fields = {
       status,
@@ -26,6 +27,7 @@ export class ErrorFilter implements ExceptionFilter {
       // Path only: the query string can carry search terms or OAuth codes.
       path: requestUrlPath(req.url),
       cause: logDetail,
+      ...(upstreamStatus === undefined ? {} : { upstreamStatus }),
     };
 
     // Our fault or theirs decides the level: a 404 is not an incident, a 500

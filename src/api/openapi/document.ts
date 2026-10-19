@@ -522,8 +522,11 @@ function integrationOperations(): Operation[] {
         'When Auth0 already holds a GitHub identity for the caller (they sign in with GitHub, or ' +
         'linked it), GitHub confirms its token and the account is connected: `state: ' +
         'connected`. Otherwise `state: link_required` with a single-use nonce for a secondary ' +
-        'GitHub sign-in (see `link`). Public repositories only (D6). A connected GitHub counts ' +
-        'toward `verified`.',
+        'GitHub sign-in (see `link`); so is the case where GitHub refuses the token Auth0 holds ' +
+        '(revoked at GitHub, or stale) for a login that is not itself the GitHub one: a flag ' +
+        'left from that token is cleared first. A login that is the GitHub one answers 409 ' +
+        'GITHUB_NOT_LINKED (sign in with GitHub again). Public repositories only (D6). A ' +
+        'connected GitHub counts toward `verified`.',
       responses: {
         '200': { description: 'Connected, or a link is required', schema: connectResponseSchema },
         '409': error(
@@ -579,6 +582,10 @@ function integrationOperations(): Operation[] {
       description:
         'Revokes the GitHub app grant first (every token of it, including the one Auth0 holds); ' +
         'only once GitHub confirms, or there is nothing left to revoke, is GitHub disconnected. ' +
+        'A token GitHub itself refuses (`GET /user` answers 401) counts as revoked, whatever the ' +
+        'grant delete answered: the API holds no other token, and GitHub deletes a grant only ' +
+        'for a valid one. Any other authorization the student made at GitHub stays until they ' +
+        'remove it under Settings, Applications. ' +
         'A revocation GitHub refuses changes nothing (502): retry. One whose outcome is unknown ' +
         '(timeout, dropped connection, 5xx) also answers 502, but the grant may still be deleted: ' +
         'the card then shows not_connected and a retry answers 409 GITHUB_LINK_IN_PROGRESS until ' +
