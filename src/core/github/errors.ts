@@ -7,13 +7,14 @@ import { AppError } from '../errors/app-error.js';
 
 /** 409: GitHub refused the token (revoked, or the identity is gone at Auth0). */
 export class GithubNotLinkedError extends AppError {
-  constructor(cause: string) {
+  constructor(cause: string, upstreamStatus?: number) {
     super(
       'GITHUB_NOT_LINKED',
       'the GitHub account is no longer linked; sign in with GitHub again, then connect',
       409,
     );
     this.logDetail = `github not linked: ${cause}`;
+    this.upstreamStatus = upstreamStatus;
   }
 }
 
@@ -27,9 +28,10 @@ export class GithubRateLimitedError extends AppError {
 
 /** 502: GitHub failed, timed out, or answered something we do not expect. */
 export class GithubUnavailableError extends AppError {
-  constructor(cause: string) {
+  constructor(cause: string, upstreamStatus?: number) {
     super('GITHUB_UNAVAILABLE', 'GitHub could not be reached', 502);
     this.logDetail = `github unavailable: ${cause}`;
+    this.upstreamStatus = upstreamStatus;
   }
 }
 
@@ -42,7 +44,7 @@ export class GithubRevokeFailedError extends AppError {
    */
   readonly refused: boolean;
 
-  constructor(cause: string, refused = false) {
+  constructor(cause: string, refused = false, upstreamStatus?: number) {
     super(
       'GITHUB_REVOKE_FAILED',
       refused
@@ -53,5 +55,6 @@ export class GithubRevokeFailedError extends AppError {
     );
     this.refused = refused;
     this.logDetail = `github revoke failed: ${cause}`;
+    this.upstreamStatus = upstreamStatus;
   }
 }

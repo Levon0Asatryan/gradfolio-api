@@ -143,8 +143,9 @@ export class GithubConnectionService {
    * `POST /v1/me/integrations/github/connect`. Auth0 is asked whether a GitHub
    * identity is linked (the token's `identities` claim can be an hour stale);
    * if so, GitHub confirms the token and the flag is set. Otherwise a link
-   * nonce is issued, and a flag left from an identity that is gone at Auth0 is
-   * cleared (plan §2.3: a token fetch that finds no identity clears it).
+   * nonce is issued, and a flag left from an identity that is gone at Auth0, or
+   * whose token GitHub refuses, is cleared (plan §2.3: a token fetch that finds no
+   * identity clears it).
    */
   async connect(user: UserRow, identity: AccessTokenIdentity): Promise<ConnectResponse> {
     const gh = this.required();
@@ -161,7 +162,24 @@ export class GithubConnectionService {
       }
       return this.issueNonce(user.id);
     }
-    const ghUser = await this.githubUser(gh, user.auth0Id, found);
+    let ghUser: GithubUser;
+    try {
+      ghUser = await this.githubUser(gh, user.auth0Id, found);
+    } catch (err) {
+      if (!(err instanceof GithubNotLinkedError)) throw err;
+      // A login that is the GitHub one has no secondary sign-in to offer (Auth0
+      // refuses to link a user to itself): signing in again replaces the token.
+      if (user.auth0Id.startsWith('github|')) throw err;
+      // GitHub refuses the token Auth0 holds (revoked at GitHub, or stale): only a
+      // fresh GitHub sign-in replaces it. Answering 409 again would leave the
+      // student no way to start one, so a flag left from that token is cleared
+      // and the link is offered, as when the identity is gone.
+      this.logger.info({ userId: user.id }, 'github token refused at connect; link offered');
+      if (row?.status === 'connected') {
+        await this.markDisconnected(user.id, identity, versionOf(row));
+      }
+      return this.issueNonce(user.id);
+    }
     // Only onto the row as it was read: a disconnect that revoked this token
     // meanwhile must not be undone with it.
     await this.markConnected(user.id, ghUser, versionOf(row));

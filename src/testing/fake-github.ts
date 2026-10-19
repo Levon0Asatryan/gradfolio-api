@@ -366,13 +366,20 @@ export async function startFakeGithub(): Promise<FakeGithub> {
           await held.released;
         }
         const basic = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
-        if (decodeURIComponent(grant[1]!) !== clientId || req.headers.authorization !== basic) {
+        // A client id GitHub does not know is a 404 (as is a dead token, below).
+        if (decodeURIComponent(grant[1]!) !== clientId) {
+          return send(res, 404, { message: 'Not Found' });
+        }
+        if (req.headers.authorization !== basic) {
           return send(res, 401, { message: 'Requires authentication' });
         }
         if (state.grantStatus !== undefined) return send(res, state.grantStatus, { message: 'x' });
         const token = (body as { access_token?: unknown } | undefined)?.access_token;
+        // ASSUMPTION (production, 2026-10-19: Levon's refused token): a token GitHub no
+        // longer holds answers 404 here. The documented 422 stays reachable through
+        // `grantStatus`. Not verified for a token revoked at github.com by hand.
         if (typeof token !== 'string' || !state.tokens.has(token)) {
-          return send(res, 422, { message: 'Validation Failed' });
+          return send(res, 404, { message: 'Not Found' });
         }
         state.tokens.delete(token);
         state.revoked.push(token);
