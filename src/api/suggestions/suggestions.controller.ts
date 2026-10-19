@@ -50,8 +50,12 @@ export class SuggestionsController {
   @Post(':id/accept')
   @HttpCode(200)
   @RateBudget('integration')
-  accept(@CurrentUser() user: UserRow, @Param('id') id: string): Promise<ResolveResponse> {
-    return this.suggestions.accept(user, id);
+  accept(
+    @CurrentUser() user: UserRow,
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<ResolveResponse> {
+    return this.suggestions.accept(user, tokenOf(req), id);
   }
 
   @Post(':id/dismiss')

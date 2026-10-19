@@ -30,6 +30,8 @@ const ENV = (over: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv => ({
   RATE_LIMIT_IMPORT: '100',
   RATE_LIMIT_INTEGRATION: '100',
   SUGGESTIONS_MIN_INTERVAL_S: '0',
+  // These tests are about profile, link and skill suggestions: no repository is offered as new.
+  SUGGESTIONS_NEW_REPOS: '0',
   ...over,
 });
 
@@ -257,6 +259,7 @@ describe('accept and dismiss', () => {
       id: row!.id,
       status: 'accepted',
       applied: { field: 'skills', value: 'TypeScript' },
+      projectId: null,
     });
     expect(await skillsOf(http, alice)).toEqual(['Go', 'TypeScript']);
     // Idempotent: the list does not change.

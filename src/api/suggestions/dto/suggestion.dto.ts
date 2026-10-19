@@ -18,6 +18,8 @@ export const SUGGESTION_KINDS = [
   'profile.links.twitter',
   'linkedin.reimport',
   'skill.add',
+  'project.new',
+  'project.update',
 ] as const;
 export type SuggestionKind = (typeof SUGGESTION_KINDS)[number];
 
@@ -31,12 +33,15 @@ export const suggestionSchema = z
     status: z.enum(SUGGESTION_STATUSES),
     field: z.string().nullable().meta({
       description:
-        'The profile field a `profile.*` suggestion would change (`bio`, `links.github` …); null for a reminder.',
+        'The field an accept would change: a profile field for `profile.*` (`bio`, `links.github` …); `summary` (GitHub’s description) or `descriptionHtml` (the README) for `project.update`; null otherwise.',
     }),
     current: z.string().nullable().meta({
       description: 'The field’s value now (open suggestions only); null when empty.',
     }),
-    proposed: z.string().nullable().meta({ description: 'The value an accept would write.' }),
+    proposed: z.string().nullable().meta({
+      description:
+        'The value an accept would write. For `project.update` the new description, or the new README as sanitized HTML.',
+    }),
     mode: z.enum(['fill', 'replace']).nullable().meta({
       description: '`fill`: the field is empty now; `replace`: it holds a different value.',
     }),
@@ -55,6 +60,20 @@ export const suggestionSchema = z
           '`skill.add` only, as of when it was offered: how many of the student’s own public ' +
           'repositories and projects show the skill. `total` counts a project imported from a ' +
           'repository once.',
+      }),
+    repository: z
+      .object({ id: z.number().int(), fullName: z.string() })
+      .nullable()
+      .meta({ description: '`project.new` and `project.update`: the GitHub repository.' }),
+    project: z
+      .object({
+        id: z.string().nullable(),
+        title: z.string(),
+      })
+      .nullable()
+      .meta({
+        description:
+          '`project.update`: the project it would update, with its title when it was offered. `project.new`: `id` null until accepted (then the draft’s id), `title` the repository’s name.',
       }),
     lastSyncedAt: z.string().nullable().meta({
       description: '`linkedin.reimport` only: the last confirmed export import, ISO 8601.',
@@ -110,10 +129,14 @@ export const resolveResponseSchema = z
   .object({
     id: z.string(),
     status: z.enum(['accepted', 'dismissed']),
-    applied: z
-      .object({ field: z.string(), value: z.string().nullable() })
-      .nullable()
-      .meta({ description: 'What an accept wrote; null for a dismiss or a reminder.' }),
+    applied: z.object({ field: z.string(), value: z.string().nullable() }).nullable().meta({
+      description:
+        'What an accept wrote; null for a dismiss or a reminder. A project suggestion names the field (`project` for a new draft, `summary`, `descriptionHtml`) with `value` null: see `projectId`.',
+    }),
+    projectId: z.string().nullable().meta({
+      description:
+        'The draft an accepted `project.new` created, or the project an accepted `project.update` changed; null otherwise.',
+    }),
   })
   .meta({ id: 'SuggestionResolved' });
 export type ResolveResponse = z.infer<typeof resolveResponseSchema>;

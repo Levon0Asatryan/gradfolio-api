@@ -2,7 +2,10 @@ import type { Transaction } from 'kysely';
 import { newId } from '../../../core/db/ids.js';
 import { toJsonColumn } from '../../../core/db/json.js';
 import type { DB } from '../../../core/db/types.generated.js';
-import { notificationParams } from '../../../core/validation/json-shapes.js';
+import {
+  notificationParams,
+  suggestionsNotificationParams,
+} from '../../../core/validation/json-shapes.js';
 
 export type TeamNotificationType = 'team_invite' | 'team_accepted' | 'team_rejected' | 'team_left';
 
@@ -48,6 +51,34 @@ export async function insertTeamNotification(
         projectId: n.project.id,
         projectTitle: n.project.title,
         role: n.role ?? null,
+      }),
+    })
+    .execute();
+}
+
+/**
+ * One notification for a refresh that opened `count` repository suggestions
+ * (docs/modules/m7/plan.md §6.6e), written **inside the refresh's transaction**: it commits
+ * with the suggestions it reports, so a suggestion is announced exactly once. The
+ * text is the client's: it renders `type` + `params`.
+ */
+export async function insertSuggestionsNotification(
+  trx: Transaction<DB>,
+  userId: string,
+  summary: { count: number; kinds: readonly string[] },
+): Promise<void> {
+  await trx
+    .insertInto('notifications')
+    .values({
+      id: newId(),
+      userId,
+      type: 'suggestions_available',
+      title: 'Suggestions available',
+      referenceId: null,
+      referenceType: null,
+      params: toJsonColumn(suggestionsNotificationParams, {
+        count: summary.count,
+        kinds: [...summary.kinds],
       }),
     })
     .execute();

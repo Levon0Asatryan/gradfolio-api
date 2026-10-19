@@ -34,13 +34,21 @@ export type LinkList = { label: string; url: string }[];
 export type TranslationParams = Record<string, string | number>;
 
 /** What a notification renders from (docs/modules/m5/plan.md §5.1): names snapshotted when it was written. */
-export interface NotificationParams {
+export interface TeamNotificationParams {
   actorId?: string | null;
   actorName: string;
   projectId: string;
   projectTitle: string;
   role?: string | null;
 }
+
+/** `suggestions_available` (docs/modules/m7/plan.md §6.6e): how many suggestions a refresh opened, and of which kinds. */
+export interface SuggestionsNotificationParams {
+  count: number;
+  kinds: string[];
+}
+
+export type NotificationParams = TeamNotificationParams | SuggestionsNotificationParams;
 
 /**
  * `project_github_imports.snapshot` (docs/modules/m7/plan.md §3.5): per synced field, the

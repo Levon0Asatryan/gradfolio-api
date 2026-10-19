@@ -6,6 +6,7 @@ export const NOTIFICATION_TYPES = [
   'team_accepted',
   'team_rejected',
   'team_left',
+  'suggestions_available',
   'general',
 ] as const;
 
@@ -28,6 +29,21 @@ export const notificationParamsOutSchema = z
       'Names saved when the notification was written, so it still reads after the project or the person is gone. Render the text from `type` and these.',
   });
 
+export const suggestionsParamsOutSchema = z
+  .object({
+    count: z.number().int().meta({
+      description: 'How many suggestions the refresh opened (still open when it was written).',
+    }),
+    kinds: z.array(z.string()).meta({
+      description: 'The distinct suggestion kinds among them (`project.new`, `project.update`).',
+    }),
+  })
+  .meta({
+    id: 'SuggestionsNotificationParams',
+    description:
+      'Of a `suggestions_available` notification: render “N suggestions” from `count`. The list is `GET /v1/me/suggestions`.',
+  });
+
 export const notificationInviteSchema = z
   .object({
     status: z.enum(INVITE_STATUSES).meta({
@@ -44,8 +60,9 @@ export const notificationSchema = z
     title: z
       .string()
       .meta({ description: 'English fallback text. Prefer rendering `type` + `params`.' }),
-    params: notificationParamsOutSchema.nullable().meta({
-      description: 'null on a notification written before params existed: show `title`.',
+    params: z.union([notificationParamsOutSchema, suggestionsParamsOutSchema]).nullable().meta({
+      description:
+        'Team notifications: `NotificationParams`. `suggestions_available`: `SuggestionsNotificationParams`. null on a notification written before params existed: show `title`.',
     }),
     read: z.boolean(),
     createdAt: z.string().meta({ description: 'ISO 8601, UTC.' }),

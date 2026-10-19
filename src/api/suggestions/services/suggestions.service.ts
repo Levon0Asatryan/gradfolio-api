@@ -7,14 +7,20 @@ import { inTransaction } from '../../../core/db/transaction.js';
 import { lockUser } from '../../../core/db/user-lock.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../core/errors/app-error.js';
 import { GithubNotLinkedError } from '../../../core/github/errors.js';
-import type { GithubProfile, GithubSocialAccount } from '../../../core/github/github-client.js';
+import type {
+  GithubProfile,
+  GithubRepo,
+  GithubSocialAccount,
+} from '../../../core/github/github-client.js';
 import type { GithubAccessToken } from '../../../core/github/github-access-token.js';
 import type { GithubClient } from '../../../core/github/github-client.js';
 import { SkillsService } from '../../profiles/services/skills.service.js';
 import { decodeTimeCursor, encodeTimeCursor } from '../../common/utils/time-cursor.js';
 import { updateProfileSchema } from '../../profiles/dto/profile.dto.js';
 import { ProfileService, type AvatarMemo } from '../../profiles/services/profile.service.js';
+import { importedProjectIds } from '../../integrations/repositories/github-import.repository.js';
 import { GithubConnectionService } from '../../integrations/services/github-connection.service.js';
+import { insertSuggestionsNotification } from '../../notifications/repositories/notification-write.repository.js';
 import type { UserRow } from '../../users/repositories/user.repository.js';
 import type {
   RefreshResponse,
@@ -24,6 +30,7 @@ import type {
   SuggestionQuery,
   SuggestionView,
 } from '../dto/suggestion.dto.js';
+import { lockProjectStates } from '../repositories/project-change.repository.js';
 import {
   claimRefresh,
   currentProfile,
@@ -56,6 +63,18 @@ import {
   type ProfileNow,
   quarterOf,
 } from './profile-rules.js';
+import {
+  isOffered,
+  isUpdateStale,
+  newRepoRows,
+  PROJECT_FIELDS,
+  updateRows,
+  type WantedProjectRow,
+} from './project-rules.js';
+import {
+  ProjectSuggestionsService,
+  type UpstreamByProject,
+} from './project-suggestions.service.js';
 import { type EvidenceItem, skillKey, skillsToOffer } from './skill-rules.js';
 
 const CURSOR_SCOPE = 'sug';
@@ -67,6 +86,14 @@ interface Row {
   source: 'github' | 'linkedin';
   dedupeKey: string;
   payload: Record<string, unknown>;
+  targetId?: string | null;
+}
+
+/** The newest page of the student's repositories as read just now, and whether it was all of them. */
+interface Listed {
+  page: GithubRepo[];
+  complete: boolean;
+  githubUserId: number;
 }
 
 /** GitHub's social accounts, read per refresh; `undefined`: GitHub was not asked. */
@@ -130,6 +157,7 @@ export class SuggestionsService {
     private readonly connection: GithubConnectionService,
     private readonly profiles: ProfileService,
     private readonly skills: SkillsService,
+    private readonly changes: ProjectSuggestionsService,
     @Inject(APP_CONFIG) private readonly cfg: AppConfig,
   ) {}
 
@@ -179,6 +207,8 @@ export class SuggestionsService {
     let fresh: { profile: GithubProfile; etag: string | null } | undefined;
     let repoEvidence: RepoEvidence;
     let social: SocialAccounts;
+    let listed: Listed | undefined;
+    let upstream: UpstreamByProject | undefined;
 
     if (state?.status === 'connected') {
       if (!(await claimRefresh(this.dbs.db, user.id, floor))) {
@@ -194,7 +224,10 @@ export class SuggestionsService {
           try {
             read = await gh.github.getProfile(token, usable ? state.etag : null);
             try {
-              repoEvidence = await this.readRepoEvidence(gh.github, token, githubUserId);
+              const repos = await this.readRepoEvidence(gh.github, token, githubUserId);
+              repoEvidence = repos.evidence;
+              listed = { ...repos, githubUserId: Number(githubUserId) };
+              upstream = await this.changes.readUpstream(gh.github, token, user.id, repos.page);
               social = (await gh.github.listSocialAccounts(token)).accounts;
             } catch (err) {
               // The profile was read a moment ago: a token refused now was revoked in
@@ -228,6 +261,8 @@ export class SuggestionsService {
       fresh,
       repoEvidence,
       social,
+      listed,
+      upstream,
     });
     if (outcome.githubDropped === 'gone') github = 'not_connected';
     // Connected again, as another connection: nothing of this read was applied; try again.
@@ -248,13 +283,14 @@ export class SuggestionsService {
    * The student's own public repositories (not forks) as evidence for skills:
    * one page of the newest 100, each with its primary language and topics, and
    * for the SUGGESTIONS_LANGUAGE_REPOS newest also GitHub's list of languages.
-   * At most 2 + that many calls (the profile read is the first).
+   * At most 2 + that many calls (the profile read is the first). The page itself
+   * is returned too, for the repository-change suggestions.
    */
   private async readRepoEvidence(
     github: GithubClient,
     token: GithubAccessToken,
     githubUserId: string,
-  ): Promise<EvidenceItem[]> {
+  ): Promise<{ evidence: EvidenceItem[]; page: GithubRepo[]; complete: boolean }> {
     const page = await github.listRepos(token, { page: 1, perPage: REPO_PAGE });
     const own = page.items.filter((r) => !r.fork && r.ownerId === Number(githubUserId));
     const items: EvidenceItem[] = [];
@@ -270,7 +306,7 @@ export class SuggestionsService {
         names: [...(repo.language === null ? [] : [repo.language]), ...languages, ...repo.topics],
       });
     }
-    return items;
+    return { evidence: items, page: page.items, complete: page.nextPage === null };
   }
 
   /**
@@ -292,6 +328,8 @@ export class SuggestionsService {
       fresh: { profile: GithubProfile; etag: string | null } | undefined;
       repoEvidence: RepoEvidence;
       social: SocialAccounts;
+      listed: Listed | undefined;
+      upstream: UpstreamByProject | undefined;
     },
   ): Promise<{ created: number; githubDropped: false | 'gone' | 'replaced' }> {
     const userId = user.id;
@@ -349,20 +387,64 @@ export class SuggestionsService {
         });
       }
 
+      // Repository changes (plan §6.6e): decided from the projects as they are under
+      // their locks, whatever was read before them.
+      const open = await openOfSources(trx, userId, ['github', 'linkedin']);
+      const openNew = open.filter((r) => r.kind === 'project.new');
+      const openUpdates = open.filter((r) => r.kind === 'project.update');
+      const states = await lockProjectStates(trx, userId, [
+        ...(githubOk ? [...(read.upstream?.keys() ?? [])] : []),
+        ...openUpdates.flatMap((r) => (r.targetId === null ? [] : [r.targetId])),
+      ]);
+      const repoIdOf = (r: SuggestionRow) => payloadOf(r).repoId;
+      const importedNow = await importedProjectIds(trx, userId, [
+        ...(githubOk ? (read.listed?.page.map((r) => r.id) ?? []) : []),
+        ...openNew.flatMap((r) => {
+          const id = repoIdOf(r);
+          return typeof id === 'number' ? [id] : [];
+        }),
+      ]);
+      const projectRows: WantedProjectRow[] = [];
+      if (githubOk && read.listed !== undefined) {
+        projectRows.push(
+          ...newRepoRows(
+            read.listed.page,
+            read.listed.githubUserId,
+            new Set(importedNow.keys()),
+            this.cfg.SUGGESTIONS_NEW_REPOS,
+          ),
+        );
+      }
+      if (githubOk && read.upstream !== undefined) {
+        projectRows.push(...updateRows(states, read.upstream));
+      }
+      for (const w of projectRows) {
+        wanted.push({
+          kind: w.kind,
+          source: 'github',
+          dedupeKey: w.dedupeKey,
+          payload: w.payload,
+          targetId: w.targetId,
+        });
+      }
+
       const known = await statusesOfKeys(
         trx,
         userId,
         wanted.map((w) => w.dedupeKey),
       );
       let created = 0;
+      const announced: { id: string; kind: SuggestionKind }[] = [];
       for (const w of wanted) {
         if (known.has(w.dedupeKey)) continue;
-        await insertOpen(trx, userId, w);
+        const id = await insertOpen(trx, userId, w);
         created++;
+        if (w.kind === 'project.new' || w.kind === 'project.update') {
+          announced.push({ id, kind: w.kind });
+        }
       }
 
       const wantedKeys = new Set(wanted.map((w) => w.dedupeKey));
-      const open = await openOfSources(trx, userId, ['github', 'linkedin']);
       // Connected but not read just now (inside the floor), an open skill is kept unless
       // the profile has it now: what the repositories show is only known after a read.
       const haveKeys = new Set(have.map(skillKey));
@@ -378,13 +460,41 @@ export class SuggestionsService {
           currentOf(profile, field as ProfileField) !== null
         );
       };
+      const listedById = new Map(read.listed?.page.map((r) => [r.id, r]));
+      // A new repository stays offered until it is imported or is no longer the student's
+      // own work; one that fell out of the newest few is not withdrawn for that.
+      const newGone = (r: SuggestionRow) => {
+        const repoId = repoIdOf(r);
+        if (typeof repoId !== 'number' || !githubOk || importedNow.has(repoId)) return true;
+        if (read.listed === undefined) return false;
+        const repo = listedById.get(repoId);
+        return repo === undefined
+          ? read.listed.complete
+          : !isOffered(repo, read.listed.githubUserId);
+      };
+      // An update stays offered until it cannot be applied, or GitHub was read just now
+      // and no longer differs from what the project holds.
+      const updateGone = (r: SuggestionRow) => {
+        if (!githubOk) return true;
+        const projectId = r.targetId;
+        if (isUpdateStale(payloadOf(r), projectId === null ? undefined : states.get(projectId))) {
+          return true;
+        }
+        const field = PROJECT_FIELDS.find((f) => f === payloadOf(r).field);
+        const seen = projectId === null ? undefined : read.upstream?.get(projectId)?.values;
+        return field !== undefined && seen?.[field] !== undefined;
+      };
       const gone = (r: SuggestionRow) =>
         !wantedKeys.has(r.dedupeKey) &&
         (r.kind === 'skill.add'
           ? repositoriesKnown || haveKeys.has(skillKey(skillOf(payloadOf(r)) ?? ''))
           : isSocialKind(r.kind)
             ? socialKnown || socialFieldFilled(r)
-            : true);
+            : r.kind === 'project.new'
+              ? newGone(r)
+              : r.kind === 'project.update'
+                ? updateGone(r)
+                : true);
       await supersede(
         trx,
         userId,
@@ -392,6 +502,7 @@ export class SuggestionsService {
       );
 
       const total = await openCount(trx, userId);
+      const capped = new Set<string>();
       if (total > this.cfg.SUGGESTIONS_MAX_OPEN) {
         const extra = await oldestOpen(trx, userId, total - this.cfg.SUGGESTIONS_MAX_OPEN);
         await supersede(
@@ -399,6 +510,17 @@ export class SuggestionsService {
           userId,
           extra.map((r) => r.id),
         );
+        for (const r of extra) capped.add(r.id);
+      }
+      // One notification for the batch, in this transaction: it commits with the
+      // suggestions it announces, so each is announced once. Stars, forks and the
+      // other kinds are not announced here.
+      const open2 = announced.filter((a) => !capped.has(a.id));
+      if (open2.length > 0) {
+        await insertSuggestionsNotification(trx, userId, {
+          count: open2.length,
+          kinds: [...new Set(open2.map((a) => a.kind))].sort(),
+        });
       }
       return { created, githubDropped };
     });
@@ -439,18 +561,31 @@ export class SuggestionsService {
   }
 
   /** `POST /v1/me/suggestions/{id}/accept`. */
-  async accept(user: UserRow, id: string): Promise<ResolveResponse> {
+  async accept(user: UserRow, identity: AccessTokenIdentity, id: string): Promise<ResolveResponse> {
     const memo: AvatarMemo = {};
     type Outcome =
-      | { kind: 'done'; applied: ResolveResponse['applied']; released: string[] }
+      | {
+          kind: 'done';
+          applied: ResolveResponse['applied'];
+          released: string[];
+          projectId?: string | null;
+        }
       | { kind: 'invalid' }
-      | { kind: 'stale'; what: 'skill' | 'link' };
-    const outcome = await inTransaction(this.dbs.db, async (trx): Promise<Outcome> => {
+      | { kind: 'limit' }
+      | { kind: 'stale'; what: 'skill' | 'link' | 'project' }
+      /** A `project.new`: imported after this transaction, with no lock held. */
+      | { kind: 'import'; row: SuggestionRow };
+    let outcome: Outcome = await inTransaction(this.dbs.db, async (trx): Promise<Outcome> => {
       await lockUser(trx, user.id);
       const row = await lockSuggestion(trx, user.id, id);
       if (row === undefined) throw new NotFoundError('suggestion');
       if (row.status === 'accepted') {
-        return { kind: 'done', applied: this.applied(row), released: [] };
+        return {
+          kind: 'done',
+          applied: this.applied(row),
+          released: [],
+          projectId: this.changes.projectIdOf(row),
+        };
       }
       if (row.status !== 'open') {
         throw new ConflictError('SUGGESTION_RESOLVED', 'this suggestion is no longer open');
@@ -458,6 +593,15 @@ export class SuggestionsService {
       if (row.kind === 'linkedin.reimport') {
         await resolve(trx, user.id, id, 'accepted');
         return { kind: 'done', applied: null, released: [] };
+      }
+      if (row.kind === 'project.new') return { kind: 'import', row };
+      if (row.kind === 'project.update') {
+        const done = await this.changes.applyUpdateIn(trx, user, row);
+        return done.kind === 'done'
+          ? { kind: 'done', applied: done.applied, released: [], projectId: done.projectId }
+          : done.kind === 'stale'
+            ? { kind: 'stale', what: 'project' }
+            : { kind: done.kind };
       }
       if (row.kind === 'skill.add') {
         const skill = skillOf(payloadOf(row)) ?? '';
@@ -499,19 +643,40 @@ export class SuggestionsService {
       await resolve(trx, user.id, id, 'accepted');
       return { kind: 'done', applied: { field, value: value as string }, released };
     });
+    if (outcome.kind === 'import') {
+      const imported = await this.changes.acceptNew(user, identity, outcome.row);
+      outcome =
+        imported.kind === 'done'
+          ? { kind: 'done', applied: imported.applied, released: [], projectId: imported.projectId }
+          : imported.kind === 'stale'
+            ? { kind: 'stale', what: 'project' }
+            : { kind: imported.kind };
+    }
     if (outcome.kind === 'invalid') {
       throw new ConflictError('SUGGESTION_INVALID', 'this value can no longer be written');
+    }
+    if (outcome.kind === 'limit') {
+      throw new ConflictError('LIMIT_REACHED', 'the maximum number of projects is reached');
     }
     if (outcome.kind === 'stale') {
       throw new ConflictError(
         'SUGGESTION_STALE',
         outcome.what === 'skill'
           ? 'this skill is already on the profile'
-          : 'this link is already set on the profile',
+          : outcome.what === 'link'
+            ? 'this link is already set on the profile'
+            : 'the project or the repository changed since this was suggested',
       );
     }
+    // Only a `done` outcome is left; `import` was turned into one of the others above.
+    if (outcome.kind !== 'done') throw new Error('accept ended without an answer');
     await this.profiles.releaseFiles(outcome.released);
-    return { id, status: 'accepted', applied: outcome.applied };
+    return {
+      id,
+      status: 'accepted',
+      applied: outcome.applied,
+      projectId: outcome.projectId ?? null,
+    };
   }
 
   /** `POST /v1/me/suggestions/{id}/dismiss`: remembered by its key until the value changes. */
@@ -525,10 +690,13 @@ export class SuggestionsService {
       }
       await resolve(trx, user.id, id, 'dismissed');
     });
-    return { id, status: 'dismissed', applied: null };
+    return { id, status: 'dismissed', applied: null, projectId: null };
   }
 
   private applied(row: SuggestionRow): ResolveResponse['applied'] {
+    if (row.kind === 'project.new' || row.kind === 'project.update') {
+      return this.changes.appliedOf(row);
+    }
     if (row.kind === 'skill.add') {
       const skill = payloadOf(row).skill;
       return typeof skill === 'string' ? { field: 'skills', value: skill } : null;
@@ -541,20 +709,34 @@ export class SuggestionsService {
     const p = payloadOf(row) as { field?: string; value?: string; mode?: 'fill' | 'replace' };
     const isProfile = row.kind.startsWith('profile.');
     const isSkill = row.kind === 'skill.add';
+    const isUpdate = row.kind === 'project.update';
+    const isNew = row.kind === 'project.new';
+    const stored = payloadOf(row);
+    const text = (v: unknown) => (typeof v === 'string' ? v : null);
+    const repoId = stored.repoId;
     return {
       id: row.id,
       kind: row.kind as SuggestionKind,
       source: row.source,
       status: row.status,
-      field: isProfile ? (p.field ?? null) : null,
+      field: isProfile || isUpdate ? (p.field ?? null) : null,
       current:
         isProfile && row.status === 'open' && p.field !== undefined
           ? currentOf(profileNow(user), p.field as ProfileField)
           : null,
-      proposed: isProfile ? (p.value ?? null) : null,
+      proposed: isProfile || isUpdate ? (p.value ?? null) : null,
       mode: isProfile ? (p.mode ?? null) : null,
       skill: isSkill ? skillOf(payloadOf(row)) : null,
       evidence: isSkill ? evidenceOf(payloadOf(row)) : null,
+      repository:
+        (isNew || isUpdate) && typeof repoId === 'number'
+          ? { id: repoId, fullName: text(stored.fullName) ?? '' }
+          : null,
+      project: isUpdate
+        ? { id: row.targetId, title: text(stored.title) ?? '' }
+        : isNew
+          ? { id: text(stored.projectId), title: text(stored.name) ?? '' }
+          : null,
       lastSyncedAt:
         row.kind === 'linkedin.reimport'
           ? ((payloadOf(row) as { lastSyncedAt?: string | null }).lastSyncedAt ?? null)

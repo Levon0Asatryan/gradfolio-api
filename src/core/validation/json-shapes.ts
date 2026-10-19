@@ -50,6 +50,12 @@ export const notificationParams = z.strictObject({
   role: z.string().max(255).nullish(),
 });
 
+/** `NotificationParams` of a `suggestions_available` notification. */
+export const suggestionsNotificationParams = z.strictObject({
+  count: z.number().int().min(1).max(100_000),
+  kinds: z.array(z.string().min(1).max(40)).min(1).max(20),
+});
+
 /** `GithubImportSnapshot`: project_github_imports.snapshot, a SHA-256 (hex) per synced field. */
 export const githubImportSnapshot = z.record(z.string(), z.string().regex(/^[0-9a-f]{64}$/));
 
