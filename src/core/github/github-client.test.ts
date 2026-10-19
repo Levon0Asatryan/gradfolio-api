@@ -279,6 +279,54 @@ describe('GithubClient', () => {
       await expect(client.listSocialAccounts(bad)).rejects.toBeInstanceOf(GithubNotLinkedError);
     });
 
+    it('asks only whether a verified address matches; the addresses never leave the client', async () => {
+      gh.emails.set(583231, [
+        { email: 'unverified@polytechnic.am', verified: false },
+        { email: 'other@example.com', verified: true },
+      ]);
+      const seen: string[] = [];
+      const isPoly = (a: string) => {
+        seen.push(a);
+        return a.endsWith('@polytechnic.am');
+      };
+      // The matching address is unverified: it is not even offered to the predicate.
+      expect(await client.hasVerifiedEmail(token, isPoly)).toBe(false);
+      expect(seen).toEqual(['other@example.com']);
+      gh.emails.get(583231)!.push({ email: 'student@polytechnic.am', verified: true });
+      expect(await client.hasVerifiedEmail(token, isPoly)).toBe(true);
+      expect(gh.requests.at(-1)!.path).toBe('/user/emails');
+    });
+
+    it('an email read: no scope is null; a failure or a bad body is an error that names no address', async () => {
+      gh.emails.set(583231, [{ email: 'student@polytechnic.am', verified: true }]);
+      gh.emailsMode = 'no-scope';
+      expect(await client.hasVerifiedEmail(token, () => true)).toBeNull();
+      gh.emailsMode = 'status-500';
+      await expect(client.hasVerifiedEmail(token, () => true)).rejects.toBeInstanceOf(
+        GithubUnavailableError,
+      );
+      gh.emailsMode = 'bad-body';
+      const err = await client.hasVerifiedEmail(token, () => true).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(GithubUnavailableError);
+      expect(JSON.stringify(err)).not.toContain('polytechnic');
+      expect((err as Error).message).not.toContain('polytechnic');
+      gh.emailsMode = 'ok';
+      const bad = new GithubAccessToken('not-a-token');
+      await expect(client.hasVerifiedEmail(bad, () => true)).rejects.toBeInstanceOf(
+        GithubNotLinkedError,
+      );
+    });
+
+    it('lists public organisation logins, lower-cased; a login of an odd shape is refused', async () => {
+      gh.orgs.set('ani-p', ['Poly-Club', 'other']);
+      expect(await client.listPublicOrgLogins(token, 'ani-p')).toEqual(['poly-club', 'other']);
+      expect(gh.requests.at(-1)!.path).toBe('/users/ani-p/orgs');
+      expect(await client.listPublicOrgLogins(token, 'nobody')).toEqual([]);
+      await expect(client.listPublicOrgLogins(token, '../user')).rejects.toBeInstanceOf(
+        GithubUnavailableError,
+      );
+    });
+
     it('reads a repository by integer id; 404 is null; a limit or failure is an error', async () => {
       expect((await client.getRepo(token, 2)).repo).toMatchObject({ id: 2, defaultBranch: 'main' });
       expect((await client.getRepo(token, 99)).repo).toBeNull();

@@ -151,6 +151,14 @@ const socialAccountsResponse = z.array(
   z.object({ provider: z.string().min(1).max(100), url: z.string().max(2000) }),
 );
 
+/**
+ * `GET /user/emails`. Only the two fields the comparison needs are read; an address
+ * is never kept past it (`hasVerifiedEmail`).
+ */
+const emailsResponse = z.array(z.object({ email: z.string().max(320), verified: z.boolean() }));
+
+const orgsResponse = z.array(z.object({ login: z.string().regex(NAME) }));
+
 /** A README as GitHub rendered it, with where it lives in the repository. */
 export interface GithubReadme {
   html: string;
@@ -253,6 +261,46 @@ export class GithubClient {
     const parsed = socialAccountsResponse.safeParse(res.body);
     if (!parsed.success) throw new GithubUnavailableError('GET social_accounts bad body');
     return { accounts: parsed.data, rateLimit };
+  }
+
+  /**
+   * `GET /user/emails`, asked one question: does a **verified** address satisfy
+   * `matches`? Unverified addresses are never offered to it. The addresses stay inside
+   * this method: they are compared and dropped, never returned, stored, logged or put in
+   * an error (a bad body is reported without its content). `null`: GitHub does not
+   * show the emails to this token (403/404: the `user:email` scope is missing), which is
+   * no evidence either way.
+   */
+  async hasVerifiedEmail(
+    token: GithubAccessToken,
+    matches: (address: string) => boolean,
+  ): Promise<boolean | null> {
+    const res = await this.send('user/emails?per_page=100', {
+      method: 'GET',
+      headers: { authorization: `Bearer ${token.reveal()}` },
+    });
+    if (res.status === 403 && !isRateLimited(res)) return null;
+    if (res.status === 404) return null;
+    if (res.status !== 200) throw mapFailure(res);
+    const parsed = emailsResponse.safeParse(res.body);
+    if (!parsed.success) throw new GithubUnavailableError('GET emails bad body');
+    return parsed.data.some((e) => e.verified && matches(e.email));
+  }
+
+  /**
+   * `GET /users/{login}/orgs`: the organisations the account shows publicly (no scope
+   * needed), as logins, lower-cased. The first 100: a student is in a handful.
+   */
+  async listPublicOrgLogins(token: GithubAccessToken, login: string): Promise<string[]> {
+    if (!NAME.test(login)) throw new GithubUnavailableError('orgs for a login of an odd shape');
+    const res = await this.send(`users/${login}/orgs?per_page=100`, {
+      method: 'GET',
+      headers: { authorization: `Bearer ${token.reveal()}` },
+    });
+    if (res.status !== 200) throw mapFailure(res);
+    const parsed = orgsResponse.safeParse(res.body);
+    if (!parsed.success) throw new GithubUnavailableError('GET orgs bad body');
+    return parsed.data.map((o) => o.login.toLowerCase());
   }
 
   /**
@@ -521,6 +569,10 @@ export function rateLimitOf(headers: Headers): GithubRateLimit {
 }
 
 /** The error for a response that is not the success the caller expected. */
+/** A 403 that GitHub sent because of the rate limit (the same test `mapFailure` makes). */
+const isRateLimited = (res: UpstreamResponse): boolean =>
+  res.headers.get('x-ratelimit-remaining') === '0' || res.headers.has('retry-after');
+
 export function mapFailure(res: UpstreamResponse, nowMs: number = Date.now()): Error {
   if (res.status === 401) return new GithubNotLinkedError('github 401', 401);
   if (res.status === 403 || res.status === 429) {
