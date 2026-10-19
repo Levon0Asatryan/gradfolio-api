@@ -1,18 +1,19 @@
 # M7-T25: Education and organisation suggestions from verified emails and orgs
 
-**Repo:** gradfolio-api · **Depends on:** queue M7-T10 (the NPUA mail domains) · **Tracker:** 7.13 (proposed) · **Size:** one PR
-**Status:** blocked until Levon gives the domains.
+**Repo:** gradfolio-api · **Depends on:** — (the domain arrived, queue M7-T10 done) · **Tracker:** 7.13 (proposed) · **Size:** one PR
+**Status:** ready. Levon gave the domain on 2026-10-19: every university address ends in `polytechnic.am`.
 
 ## Context
 
 GitHub exposes `GET /user/emails` (the connection already has the Email scope) and
 `GET /users/{login}/orgs` (public orgs, no scope). A verified address on a university
 domain is evidence of study there. Plan §6 and §14. Config `UNIVERSITY_DOMAINS` is
-designed but empty.
+designed but empty; production gets `polytechnic.am` after the merge (Cloud Run env var, the
+module chat sets it with Levon's OK).
 
 ## Goal
 
-A student with a verified `…@npua.am`-style address is offered an education entry; a
+A student with a verified `…@polytechnic.am` address is offered an education entry; a
 public organisation matching a configured list is offered as experience or education.
 
 ## Scope
@@ -25,7 +26,12 @@ returned).
 
 ## Decisions
 
-**Levon decides:** the domain list (queue M7-T10); whether organisations are in or out.
+Made (Levon, 2026-10-19): `UNIVERSITY_DOMAINS=polytechnic.am` (a domain matches itself and any
+subdomain, compared case-insensitively on the part after the last `@`; never a suffix trick such
+as `evilpolytechnic.am`, which must NOT match: test it). The institution name offered is
+"National Polytechnic University of Armenia" (a config value, `UNIVERSITY_NAME`).
+Organisations: **in, but only for a configured list** (`UNIVERSITY_ORGS`, default empty, so no
+organisation is offered until Levon names one). **Levon decides:** the organisation names, later.
 
 ## Acceptance
 

@@ -45,7 +45,7 @@ finding. The findings were re-landed in #104, #123 and task M7-T30.
 **Status legend:** `todo` (not started), `in progress` (a task chat is working on it),
 `review` (PR open), `done` (merged and deployed), `blocked` (waiting on something that is
 not a task; the Depends column says what). The module chat updates this table in a small
-docs PR whenever a task changes state. **Last updated: 2026-10-19** (done: T20–T24, T27, T28, T30, T31; in progress: wave 1 = T29, T34, T36; free: T32, T33, T35, T50, T52; blocked: T25, T40–T43, T51).
+docs PR whenever a task changes state. **Last updated: 2026-10-19** (done: T20–T24, T27, T28, T30, T31; in progress: wave 1 = T29, T34, T36; free: T32, T33, T35, T50, T52; blocked: T40–T43, T51).
 
 The **Status** column is the status of record. **Depends on** lists tasks that must be
 **merged** first. Task IDs start at T20 because **M7-T1 to M7-T13 are Levon's queue rows**
@@ -59,7 +59,7 @@ brief, "queue M7-T1" always means a queue row.
 | M7-T22 | Repo-change suggestions and a notification (d2)                             | api     | T20               | 7.13    | done        | [T22](tasks/M7-T22-repo-change-suggestions.md)     |
 | M7-T23 | Deletion tombstone: precondition of `AUTH0_DELETE_USERS`                    | api     | —                 | 7.2     | done        | [T23](tasks/M7-T23-deletion-tombstone.md)          |
 | M7-T24 | Startup check: log which of the five GitHub settings is missing             | api     | —                 | 7.2     | done        | [T24](tasks/M7-T24-startup-check.md)               |
-| M7-T25 | Education and organisation suggestions from verified emails and orgs        | api     | queue M7-T10      | 7.13    | blocked     | [T25](tasks/M7-T25-education-suggestions.md)       |
+| M7-T25 | Education and organisation suggestions from verified emails and orgs        | api     | —                 | 7.13    | todo        | [T25](tasks/M7-T25-education-suggestions.md)       |
 | M7-T27 | Stuck GitHub connection: refused token, Disconnect cannot finish            | api     | —                 | 7.2     | done        | [T27](tasks/M7-T27-stuck-github-connection.md)     |
 | M7-T28 | `GET /v1/me/suggestions?limit=100` answers 400                              | api, fe | —                 | 7.13    | done        | [T28](tasks/M7-T28-suggestions-limit-400.md)       |
 | M7-T29 | Re-check the repository when accepting a `project.new` suggestion           | api     | —                 | 7.13    | in progress | [T29](tasks/M7-T29-project-new-recheck.md)         |
@@ -107,7 +107,7 @@ and the exit says so.
 ```
 Lane G (GitHub data, api):  T20 ──► T21
                                 └──► T22
-                            T23, T24 (independent)      T25 waits for queue M7-T10
+                            T23, T24 (independent)      T25 ready (domain given)
 Lane F (frontend):          T30, T31, T33 (independent)
                             T32 after T20 (grows with T21, T22)
 Lane L (LinkedIn):          T40 ──► T41 ──► T42 ──► T43        (all wait for queue M7-T1)
@@ -134,7 +134,7 @@ is merged and deployed, except where the table says otherwise.
 | 3    | **T33** (fe), **T50** (real run)           | T33 touches the connect action and callback, which T36 may change, so it follows T36. T50 needs T36, T34 and T35 deployed so the run exercises the fixed flows.                                                  |
 | 4    | T52                                        | Verification and the module report.                                                                                                                                                                              |
 
-LinkedIn (T40–T43, T51) and T25 stay blocked until Levon's queue rows M7-T1 and M7-T10 are done.
+LinkedIn (T40–T43, T51) stays blocked until Levon's queue row M7-T1 is done. **T25 is ready** (the domain arrived): it joins wave 2, after T29 (both touch `src/api/suggestions/`).
 
 ## Rules for every M7 task
 
