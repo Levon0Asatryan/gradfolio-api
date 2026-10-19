@@ -36,7 +36,8 @@ Authorization: Bearer {{accessToken}}
 # Writes that one field through the profile's own rules (skill.add: appends the skill to
 # the profile's skills, 400 over PROFILE_MAX_SKILLS); idempotent when accepted.
 # A link is never replaced: 409 SUGGESTION_STALE when the field was filled since the offer.
-# project.new: imports the repository as a draft (GitHub is read again) -> `projectId`.
+# project.new: imports the repository as a draft (GitHub is read again) -> `projectId`; 409
+# SUGGESTION_STALE (no draft) when it is no longer your own public, non-fork, non-archived repo.
 # project.update: writes the field only if it still equals the snapshot; a field the student
 # edited (or a re-sync moved) since is 409 SUGGESTION_STALE and is left as it is.
 # 409 LIMIT_REACHED when a project.new would exceed the per-user project cap.

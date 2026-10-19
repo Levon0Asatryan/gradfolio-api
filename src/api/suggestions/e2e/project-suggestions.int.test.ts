@@ -743,6 +743,49 @@ describe('project.new: a repository not imported yet', () => {
     expect(await projectsOf(alice.id)).toEqual([]);
   });
 
+  it.each([
+    ['archived', { archived: true }],
+    ['made private', { private: true }],
+    ['turned out to be a fork', { fork: true }],
+    // The owner changed; the caller keeps push access, which the import alone allows.
+    ['transferred to another owner', { ownerId: 200, ownerLogin: 'bob', pushers: [100] }],
+  ])(
+    'is 409 SUGGESTION_STALE when the repository was %s after the offer: no draft, superseded',
+    async (_what, change) => {
+      const { http, alice } = await setup();
+      own(alice, 90);
+      await refresh(http, alice).expect(200);
+      const [row] = await list(http, alice);
+      Object.assign(h.gh.repos.get(90)!, change);
+
+      expect((await accept(http, alice, row!.id).expect(409)).body.code).toBe('SUGGESTION_STALE');
+      expect(await projectsOf(alice.id)).toEqual([]);
+      expect(await list(http, alice, 'all')).toMatchObject([{ status: 'superseded' }]);
+    },
+  );
+
+  it('a refresh that withdraws the offer while the accept is reading GitHub leaves no draft (barrier on a held repository answer)', async () => {
+    const { http, alice } = await setup();
+    own(alice, 91);
+    await refresh(http, alice).expect(200);
+    const [row] = await list(http, alice);
+
+    const gate = h.gh.holdNextRepo();
+    const accepting = accept(http, alice, row!.id).then((r) => r);
+    await gate.arrived;
+    h.gh.repos.get(91)!.archived = true;
+    await refresh(http, alice).expect(200);
+    expect(await list(http, alice)).toEqual([]);
+    gate.release();
+
+    const res = await accepting;
+    // The refresh answered the suggestion first: the accept finds it already superseded.
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('SUGGESTION_RESOLVED');
+    expect(await projectsOf(alice.id)).toEqual([]);
+    expect(await list(http, alice, 'all')).toMatchObject([{ status: 'superseded' }]);
+  });
+
   it('is 409 LIMIT_REACHED at the project cap, and the suggestion stays open', async () => {
     const { http, alice } = await setup({ PROJECT_MAX_PER_USER: '1' });
     await imported(http, alice, 75);
