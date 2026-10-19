@@ -316,6 +316,10 @@ const integrations = {
   // Account deletion also deletes the Auth0 user (and so every identity linked to it).
   // Needs `delete:users` on the M2M application: off until Levon grants it (M7-T13).
   AUTH0_DELETE_USERS: envBoolean('false'),
+  // How long a deleted account's `sub` is refused by provisioning (the deletion
+  // tombstone, docs/modules/m7/plan.md §2.8): the access-token lifetime (3600 s,
+  // docs/ops/auth0-setup.md) plus a margin. Checked only with AUTH0_DELETE_USERS.
+  ACCOUNT_TOMBSTONE_TTL_S: z.coerce.number().int().min(60).max(172_800).default(7200),
   GITHUB_CLIENT_ID: optionalSetting(200),
   GITHUB_CLIENT_SECRET: optionalSetting(500),
   GITHUB_API_BASE_URL: githubApiBaseUrl,

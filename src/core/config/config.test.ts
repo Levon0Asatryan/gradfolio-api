@@ -467,6 +467,20 @@ describe('AUTH0_DELETE_USERS (docs/modules/m7/plan.md §2.8)', () => {
   });
 });
 
+describe('ACCOUNT_TOMBSTONE_TTL_S (docs/modules/m7/plan.md §2.8)', () => {
+  it('defaults to two hours, covering the one-hour access token with a margin', () => {
+    expect(loadConfig(REQUIRED).ACCOUNT_TOMBSTONE_TTL_S).toBe(7200);
+  });
+  it('is bounded: at least a minute, at most two days', () => {
+    expect(() => loadConfig({ ...REQUIRED, ACCOUNT_TOMBSTONE_TTL_S: '59' })).toThrow(
+      /ACCOUNT_TOMBSTONE_TTL_S/,
+    );
+    expect(() => loadConfig({ ...REQUIRED, ACCOUNT_TOMBSTONE_TTL_S: '172801' })).toThrow(
+      /ACCOUNT_TOMBSTONE_TTL_S/,
+    );
+  });
+});
+
 describe('suggestion settings (docs/modules/m7/plan.md §6)', () => {
   it('default sensibly, and the university domains default to none', () => {
     expect(loadConfig(REQUIRED)).toMatchObject({
