@@ -1,8 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { Transaction } from 'kysely';
 import type { z } from 'zod';
 import { APP_CONFIG } from '../../../core/config/config.module.js';
 import type { AppConfig } from '../../../core/config/schema.js';
 import { DbService } from '../../../core/db/db.service.js';
+import type { DB } from '../../../core/db/types.generated.js';
 import { newId } from '../../../core/db/ids.js';
 import { inTransaction } from '../../../core/db/transaction.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../core/errors/app-error.js';
@@ -33,18 +35,26 @@ export class SectionService {
     userId: string,
     input: TInput,
   ): Promise<TItem> {
-    return inTransaction(this.dbs.db, async (trx) => {
-      await lockUser(trx, userId);
-      if ((await countOwned(trx, def.table, userId)) >= this.cfg.PROFILE_MAX_SECTION_ITEMS) {
-        throw new ConflictError(
-          'LIMIT_REACHED',
-          `at most ${this.cfg.PROFILE_MAX_SECTION_ITEMS} entries are allowed`,
-        );
-      }
-      const id = newId();
-      await def.insert(trx, userId, id, await topSortOrder(trx, def.table, userId), input);
-      return one(def, await def.getOne(trx, userId, id));
-    });
+    return inTransaction(this.dbs.db, (trx) => this.createIn(trx, def, userId, input));
+  }
+
+  /** `create` inside a transaction the caller owns (it takes the user lock itself). */
+  async createIn<TItem extends { id: string }, TInput>(
+    trx: Transaction<DB>,
+    def: SectionDefinition<TItem, TInput>,
+    userId: string,
+    input: TInput,
+  ): Promise<TItem> {
+    await lockUser(trx, userId);
+    if ((await countOwned(trx, def.table, userId)) >= this.cfg.PROFILE_MAX_SECTION_ITEMS) {
+      throw new ConflictError(
+        'LIMIT_REACHED',
+        `at most ${this.cfg.PROFILE_MAX_SECTION_ITEMS} entries are allowed`,
+      );
+    }
+    const id = newId();
+    await def.insert(trx, userId, id, await topSortOrder(trx, def.table, userId), input);
+    return one(def, await def.getOne(trx, userId, id));
   }
 
   /**

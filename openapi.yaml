@@ -3867,7 +3867,7 @@ paths:
       tags:
         - suggestions
       summary: The caller’s suggestions, newest first
-      description: "Open ones by default (`status=all` adds the answered). A `profile.*` suggestion names the `field`, what it holds now (`current`) and what an accept would write (`proposed`). A `profile.links.linkedin` / `profile.links.twitter` suggestion (from GitHub’s social accounts) is always `mode: fill`: offered to an empty field only. A `skill.add` suggestion names the `skill` and the `evidence` (public repositories and projects that show it). A `project.new` suggestion names the `repository` to import (and `project.id` once accepted). A `project.update` suggestion names the `project`, the `field` (`summary`: GitHub’s description; `descriptionHtml`: the README) and the `proposed` value; it is offered only while the project’s field is still what the import or last re-sync wrote. `openCount` is the caller’s open suggestions in all."
+      description: "Open ones by default (`status=all` adds the answered). A `profile.*` suggestion names the `field`, what it holds now (`current`) and what an accept would write (`proposed`). A `profile.links.linkedin` / `profile.links.twitter` suggestion (from GitHub’s social accounts) is always `mode: fill`: offered to an empty field only. A `skill.add` suggestion names the `skill` and the `evidence` (public repositories and projects that show it). A `project.new` suggestion names the `repository` to import (and `project.id` once accepted). A `project.update` suggestion names the `project`, the `field` (`summary`: GitHub’s description; `descriptionHtml`: the README) and the `proposed` value; it is offered only while the project’s field is still what the import or last re-sync wrote. An `education.add` (the configured institution, UNIVERSITY_NAME) or `experience.add` (a configured organisation, UNIVERSITY_ORGS) names the section in `field` and the institution or organisation in `proposed`; accepting it needs `overrides`. `openCount` is the caller’s open suggestions in all."
       security:
         - bearerAuth: []
       parameters:
@@ -3930,7 +3930,7 @@ paths:
       tags:
         - suggestions
       summary: Read GitHub’s public profile and recompute the suggestions
-      description: "Reads GitHub at most once per SUGGESTIONS_MIN_INTERVAL_S (conditionally by ETag; a refresh inside the floor uses the stored profile and says `throttled`), then opens what is new, supersedes what GitHub no longer says, and never reopens an answered suggestion with the same value. It also reads the caller’s newest public repositories (not forks): one `GET /user/repos` page and, for the newest SUGGESTIONS_LANGUAGE_REPOS (default 5), one `GET …/languages` each, and offers a skill missing from the profile (compared case-insensitively) that at least two repositories or projects show. A refresh inside the floor reads nothing and keeps the open skill suggestions. Repositories: up to SUGGESTIONS_NEW_REPOS (default 5) of the newest own, not-imported repositories are offered as `project.new`; for each imported project whose repository is on that page, a changed description is offered as `project.update` at no extra call, and its README is read (one call each, at most SUGGESTIONS_README_READS, default 10) only if the repository was pushed to since the import or last re-sync. Stars and forks are never suggested. One notification (`suggestions_available`, `count` and `kinds`) is written when a refresh opens repository suggestions, in the same transaction. LinkedIn: a sign-in’s name and photo, and a re-import reminder. Without GitHub connected the LinkedIn rules run and skills are offered from the caller’s projects alone."
+      description: "Reads GitHub at most once per SUGGESTIONS_MIN_INTERVAL_S (conditionally by ETag; a refresh inside the floor uses the stored profile and says `throttled`), then opens what is new, supersedes what GitHub no longer says, and never reopens an answered suggestion with the same value. It also reads the caller’s newest public repositories (not forks): one `GET /user/repos` page and, for the newest SUGGESTIONS_LANGUAGE_REPOS (default 5), one `GET …/languages` each, and offers a skill missing from the profile (compared case-insensitively) that at least two repositories or projects show. A refresh inside the floor reads nothing and keeps the open skill suggestions. Repositories: up to SUGGESTIONS_NEW_REPOS (default 5) of the newest own, not-imported repositories are offered as `project.new`; for each imported project whose repository is on that page, a changed description is offered as `project.update` at no extra call, and its README is read (one call each, at most SUGGESTIONS_README_READS, default 10) only if the repository was pushed to since the import or last re-sync. Stars and forks are never suggested. One notification (`suggestions_available`, `count` and `kinds`) is written when a refresh opens repository suggestions, in the same transaction. LinkedIn: a sign-in’s name and photo, and a re-import reminder. University: when UNIVERSITY_DOMAINS is set, one `GET /user/emails` (a verified address on a listed domain or a subdomain of it offers the institution as `education.add`; an unverified one counts for nothing; an address is compared and dropped, never stored, returned or logged); when UNIVERSITY_ORGS is set, `GET /user` and `GET /users/{login}/orgs` (a listed public organisation is offered as `experience.add`). Offered only when the profile has no entry for that institution or organisation. Without GitHub connected the LinkedIn rules run and skills are offered from the caller’s projects alone."
       security:
         - bearerAuth: []
       responses:
@@ -3976,7 +3976,7 @@ paths:
       tags:
         - suggestions
       summary: "Apply a suggestion: write the one field it names"
-      description: "Writes that field through the profile’s own rules and marks the suggestion accepted, in one transaction. A `skill.add` appends the skill to the profile’s skills (at most PROFILE_MAX_SKILLS, else 400). A `project.new` imports the repository as a draft through the import service (GitHub is read again; the repository must still be the caller’s own public, non-fork, non-archived work, else 409 `SUGGESTION_STALE` and no draft) and answers with its `projectId`. A `project.update` writes the field only if it still equals the snapshot of the last import, re-sync or accept, and moves the snapshot; a field the student changed is never overwritten: 409 `SUGGESTION_STALE`. Idempotent for an accepted one. A reminder is only acknowledged."
+      description: "Writes that field through the profile’s own rules and marks the suggestion accepted, in one transaction. A `skill.add` appends the skill to the profile’s skills (at most PROFILE_MAX_SKILLS, else 400). A `project.new` imports the repository as a draft through the import service (GitHub is read again; the repository must still be the caller’s own public, non-fork, non-archived work, else 409 `SUGGESTION_STALE` and no draft) and answers with its `projectId`. A `project.update` writes the field only if it still equals the snapshot of the last import, re-sync or accept, and moves the snapshot; a field the student changed is never overwritten: 409 `SUGGESTION_STALE`. An `education.add` or `experience.add` adds the entry through the section’s create rules: `overrides` gives `degree`, `field`, `startYear` (education) or `title`, `start` (experience); a missing or invalid one is a 400 naming `overrides.<field>` and the suggestion stays open; if the profile has an entry for that name by now, or the configuration no longer offers it, 409 `SUGGESTION_STALE`. Other kinds take no overrides. Idempotent for an accepted one. A reminder is only acknowledged."
       security:
         - bearerAuth: []
       parameters:
@@ -3987,6 +3987,12 @@ paths:
             type: string
             description: The suggestion id (UUID)
             example: 0b6f2c1e-…
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SuggestionAccept"
       responses:
         "200":
           description: Accepted
@@ -7050,6 +7056,39 @@ components:
         - label
         - avatarUrl
       additionalProperties: false
+    SuggestionAccept:
+      type: object
+      properties:
+        overrides:
+          description: What an `education.add` (`degree`, `field`, `startYear`, optionally `endYear`, `description`) or an `experience.add` (`title`, `start` as YYYY-MM, optionally `end`, `summary`) needs from the student. The rules are those of `POST /v1/me/education` and `POST /v1/me/experience`; a missing or invalid value is a 400 naming `overrides.<field>`, and the suggestion stays open.
+          allOf:
+            - $ref: "#/components/schemas/SuggestionAcceptOverrides"
+      additionalProperties: false
+    SuggestionAcceptOverrides:
+      type: object
+      properties:
+        degree:
+          type: string
+        field:
+          type: string
+        startYear:
+          type: number
+        endYear:
+          nullable: true
+          type: number
+        description:
+          nullable: true
+          type: string
+        title:
+          type: string
+        start:
+          type: string
+        end:
+          nullable: true
+          type: string
+        summary:
+          type: string
+      additionalProperties: false
     SuggestionItem:
       type: object
       properties:
@@ -7069,6 +7108,8 @@ components:
             - profile.links.twitter
             - linkedin.reimport
             - skill.add
+            - education.add
+            - experience.add
             - project.new
             - project.update
         source:
@@ -7086,7 +7127,7 @@ components:
             - superseded
         field:
           nullable: true
-          description: "The field an accept would change: a profile field for `profile.*` (`bio`, `links.github` …); `summary` (GitHub’s description) or `descriptionHtml` (the README) for `project.update`; null otherwise."
+          description: "The field an accept would change: a profile field for `profile.*` (`bio`, `links.github` …); `summary` (GitHub’s description) or `descriptionHtml` (the README) for `project.update`; the section (`education`, `experience`) for `education.add` and `experience.add`; null otherwise."
           type: string
         current:
           nullable: true
@@ -7094,7 +7135,7 @@ components:
           type: string
         proposed:
           nullable: true
-          description: The value an accept would write. For `project.update` the new description, or the new README as sanitized HTML.
+          description: "The value an accept would write. For `project.update` the new description, or the new README as sanitized HTML. For `education.add` the institution, for `experience.add` the organisation: the entry also needs what `overrides` gives (see accept)."
           type: string
         mode:
           nullable: true

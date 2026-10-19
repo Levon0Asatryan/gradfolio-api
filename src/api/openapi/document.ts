@@ -59,6 +59,7 @@ import {
 } from '../notifications/dto/notification.dto.js';
 import { myTeamsQuerySchema, myTeamsSchema } from '../team/dto/my-teams.dto.js';
 import {
+  acceptBodySchema,
   refreshResponseSchema,
   resolveResponseSchema,
   suggestionIdParamSchema,
@@ -189,6 +190,8 @@ export interface Operation {
   query?: ZodObject;
   /** The JSON request body. */
   body?: ZodType;
+  /** The body may be left out (a request without one is valid). */
+  bodyOptional?: boolean;
   responses: Record<string, { description: string; schema?: ZodType }>;
   /** Needs `Authorization: Bearer <Auth0 access token>`. Every route except `@Public()` ones. */
   bearer?: boolean;
@@ -640,7 +643,10 @@ function suggestionOperations(): Operation[] {
         '`project.id` once accepted). A `project.update` suggestion names the `project`, the ' +
         '`field` (`summary`: GitHub’s description; `descriptionHtml`: the README) and the ' +
         '`proposed` value; it is offered only while the project’s field is still what the import ' +
-        'or last re-sync wrote. `openCount` is the caller’s open suggestions in all.',
+        'or last re-sync wrote. An `education.add` (the configured institution, UNIVERSITY_NAME) or ' +
+        '`experience.add` (a configured organisation, UNIVERSITY_ORGS) names the section in `field` and ' +
+        'the institution or organisation in `proposed`; accepting it needs `overrides`. ' +
+        '`openCount` is the caller’s open suggestions in all.',
       query: suggestionQuerySchema,
       responses: {
         '200': { description: 'One page', schema: suggestionPageSchema },
@@ -669,7 +675,12 @@ function suggestionOperations(): Operation[] {
         'at most SUGGESTIONS_README_READS, default 10) only if the repository was pushed to since the import or ' +
         'last re-sync. Stars and forks are never suggested. One notification (`suggestions_available`, ' +
         '`count` and `kinds`) is written when a refresh opens repository suggestions, in the same transaction. LinkedIn: a sign-in’s name and photo, and a re-import ' +
-        'reminder. Without GitHub connected the LinkedIn rules run and skills are offered from the caller’s projects alone.',
+        'reminder. University: when UNIVERSITY_DOMAINS is set, one `GET /user/emails` (a verified ' +
+        'address on a listed domain or a subdomain of it offers the institution as `education.add`; ' +
+        'an unverified one counts for nothing; an address is compared and dropped, never stored, ' +
+        'returned or logged); when UNIVERSITY_ORGS is set, `GET /user` and `GET /users/{login}/orgs` ' +
+        '(a listed public organisation is offered as `experience.add`). Offered only when the ' +
+        'profile has no entry for that institution or organisation. Without GitHub connected the LinkedIn rules run and skills are offered from the caller’s projects alone.',
       responses: {
         '200': { description: 'What was done', schema: refreshResponseSchema },
         '409': error('GITHUB_NOT_LINKED: GitHub refused the token (sign in with GitHub again)'),
@@ -693,8 +704,15 @@ function suggestionOperations(): Operation[] {
         'non-fork, non-archived work, else 409 `SUGGESTION_STALE` and no draft) and answers with its `projectId`. A ' +
         '`project.update` writes the field only if it still equals the snapshot of the last import, ' +
         're-sync or accept, and moves the snapshot; a field the student changed is never overwritten: ' +
-        '409 `SUGGESTION_STALE`. Idempotent for an accepted one. A reminder is only acknowledged.',
+        '409 `SUGGESTION_STALE`. An `education.add` or `experience.add` adds the entry through the ' +
+        'section’s create rules: `overrides` gives `degree`, `field`, `startYear` (education) or ' +
+        '`title`, `start` (experience); a missing or invalid one is a 400 naming `overrides.<field>` ' +
+        'and the suggestion stays open; if the profile has an entry for that name by now, or the ' +
+        'configuration no longer offers it, 409 `SUGGESTION_STALE`. Other kinds take no overrides. ' +
+        'Idempotent for an accepted one. A reminder is only acknowledged.',
       params: suggestionIdParamSchema,
+      body: acceptBodySchema,
+      bodyOptional: true,
       responses: {
         '200': { description: 'Accepted', schema: resolveResponseSchema },
         '404': notYours('suggestion'),
@@ -1621,7 +1639,7 @@ export function buildOpenApiDocument(
       ...(op.body
         ? {
             requestBody: {
-              required: true,
+              required: op.bodyOptional !== true,
               content: { 'application/json': { schema: convert(op.body, components, 'input') } },
             },
           }

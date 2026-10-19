@@ -67,6 +67,9 @@ export function githubConnectHarness() {
     gh.repos.clear();
     gh.profiles.clear();
     gh.socialAccounts.clear();
+    gh.emails.clear();
+    gh.orgs.clear();
+    gh.emailsMode = 'ok';
     gh.repoMode = 'ok';
   });
   afterEach(async () => {

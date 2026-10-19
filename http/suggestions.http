@@ -42,8 +42,20 @@ Authorization: Bearer {{accessToken}}
 # edited (or a re-sync moved) since is 409 SUGGESTION_STALE and is left as it is.
 # 409 LIMIT_REACHED when a project.new would exceed the per-user project cap.
 # 404 for another user's id; 409 SUGGESTION_RESOLVED / SUGGESTION_INVALID / SUGGESTION_STALE.
+# education.add / experience.add: the entry needs what the student gives in `overrides`
+# (education: degree, field, startYear; experience: title, start as YYYY-MM). 400 naming
+# `overrides.<field>` when one is missing; 409 SUGGESTION_STALE when the profile holds an entry
+# for that institution or organisation by now. Other kinds take no body.
 POST {{baseUrl}}/v1/me/suggestions/{{suggestionId}}/accept
 Authorization: Bearer {{accessToken}}
+
+###
+# @name acceptEducationSuggestion
+POST {{baseUrl}}/v1/me/suggestions/{{suggestionId}}/accept
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "overrides": { "degree": "BSc", "field": "Computer Science", "startYear": 2022, "endYear": 2026 } }
 
 ###
 # @name dismissSuggestion
