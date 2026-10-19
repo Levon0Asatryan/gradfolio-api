@@ -65,6 +65,7 @@ const repoResponse = z.object({
   full_name: z.string().min(1).max(200),
   description: z.string().max(10_000).nullable(),
   language: z.string().max(100).nullable(),
+  topics: z.array(z.string().max(100)).max(100).default([]),
   stargazers_count: z.number().int().nonnegative(),
   forks_count: z.number().int().nonnegative(),
   html_url: z.string().url().max(500),
@@ -87,6 +88,8 @@ export interface GithubRepo {
   fullName: string;
   description: string | null;
   language: string | null;
+  /** The repository's topics, as GitHub lists them (lower case). */
+  topics: string[];
   stars: number;
   forks: number;
   htmlUrl: string;
@@ -157,6 +160,8 @@ const userResponse = z.object({
 export const GRANT_ALREADY_GONE = [422] as const;
 
 /** A 502 like any unavailable answer, but one whose headers are known (the body went over the cap). */
+const languagesResponse = z.record(z.string().min(1).max(100), z.number().nonnegative());
+
 class GithubBodyTooLargeError extends GithubUnavailableError {
   constructor(
     cause: string,
@@ -281,6 +286,31 @@ export class GithubClient {
   }
 
   /**
+   * `GET /repos/{owner}/{repo}/languages`: the languages of one public
+   * repository (names only; the byte counts are not used). Owner and name come
+   * from a validated `GithubRepo`, never from a caller. `null`: gone or not
+   * visible to the token.
+   */
+  async listLanguages(
+    token: GithubAccessToken,
+    repo: Pick<GithubRepo, 'ownerLogin' | 'name'>,
+  ): Promise<{ languages: string[] | null; rateLimit: GithubRateLimit }> {
+    if (!NAME.test(repo.ownerLogin) || !NAME.test(repo.name)) {
+      throw new Error('repository owner and name must be plain names');
+    }
+    const res = await this.send(`repos/${repo.ownerLogin}/${repo.name}/languages`, {
+      method: 'GET',
+      headers: { authorization: `Bearer ${token.reveal()}` },
+    });
+    const rateLimit = rateLimitOf(res.headers);
+    if (res.status === 404) return { languages: null, rateLimit };
+    if (res.status !== 200) throw mapFailure(res);
+    const parsed = languagesResponse.safeParse(res.body);
+    if (!parsed.success) throw new GithubUnavailableError('GET languages bad body');
+    return { languages: Object.keys(parsed.data), rateLimit };
+  }
+
+  /**
    * `GET /repositories/{id}`: by GitHub's integer id, so no name or URL from
    * a caller reaches the path. `null`: gone, or not visible to the token.
    */
@@ -393,6 +423,7 @@ function toRepo(r: z.infer<typeof repoResponse>): GithubRepo {
     fullName: r.full_name,
     description: r.description,
     language: r.language,
+    topics: r.topics,
     stars: r.stargazers_count,
     forks: r.forks_count,
     htmlUrl: r.html_url,
