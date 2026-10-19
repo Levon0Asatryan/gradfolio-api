@@ -43,7 +43,7 @@ finding. The findings were re-landed in #104, #123 and task M7-T30.
 **Status legend:** `todo` (not started), `in progress` (a task chat is working on it),
 `review` (PR open), `done` (merged and deployed), `blocked` (waiting on something that is
 not a task; the Depends column says what). The module chat updates this table in a small
-docs PR whenever a task changes state. **Last updated: 2026-10-19** (T20 in
+docs PR whenever a task changes state. **Last updated: 2026-10-19** (no task in
 progress; the rest todo or blocked; T30 has an unpushed fix commit but no chat).
 
 The **Status** column is the status of record. **Depends on** lists tasks that must be
@@ -51,30 +51,35 @@ The **Status** column is the status of record. **Depends on** lists tasks that m
 in `manual-testing.md` (the things only he can do), and the two must never collide. In a
 brief, "queue M7-T1" always means a queue row.
 
-| ID     | Task                                                                        | Repo    | Depends on        | Tracker | Status      | Brief                                          |
-| ------ | --------------------------------------------------------------------------- | ------- | ----------------- | ------- | ----------- | ---------------------------------------------- |
-| M7-T20 | Skill suggestions from repo languages/topics and the student's own projects | api     | —                 | 7.13    | in progress | [T20](tasks/M7-T20-skill-suggestions.md)       |
-| M7-T21 | Links suggestions from GitHub social accounts                               | api     | T20               | 7.13    | todo        | [T21](tasks/M7-T21-links-suggestions.md)       |
-| M7-T22 | Repo-change suggestions and a notification (d2)                             | api     | T20               | 7.13    | todo        | [T22](tasks/M7-T22-repo-change-suggestions.md) |
-| M7-T23 | Deletion tombstone: precondition of `AUTH0_DELETE_USERS`                    | api     | —                 | 7.2     | done        | [T23](tasks/M7-T23-deletion-tombstone.md)      |
-| M7-T24 | Startup check: log which of the five GitHub settings is missing             | api     | —                 | 7.2     | todo        | [T24](tasks/M7-T24-startup-check.md)           |
-| M7-T25 | Education and organisation suggestions from verified emails and orgs        | api     | queue M7-T10      | 7.13    | blocked     | [T25](tasks/M7-T25-education-suggestions.md)   |
-| M7-T30 | Focus and announcement after Publish on cards and the project page          | fe      | —                 | 7.14    | todo        | [T30](tasks/M7-T30-publish-focus.md)           |
-| M7-T31 | Import entry points: after connect, Projects → Add                          | fe      | —                 | 7.14    | todo        | [T31](tasks/M7-T31-import-entry-points.md)     |
-| M7-T32 | Suggestions inbox: skills, links, project changes, notification             | fe      | T20 (T21, T22)    | 7.13    | todo        | [T32](tasks/M7-T32-suggestions-inbox.md)       |
-| M7-T33 | One source for the Auth0 settings read by the app                           | fe      | —                 | 7.11    | todo        | [T33](tasks/M7-T33-auth0-settings-source.md)   |
-| M7-T40 | LinkedIn export: real headers, synthetic fixtures, parser                   | api     | queue M7-T1       | 7.6     | blocked     | [T40](tasks/M7-T40-linkedin-parser.md)         |
-| M7-T41 | LinkedIn ZIP upload, guards and preview                                     | api     | T40               | 7.7     | blocked     | [T41](tasks/M7-T41-linkedin-upload-preview.md) |
-| M7-T42 | LinkedIn confirm: selected items become profile rows                        | api     | T41               | 7.8     | blocked     | [T42](tasks/M7-T42-linkedin-confirm.md)        |
-| M7-T43 | LinkedIn import wizard (onboarding and integrations page)                   | fe      | T41, T42 deployed | 7.9     | blocked     | [T43](tasks/M7-T43-linkedin-wizard.md)         |
-| M7-T50 | Real GitHub run on production                                               | api, fe | T20, T30, T31     | 7.1–7.5 | todo        | [T50](tasks/M7-T50-github-real-run.md)         |
-| M7-T51 | Real LinkedIn run on production                                             | api, fe | T43, queue M7-T1  | 7.6–7.9 | blocked     | [T51](tasks/M7-T51-linkedin-real-run.md)       |
-| M7-T52 | Verification records and the module report                                  | api, fe | all above         | —       | todo        | [T52](tasks/M7-T52-verification.md)            |
+| ID     | Task                                                                        | Repo    | Depends on        | Tracker | Status  | Brief                                          |
+| ------ | --------------------------------------------------------------------------- | ------- | ----------------- | ------- | ------- | ---------------------------------------------- |
+| M7-T20 | Skill suggestions from repo languages/topics and the student's own projects | api     | —                 | 7.13    | done    | [T20](tasks/M7-T20-skill-suggestions.md)       |
+| M7-T21 | Links suggestions from GitHub social accounts                               | api     | T20               | 7.13    | todo    | [T21](tasks/M7-T21-links-suggestions.md)       |
+| M7-T22 | Repo-change suggestions and a notification (d2)                             | api     | T20               | 7.13    | todo    | [T22](tasks/M7-T22-repo-change-suggestions.md) |
+| M7-T23 | Deletion tombstone: precondition of `AUTH0_DELETE_USERS`                    | api     | —                 | 7.2     | done    | [T23](tasks/M7-T23-deletion-tombstone.md)      |
+| M7-T24 | Startup check: log which of the five GitHub settings is missing             | api     | —                 | 7.2     | todo    | [T24](tasks/M7-T24-startup-check.md)           |
+| M7-T25 | Education and organisation suggestions from verified emails and orgs        | api     | queue M7-T10      | 7.13    | blocked | [T25](tasks/M7-T25-education-suggestions.md)   |
+| M7-T30 | Focus and announcement after Publish on cards and the project page          | fe      | —                 | 7.14    | todo    | [T30](tasks/M7-T30-publish-focus.md)           |
+| M7-T31 | Import entry points: after connect, Projects → Add                          | fe      | —                 | 7.14    | todo    | [T31](tasks/M7-T31-import-entry-points.md)     |
+| M7-T32 | Suggestions inbox: skills, links, project changes, notification             | fe      | T20 (T21, T22)    | 7.13    | todo    | [T32](tasks/M7-T32-suggestions-inbox.md)       |
+| M7-T33 | One source for the Auth0 settings read by the app                           | fe      | —                 | 7.11    | todo    | [T33](tasks/M7-T33-auth0-settings-source.md)   |
+| M7-T40 | LinkedIn export: real headers, synthetic fixtures, parser                   | api     | queue M7-T1       | 7.6     | blocked | [T40](tasks/M7-T40-linkedin-parser.md)         |
+| M7-T41 | LinkedIn ZIP upload, guards and preview                                     | api     | T40               | 7.7     | blocked | [T41](tasks/M7-T41-linkedin-upload-preview.md) |
+| M7-T42 | LinkedIn confirm: selected items become profile rows                        | api     | T41               | 7.8     | blocked | [T42](tasks/M7-T42-linkedin-confirm.md)        |
+| M7-T43 | LinkedIn import wizard (onboarding and integrations page)                   | fe      | T41, T42 deployed | 7.9     | blocked | [T43](tasks/M7-T43-linkedin-wizard.md)         |
+| M7-T50 | Real GitHub run on production                                               | api, fe | T20, T30, T31     | 7.1–7.5 | todo    | [T50](tasks/M7-T50-github-real-run.md)         |
+| M7-T51 | Real LinkedIn run on production                                             | api, fe | T43, queue M7-T1  | 7.6–7.9 | blocked | [T51](tasks/M7-T51-linkedin-real-run.md)       |
+| M7-T52 | Verification records and the module report                                  | api, fe | all above         | —       | todo    | [T52](tasks/M7-T52-verification.md)            |
 
 **Follow-up from T23 (open, not yet a task):** Codex P2 on `src/core/config/schema.ts`:
 `ACCOUNT_TOMBSTONE_TTL_S` accepts values below the access-token lifetime plus the clock
 tolerance, so a token can outlive its tombstone. The merged PR left the thread unanswered.
 Fix: raise the minimum or check it at boot. Proposed as M7-T26 (small, todo).
+
+**Follow-up from T20 (review gap):** PR #93 merged as `caa791a`. Codex reviewed `c4641a8`
+and its two threads were answered and resolved, but the final head `3ed18fe` was never
+reviewed by Codex before the merge. Rule: a merge needs Codex on the current head. The
+fixes are small and are covered by tests; the gap is process, and is recorded here.
 
 **Dropped as done:** connection-name limit 128 vs 64 (fe #108), the delete-account sign-out
 (fe #108), the discovery flake (fe #110), the profile-tab fixes (fe #123), account deletion
