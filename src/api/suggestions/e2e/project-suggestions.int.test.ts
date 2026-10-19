@@ -786,6 +786,25 @@ describe('project.new: a repository not imported yet', () => {
     expect(await list(http, alice, 'all')).toMatchObject([{ status: 'superseded' }]);
   });
 
+  it('a repository archived while its README is being read is refused too: no draft (barrier on a held README)', async () => {
+    const { http, alice } = await setup();
+    own(alice, 92);
+    await refresh(http, alice).expect(200);
+    const [row] = await list(http, alice);
+
+    const gate = h.gh.holdNextReadme();
+    const accepting = accept(http, alice, row!.id).then((r) => r);
+    await gate.arrived;
+    h.gh.repos.get(92)!.archived = true;
+    gate.release();
+
+    const res = await accepting;
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('SUGGESTION_STALE');
+    expect(await projectsOf(alice.id)).toEqual([]);
+    expect(await list(http, alice, 'all')).toMatchObject([{ status: 'superseded' }]);
+  });
+
   it('is 409 LIMIT_REACHED at the project cap, and the suggestion stays open', async () => {
     const { http, alice } = await setup({ PROJECT_MAX_PER_USER: '1' });
     await imported(http, alice, 75);

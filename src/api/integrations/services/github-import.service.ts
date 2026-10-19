@@ -320,7 +320,7 @@ export class GithubImportService {
     const { gh, token, user } = ctx;
     const read = await this.github(gh, user, () => gh.github.getRepo(token, repoId));
     ctx.note(read.rateLimit);
-    const repo = read.repo;
+    let repo = read.repo;
     if (repo === null) return { kind: 'done', result: done(repoId, 'skipped', 'not_found') };
     // Anyone could otherwise import a famous repository as their own work.
     if (repo.ownerId !== Number(ctx.githubUserId) && !repo.canPush) {
@@ -334,6 +334,18 @@ export class GithubImportService {
     );
     // The limit as of the last call made: the README's, not the repository's.
     if (got.rateLimit !== null) ctx.note(got.rateLimit);
+    if (eligible !== undefined) {
+      // The README took time: the repository is read once more, and what is stored is
+      // what this read says.
+      const again = await this.github(gh, user, () => gh.github.getRepo(token, repoId));
+      ctx.note(again.rateLimit);
+      if (again.repo === null)
+        return { kind: 'done', result: done(repoId, 'skipped', 'not_found') };
+      if (!eligible(again.repo, Number(ctx.githubUserId))) {
+        return { kind: 'done', result: done(repoId, 'skipped', 'ineligible') };
+      }
+      repo = again.repo;
+    }
     const description = descriptionOf(repo, got.readme, this.cfg.PROJECT_DESCRIPTION_MAX_BYTES);
     const base = {
       ...fieldsOf(repo, description.html ?? null),
