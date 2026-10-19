@@ -15,7 +15,7 @@ export function findByAuth0Id(db: Executor, auth0Id: string): Promise<UserRow | 
 
 /**
  * The caller's row and whether their GitHub is connected, in one indexed read
- * (docs/m7-plan.md §5.1): `verified` is "email verified or GitHub connected",
+ * (docs/modules/m7/plan.md §5.1): `verified` is "email verified or GitHub connected",
  * so the per-request re-sync needs both. A reservation (`'linking'`) does not
  * count.
  */
@@ -42,7 +42,7 @@ export async function findCaller(
 
 /**
  * Whether another account has reserved or connected the GitHub account a
- * `github|<id>` subject signs in as (docs/m7-plan.md §2.3). A locking read on
+ * `github|<id>` subject signs in as (docs/modules/m7/plan.md §2.3). A locking read on
  * the `(integration_type, external_user_id)` key: with the link's locking read
  * of `users` by that subject, a provisioning and a link of the same GitHub
  * account cannot both commit (one waits, or InnoDB picks a deadlock victim

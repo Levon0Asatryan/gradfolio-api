@@ -1,4 +1,4 @@
-"""Counts the projected log fields into the answers of docs/m7-plan.md §2.1.
+"""Counts the projected log fields into the answers of docs/modules/m7/plan.md §2.1.
 
 Input: a JSON array of entries with only the fields `m7-prod-observe.sh verdict`
 projects (message, code, status, cause, result, path, url, status code). It

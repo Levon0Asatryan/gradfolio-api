@@ -2,7 +2,7 @@ import { sql } from 'kysely';
 import type { Database } from '../../../core/db/database.js';
 
 /**
- * Link nonces (docs/m7-plan.md §2.3): only the SHA-256 of a nonce is stored,
+ * Link nonces (docs/modules/m7/plan.md §2.3): only the SHA-256 of a nonce is stored,
  * bound to the user it was issued to, with an expiry.
  */
 

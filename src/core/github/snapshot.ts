@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 /**
  * The project fields a GitHub repository fills and a re-sync may update
- * (docs/m7-plan.md §3.5), and the hash that tells whether a field is still as
+ * (docs/modules/m7/plan.md §3.5), and the hash that tells whether a field is still as
  * the import wrote it (`project_github_imports.snapshot`).
  */
 export const SYNCED_FIELDS = [

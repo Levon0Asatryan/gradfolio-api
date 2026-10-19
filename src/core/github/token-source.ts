@@ -10,7 +10,7 @@ export interface GithubIdentity {
 }
 
 /**
- * Where a user's GitHub token comes from (docs/m7-plan.md §2.2, D1). Built as
+ * Where a user's GitHub token comes from (docs/modules/m7/plan.md §2.2, D1). Built as
  * A1 (`Auth0IdpTokenSource`); A2 (Token Vault) would be a second implementation
  * behind the same interface.
  */

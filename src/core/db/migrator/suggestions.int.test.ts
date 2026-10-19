@@ -7,7 +7,7 @@ import { down, up } from './runner.js';
 import { dumpSchema } from './schema-dump.js';
 
 /**
- * Migration 0009 (docs/m7-plan.md §6.4) is additive: rows that exist before it
+ * Migration 0009 (docs/modules/m7/plan.md §6.4) is additive: rows that exist before it
  * are kept, it applies twice with nothing left, and its down gives the schema
  * back identically.
  */

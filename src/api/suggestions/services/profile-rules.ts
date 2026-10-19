@@ -8,7 +8,7 @@ import type { SuggestionKind } from '../dto/suggestion.dto.js';
 
 /**
  * What the profile could take from GitHub and from the sign-in claims
- * (docs/m7-plan.md §6.2): pure rules, no I/O. A suggestion is offered only
+ * (docs/modules/m7/plan.md §6.2): pure rules, no I/O. A suggestion is offered only
  * when the field is empty or holds something else, and only for a value the
  * profile's own write rules (`updateProfileSchema`) accept, so an accept
  * cannot fail on validation.

@@ -23,7 +23,7 @@ import { db } from '../../../testing/team.js';
 /**
  * M7 PR (a): GitHub connect, link, disconnect and the integrations card against
  * MySQL 8.4, with Auth0's Management API and GitHub as fakes over real HTTP
- * (docs/m7-plan.md §2.3, §4.4, §10). Every external answer comes through the
+ * (docs/modules/m7/plan.md §2.3, §4.4, §10). Every external answer comes through the
  * real transport; races are forced with barriers, never sleeps. Ownership: no
  * route takes an id; each test that involves two students checks the second
  * sees and changes nothing of the first's.

@@ -8,7 +8,7 @@ import { db } from '../../../testing/team.js';
 
 /**
  * M7 PR (d1): suggestions against MySQL 8.4 with Auth0 and GitHub as fakes over
- * real HTTP (docs/m7-plan.md §6). Races are forced with barriers (a held GitHub
+ * real HTTP (docs/modules/m7/plan.md §6). Races are forced with barriers (a held GitHub
  * answer, a held row lock), never sleeps. Every route has a second-user test.
  */
 

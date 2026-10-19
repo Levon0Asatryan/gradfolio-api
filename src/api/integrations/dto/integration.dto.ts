@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * GitHub connect and the integrations card (docs/m7-plan.md §2.3, §4.4, §7
+ * GitHub connect and the integrations card (docs/modules/m7/plan.md §2.3, §4.4, §7
  * items 1–4). No response carries a token, a nonce hash, or the GitHub numeric
  * id (`external_user_id`): only the owner's own GitHub login.
  */

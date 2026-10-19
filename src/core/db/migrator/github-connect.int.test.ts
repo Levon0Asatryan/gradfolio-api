@@ -7,7 +7,7 @@ import { down, up } from './runner.js';
 import { dumpSchema } from './schema-dump.js';
 
 /**
- * Migration 0008 (docs/m7-plan.md §9) is additive: applied to a database with
+ * Migration 0008 (docs/modules/m7/plan.md §9) is additive: applied to a database with
  * data it keeps every row, clears only token columns (which no revision
  * writes), and its down reverses it to the identical schema.
  */

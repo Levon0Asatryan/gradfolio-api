@@ -4,7 +4,7 @@ import { newId } from '../../../core/db/ids.js';
 import type { DB, Integrations } from '../../../core/db/types.generated.js';
 
 /**
- * The caller's `integrations` rows (docs/m7-plan.md §2.6). Every statement is
+ * The caller's `integrations` rows (docs/modules/m7/plan.md §2.6). Every statement is
  * scoped to one `user_id`; no token column is ever written (0008's CHECK, and
  * the row types take only NULL there).
  */
@@ -92,7 +92,7 @@ export async function writeGithubRow(
     ...values,
     updatedAt: sql<Date>`UTC_TIMESTAMP()`,
     // Forgetting the connection also forgets what was read through it: the next
-    // account must not be offered the last one's profile (docs/m7-plan.md §6.6a).
+    // account must not be offered the last one's profile (docs/modules/m7/plan.md §6.6a).
     ...(clearSynced
       ? { lastSyncedAt: null, suggestionsPolledAt: null, profileEtag: null, profileSnapshot: null }
       : {}),

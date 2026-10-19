@@ -76,7 +76,7 @@ function decodeCursor(cursor: string | undefined): number {
 }
 
 /**
- * GitHub repository list and import (docs/m7-plan.md §3.2, §3.3). The only
+ * GitHub repository list and import (docs/modules/m7/plan.md §3.2, §3.3). The only
  * identifiers a caller supplies are integers and an opaque cursor; each
  * repository is read again from GitHub (stars, forks, language, README), and
  * only those the caller owns, or may push to, are imported.
@@ -408,7 +408,7 @@ export class GithubImportService {
         });
         await setProjectTerms(trx, id, 'technologies', input.technologies);
         // What GitHub gave, not what the student typed: a later re-sync then sees
-        // an override as an edit and keeps it (docs/m7-plan.md §3.5).
+        // an override as an edit and keeps it (docs/modules/m7/plan.md §3.5).
         await writeSnapshot(trx, id, {
           title: hashField('title', github.title),
           summary: hashField('summary', github.summary),

@@ -27,7 +27,7 @@ export class UsersService {
    * The caller's row, created on their first authenticated request (Q7,
    * docs/modules/m2/plan.md §3.4). A plain read first, outside any transaction; only a
    * miss pays for the race-safe upsert. Then `verified` follows the token's
-   * `email_verified` or a connected GitHub (2.16, 7.12, docs/m7-plan.md §5.1).
+   * `email_verified` or a connected GitHub (2.16, 7.12, docs/modules/m7/plan.md §5.1).
    */
   async resolve(identity: AccessTokenIdentity): Promise<UserRow> {
     const { db } = this.dbs;

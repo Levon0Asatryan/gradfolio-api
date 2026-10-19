@@ -17,7 +17,7 @@ import {
 
 /**
  * The GitHub client against a fake GitHub over real HTTP, with GitHub's own
- * status codes and header names: every row of the error table (docs/m7-plan.md
+ * status codes and header names: every row of the error table (docs/modules/m7/plan.md
  * §3.1, §10) and the grant delete (§2.5).
  */
 describe('GithubClient', () => {
@@ -136,7 +136,7 @@ describe('GithubClient', () => {
     });
   });
 
-  describe('repositories and README (docs/m7-plan.md §3.2–3.4)', () => {
+  describe('repositories and README (docs/modules/m7/plan.md §3.2–3.4)', () => {
     const repo = (id: number, over = {}) => ({
       id,
       name: `r${id}`,

@@ -1,4 +1,4 @@
--- Suggestions (docs/m7-plan.md §6.4): proposals computed from GitHub and the
+-- Suggestions (docs/modules/m7/plan.md §6.4): proposals computed from GitHub and the
 -- sign-in claims that the student accepts or dismisses; nothing is applied
 -- without an accept. Additive: the previous revision never reads the table or
 -- the new columns, so it serves unchanged while this applies.

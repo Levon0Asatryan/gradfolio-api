@@ -136,7 +136,7 @@ const rateLimit = {
   // largest per-route number, kept small by the cost of one suggestion (three
   // statements of at most 5 rows).
   RATE_LIMIT_SUGGEST: z.coerce.number().int().min(1).max(100_000).default(240),
-  // Integrations status, connect, link, disconnect (docs/m7-plan.md §7).
+  // Integrations status, connect, link, disconnect (docs/modules/m7/plan.md §7).
   RATE_LIMIT_INTEGRATION: z.coerce.number().int().min(1).max(100_000).default(30),
   // The same budgets for an anonymous caller whose address is the frontend's
   // shared egress: no token and no valid forwarded-client-IP secret. Higher,
@@ -293,7 +293,7 @@ const githubApiBaseUrl = z
   .transform((v) => (v.endsWith('/') ? v : `${v}/`));
 
 /**
- * GitHub connect (docs/m7-plan.md §2, §8). Every setting is optional: with any
+ * GitHub connect (docs/modules/m7/plan.md §2, §8). Every setting is optional: with any
  * of the five credentials unset, every GitHub route answers 503
  * INTEGRATION_UNAVAILABLE and production still boots.
  */
@@ -324,7 +324,7 @@ const integrations = {
   // turns the cache off. Never persisted (D2).
   GITHUB_TOKEN_CACHE_S: z.coerce.number().int().min(0).max(900).default(300),
   GITHUB_TOKEN_CACHE_MAX: z.coerce.number().int().min(1).max(100_000).default(1000),
-  // GitHub repository import (docs/m7-plan.md §3). Repositories per page the
+  // GitHub repository import (docs/modules/m7/plan.md §3). Repositories per page the
   // caller may ask for; repositories one import may name; the most README bytes
   // read (over it the project is created without a description); and how many
   // repositories are read from GitHub at once.
@@ -332,7 +332,7 @@ const integrations = {
   GITHUB_IMPORT_MAX_BATCH: z.coerce.number().int().min(1).max(10).default(10),
   GITHUB_README_MAX_BYTES: z.coerce.number().int().min(1000).max(1_000_000).default(400_000),
   // Repository search (`q`): GitHub has no search parameter on /user/repos, so up to
-  // this many pages of 100 are read and filtered here (docs/m7-plan.md §3.2).
+  // this many pages of 100 are read and filtered here (docs/modules/m7/plan.md §3.2).
   GITHUB_SEARCH_SCAN_PAGES: z.coerce.number().int().min(1).max(10).default(5),
   GITHUB_IMPORT_CONCURRENCY: z.coerce.number().int().min(1).max(5).default(2),
   // A link nonce's lifetime, and the most an id token's `iat` may lie in the past.
@@ -341,7 +341,7 @@ const integrations = {
 };
 
 /**
- * Suggestions (docs/m7-plan.md §6). The refresh floor per student, the open
+ * Suggestions (docs/modules/m7/plan.md §6). The refresh floor per student, the open
  * suggestions one student may hold (the oldest are superseded), the list's
  * page sizes, and when LinkedIn's last export import counts as old. Mail
  * domains of universities, `domain=Institution`, comma-separated: empty until
@@ -529,7 +529,7 @@ export const configSchema = z
 export type DatabaseConfig = z.infer<typeof databaseConfigSchema>;
 export type AppConfig = z.infer<typeof configSchema>;
 
-/** The five credentials GitHub connect needs, present together (docs/m7-plan.md §8, D9). */
+/** The five credentials GitHub connect needs, present together (docs/modules/m7/plan.md §8, D9). */
 export interface GithubIntegrationSettings {
   auth0ClientId: string;
   m2mClientId: string;

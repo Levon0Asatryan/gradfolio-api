@@ -10,7 +10,7 @@ import { IntegrationUnavailableError } from './errors.js';
 import { abortable, SpacedQueue } from './spaced-queue.js';
 
 /**
- * Auth0's Management API, as the machine-to-machine application (docs/m7-plan.md
+ * Auth0's Management API, as the machine-to-machine application (docs/modules/m7/plan.md
  * §2.2): read a user's linked identities (with their IdP tokens) and link a
  * second identity to a user. Nothing else.
  *

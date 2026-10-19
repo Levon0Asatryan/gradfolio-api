@@ -7,7 +7,7 @@ import { Auth0IdpTokenSource } from './token-source.js';
 
 /**
  * The A1 token source over a stand-in Management client: which identity counts,
- * and the in-memory cache's bounds (docs/m7-plan.md §2.2). The client itself
+ * and the in-memory cache's bounds (docs/modules/m7/plan.md §2.2). The client itself
  * runs against a fake tenant over HTTP in management-client.test.ts.
  */
 function management(bySub: Record<string, ManagementIdentity[] | null>) {

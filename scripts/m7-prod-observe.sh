@@ -1,5 +1,5 @@
 #!/bin/sh
-# Read-only observation of the M7 GitHub run against PRODUCTION (docs/m7-prod-run.md).
+# Read-only observation of the M7 GitHub run against PRODUCTION (docs/modules/m7/prod-run.md).
 #
 #   sh scripts/m7-prod-observe.sh preflight        revision, env var NAMES, unauthenticated checks
 #   sh scripts/m7-prod-observe.sh logs [minutes]   the GitHub lines of the API log (default 60)

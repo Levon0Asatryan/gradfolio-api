@@ -20,7 +20,7 @@ function tokenOf(req: AuthenticatedRequest): AccessTokenIdentity {
 }
 
 /**
- * The caller's suggestions (docs/m7-plan.md §6.5). Every route is the caller's
+ * The caller's suggestions (docs/modules/m7/plan.md §6.5). Every route is the caller's
  * own: another user's id is 404. Reads and answers are under the `integration`
  * budget; a refresh, which may read GitHub, under the tighter `import` one.
  */

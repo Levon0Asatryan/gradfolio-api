@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Suggestions (docs/m7-plan.md §6): proposals the student accepts or dismisses.
+ * Suggestions (docs/modules/m7/plan.md §6): proposals the student accepts or dismisses.
  * Nothing is applied without an accept. Owner only; no route takes anything
  * but the caller's own suggestion id (another's is 404).
  */

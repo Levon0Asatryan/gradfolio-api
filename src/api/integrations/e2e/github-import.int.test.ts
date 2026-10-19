@@ -8,7 +8,7 @@ import { db } from '../../../testing/team.js';
 
 /**
  * M7 PR (b): GitHub repository list, import and re-sync against MySQL 8.4,
- * with Auth0 and GitHub as fakes over real HTTP (docs/m7-plan.md §3, §10).
+ * with Auth0 and GitHub as fakes over real HTTP (docs/modules/m7/plan.md §3, §10).
  * Races are forced with barriers on the user lock or on a held GitHub answer,
  * never sleeps. Every route has a second-user test.
  */

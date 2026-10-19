@@ -5,7 +5,7 @@ import { AuthUnavailableError, InvalidIdTokenError } from './errors.js';
 import { createIdTokenVerifier, type IdTokenSettings } from './id-token.js';
 
 /**
- * The link id token (docs/m7-plan.md §2.3 step 1, §10 "Link id token"): every
+ * The link id token (docs/modules/m7/plan.md §2.3 step 1, §10 "Link id token"): every
  * refusal produced for real against a JWKS over HTTP, with the reason each
  * maps to, so removing an option shows up as a different verdict.
  */
