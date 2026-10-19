@@ -146,14 +146,14 @@ describe('connect', () => {
     expect(await verifiedOf(s.id)).toBe(false);
   });
 
-  it('a token GitHub refuses is 409 GITHUB_NOT_LINKED, and the cached token is dropped', async () => {
+  it('a token GitHub refuses offers the sign-in, and the cached token is dropped', async () => {
     const http = await start();
     const s = await student('github|9001');
     auth0.withGithub(s.sub, '9001'); // GitHub does not know the token: revoked there.
 
-    const res = await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(409);
-    expect(res.body.code).toBe('GITHUB_NOT_LINKED');
-    await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(409);
+    const res = await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(200);
+    expect(res.body.state).toBe('link_required');
+    await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(200);
     // Without the drop, the second attempt would reuse the cached token.
     expect(auth0.callsTo('/api/v2/users/')).toHaveLength(2);
     expect(await githubRow(s.id)).toBeUndefined();
@@ -1137,13 +1137,155 @@ describe('disconnect (revoke first, D9)', () => {
       expect(await githubRow(bob.id)).toMatchObject({ status: 'connected' });
     });
 
-    it('a GitHub login keeps the 409: a link cannot add its own identity, signing in again does', async () => {
+    /** What signing in again at GitHub does: Auth0 keeps a new token, and GitHub knows it. */
+    function signInAgain(sub: string, githubId: string, token: string): void {
+      const held = auth0.users.get(sub)!.find((i) => i.provider === 'github')!;
+      held.access_token = token;
+      gh.tokens.set(token, { id: Number(githubId), login: `${githubId}-login` });
+    }
+
+    it.each(['github|118', 'auth0|linked-118'])(
+      'the production sequence for %s: read 409, Disconnect, Connect offers the sign-in, the fresh token connects (M7-T36)',
+      async (sub) => {
+        const http = await start();
+        const s = await connected(http, sub, '118');
+        gh.tokens.delete(auth0.githubTokenFor('118'));
+
+        await http.get('/v1/me/github/repos').set(s.auth).expect(409);
+        await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+
+        // Connect, twice: the answer is the sign-in, never GITHUB_NOT_LINKED. One GitHub
+        // call each (GET /user, refused).
+        gh.requests.length = 0;
+        const first = await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(200);
+        expect(first.body.state).toBe('link_required');
+        expect(gh.requests.map((r) => `${r.method} ${r.path}`)).toEqual(['GET /user']);
+        const second = await http
+          .post('/v1/me/integrations/github/connect')
+          .set(s.auth)
+          .expect(200);
+        expect(second.body.state).toBe('link_required');
+        expect(await githubRow(s.id)).toMatchObject({ status: 'not_connected' });
+
+        // The sign-in at GitHub: Auth0 holds a new token.
+        const fresh = 'gho_SENTINEL_fresh_118';
+        signInAgain(sub, '118', fresh);
+        auth0.calls.length = 0;
+        gh.requests.length = 0;
+        const res = await http
+          .post('/v1/me/integrations/github/link')
+          .set(s.auth)
+          .send({ idToken: await idToken('118', second.body.nonce as string) })
+          .expect(200);
+        expect(res.body).toEqual({ state: 'connected', login: '118-login' });
+        // The login already holds the identity: nothing is linked. One GitHub call, with the fresh token.
+        expect(auth0.callsTo('/api/v2/users/').filter((c) => c.method === 'POST')).toEqual([]);
+        expect(gh.requests.map((r) => `${r.method} ${r.path} ${r.authorization}`)).toEqual([
+          `GET /user Bearer ${fresh}`,
+        ]);
+        expect(await githubRow(s.id)).toMatchObject({
+          status: 'connected',
+          externalUserId: '118',
+          accessToken: null,
+        });
+        expect(await verifiedOf(s.id)).toBe(true);
+        // Import works again.
+        await http.get('/v1/me/github/repos').set(s.auth).expect(200);
+        expect(logs.text()).not.toMatch(/SENTINEL/);
+      },
+    );
+
+    it('a Connect still waiting on GitHub does not undo a link that finished meanwhile (barrier)', async () => {
       const http = await start();
-      const s = await connected(http, 'github|118', '118');
-      gh.tokens.delete(auth0.githubTokenFor('118'));
-      const res = await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(409);
-      expect(res.body.code).toBe('GITHUB_NOT_LINKED');
+      const s = await connected(http, 'github|119', '119');
+      gh.tokens.delete(auth0.githubTokenFor('119'));
+      await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+      const nonce = await nonceFor(http, s);
+
+      // A connect has read the dead token and its GitHub answer is in flight.
+      const gate = gh.holdNextUser();
+      const racing = http
+        .post('/v1/me/integrations/github/connect')
+        .set(s.auth)
+        .then((r) => r);
+      await gate.arrived;
+
+      signInAgain(s.sub, '119', 'gho_SENTINEL_fresh_119');
+      const res = await http
+        .post('/v1/me/integrations/github/link')
+        .set(s.auth)
+        .send({ idToken: await idToken('119', nonce) })
+        .expect(200);
+      expect(res.body.state).toBe('connected');
+      gate.release();
+      expect((await racing).status).toBe(200);
       expect(await githubRow(s.id)).toMatchObject({ status: 'connected' });
+    });
+
+    it('a token still refused after the fresh sign-in is 409 GITHUB_NOT_LINKED, logs the status, and frees the reservation', async () => {
+      const http = await start();
+      const s = await connected(http, 'github|120', '120');
+      gh.tokens.delete(auth0.githubTokenFor('120'));
+      await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+      const nonce = await nonceFor(http, s);
+
+      logs.clear();
+      // Auth0 still holds the dead token: GitHub refuses it again.
+      const res = await http
+        .post('/v1/me/integrations/github/link')
+        .set(s.auth)
+        .send({ idToken: await idToken('120', nonce) })
+        .expect(409);
+      expect(res.body.code).toBe('GITHUB_NOT_LINKED');
+      expect(logs.lines().find((l) => l.msg === 'request rejected')).toMatchObject({
+        code: 'GITHUB_NOT_LINKED',
+        upstreamStatus: 401,
+      });
+      // Not a reservation to wait out: the next Connect answers at once.
+      expect(await githubRow(s.id)).toMatchObject({ status: 'not_connected' });
+      const again = await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(200);
+      expect(again.body.state).toBe('link_required');
+    });
+
+    it('two Connects at once on a dead token both offer the sign-in (barrier)', async () => {
+      const http = await start();
+      const s = await connected(http, 'github|121', '121');
+      gh.tokens.delete(auth0.githubTokenFor('121'));
+
+      // The first has GitHub's refusal in flight; the second runs through meanwhile.
+      const gate = gh.holdNextUser();
+      const a = http
+        .post('/v1/me/integrations/github/connect')
+        .set(s.auth)
+        .then((r) => r);
+      await gate.arrived;
+      const b = await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(200);
+      expect(await githubRow(s.id)).toMatchObject({ status: 'not_connected' });
+      gate.release();
+
+      const first = await a;
+      expect(first.status).toBe(200);
+      expect(first.body.state).toBe('link_required');
+      expect(b.body.state).toBe('link_required');
+      expect(first.body.nonce).not.toBe(b.body.nonce);
+      expect(await githubRow(s.id)).toMatchObject({ status: 'not_connected' });
+    });
+
+    it('another GitHub login that is a Gradfolio account is still refused; so is a second student’s dead token untouched', async () => {
+      const http = await start();
+      const s = await connected(http, 'github|122', '122');
+      const bob = await connected(http, 'github|123', '123');
+      gh.tokens.delete(auth0.githubTokenFor('122'));
+      await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+      const nonce = await nonceFor(http, s);
+      // A sign-in as someone else's GitHub login, who is a Gradfolio account.
+      await http
+        .post('/v1/me/integrations/github/link')
+        .set(s.auth)
+        .send({ idToken: await idToken('123', nonce) })
+        .expect(409)
+        .expect((r) => expect(r.body.code).toBe('GITHUB_ACCOUNT_IN_USE'));
+      expect(await githubRow(bob.id)).toMatchObject({ status: 'connected' });
     });
   });
 
