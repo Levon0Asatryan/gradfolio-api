@@ -53,11 +53,35 @@ You are the task chat for <task ID> on Gradfolio. Read CLAUDE.md and AGENTS.md f
 then docs/modules/<module>/README.md and docs/modules/<module>/tasks/<task file>.
 Do exactly that task. Report in the PR body in the format from
 docs/process/handoff-template.md, part 2. Do not merge.
+When your PR is merged, clean up (see "Cleaning up" in docs/modules/README.md).
 ```
 
 For a frontend task, the chat starts in `gradfolio`. It reads the brief from
 `gradfolio-api` (`../gradfolio-api/docs/modules/...`), because the plan of record
 lives there.
+
+### Cleaning up
+
+A task chat leaves nothing behind. **Once its PR is merged** (the chat checks with
+`gh pr view <n> --json state`; a squash merge leaves the local branch "ahead" of `main`,
+so do not use that as the test):
+
+- remove its worktree: `git worktree remove <path>` from the main checkout, then
+  `git branch -D <branch>` (a squash-merged branch needs `-D`);
+- stop its Docker project and delete its data: `docker rm -f <project>-mysql-1`,
+  `docker volume rm <project>_mysqldata`, `docker network rm <project>_default`
+  (only the chat's own project; check the name with
+  `docker ps -a --filter label=com.docker.compose.project=<project>`);
+- stop dev servers and Playwright browsers it started, and delete scratch files;
+- say in the final message what was removed.
+
+A chat whose PR is **not** merged keeps its worktree, and says so. Never remove another
+chat's worktree, branch or Docker project, and never remove a worktree with uncommitted
+changes without saving a patch of them first.
+
+The **module chat checks** `git worktree list` in both repos and `docker ps` before it
+marks a task `done`, and removes what a finished chat left. Remote branches are deleted
+by GitHub on merge; check `git branch -r --list 'origin/<module>/*'` at module close.
 
 ### Status and reports
 
