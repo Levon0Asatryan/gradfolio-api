@@ -497,6 +497,26 @@ describe('refresh around the reads', () => {
     expect(await notificationsOf(http, alice)).toEqual([]);
   });
 
+  it('a disconnect after the repositories were read drops that answer too (barrier on a held README)', async () => {
+    const { http, alice } = await setup();
+    await imported(http, alice, 58, { readme: '<p>v1</p>' });
+    h.gh.repos.get(58)!.readme = '<p>v2</p>';
+    pushed(58);
+    own(alice, 59);
+
+    const gate = h.gh.holdNextReadme();
+    const refreshing = refresh(http, alice).then((r) => r);
+    await gate.arrived;
+    await http.delete('/v1/me/integrations/github').set(alice.auth).expect(200);
+    gate.release();
+
+    const res = await refreshing;
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ github: 'not_connected', created: 0, openCount: 0 });
+    expect(await list(http, alice, 'all')).toEqual([]);
+    expect(await notificationsOf(http, alice)).toEqual([]);
+  });
+
   it('a disconnect deletes the open repository suggestions with the rest of GitHub’s', async () => {
     const { http, alice } = await setup();
     await imported(http, alice, 54, { readme: '<p>v1</p>' });

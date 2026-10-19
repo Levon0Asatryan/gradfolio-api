@@ -392,31 +392,35 @@ export class SuggestionsService {
       const open = await openOfSources(trx, userId, ['github', 'linkedin']);
       const openNew = open.filter((r) => r.kind === 'project.new');
       const openUpdates = open.filter((r) => r.kind === 'project.update');
+      // A dropped connection (a disconnect, or another one, while GitHub was asked) has
+      // no answer to use.
+      const listed = githubOk ? read.listed : undefined;
+      const upstream = githubOk ? read.upstream : undefined;
       const states = await lockProjectStates(trx, userId, [
-        ...(githubOk ? [...(read.upstream?.keys() ?? [])] : []),
+        ...(upstream?.keys() ?? []),
         ...openUpdates.flatMap((r) => (r.targetId === null ? [] : [r.targetId])),
       ]);
       const repoIdOf = (r: SuggestionRow) => payloadOf(r).repoId;
       const importedNow = await importedProjectIds(trx, userId, [
-        ...(githubOk ? (read.listed?.page.map((r) => r.id) ?? []) : []),
+        ...(listed?.page.map((r) => r.id) ?? []),
         ...openNew.flatMap((r) => {
           const id = repoIdOf(r);
           return typeof id === 'number' ? [id] : [];
         }),
       ]);
       const projectRows: WantedProjectRow[] = [];
-      if (githubOk && read.listed !== undefined) {
+      if (listed !== undefined) {
         projectRows.push(
           ...newRepoRows(
-            read.listed.page,
-            read.listed.githubUserId,
+            listed.page,
+            listed.githubUserId,
             new Set(importedNow.keys()),
             this.cfg.SUGGESTIONS_NEW_REPOS,
           ),
         );
       }
-      if (githubOk && read.upstream !== undefined) {
-        projectRows.push(...updateRows(states, read.upstream));
+      if (upstream !== undefined) {
+        projectRows.push(...updateRows(states, upstream));
       }
       for (const w of projectRows) {
         wanted.push({
@@ -460,17 +464,15 @@ export class SuggestionsService {
           currentOf(profile, field as ProfileField) !== null
         );
       };
-      const listedById = new Map(read.listed?.page.map((r) => [r.id, r]));
+      const listedById = new Map(listed?.page.map((r) => [r.id, r]));
       // A new repository stays offered until it is imported or is no longer the student's
       // own work; one that fell out of the newest few is not withdrawn for that.
       const newGone = (r: SuggestionRow) => {
         const repoId = repoIdOf(r);
         if (typeof repoId !== 'number' || !githubOk || importedNow.has(repoId)) return true;
-        if (read.listed === undefined) return false;
+        if (listed === undefined) return false;
         const repo = listedById.get(repoId);
-        return repo === undefined
-          ? read.listed.complete
-          : !isOffered(repo, read.listed.githubUserId);
+        return repo === undefined ? listed.complete : !isOffered(repo, listed.githubUserId);
       };
       // An update stays offered until it cannot be applied, or GitHub was read just now
       // and no longer differs from what the project holds.
@@ -481,7 +483,7 @@ export class SuggestionsService {
           return true;
         }
         const field = PROJECT_FIELDS.find((f) => f === payloadOf(r).field);
-        const seen = projectId === null ? undefined : read.upstream?.get(projectId)?.values;
+        const seen = projectId === null ? undefined : upstream?.get(projectId)?.values;
         return field !== undefined && seen?.[field] !== undefined;
       };
       const gone = (r: SuggestionRow) =>
