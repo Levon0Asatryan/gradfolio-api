@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * The contract of GitHub repository import and re-sync (docs/m7-plan.md §3.2,
+ * The contract of GitHub repository import and re-sync (docs/modules/m7/plan.md §3.2,
  * §3.3, §3.5; §7 items 5–7). Documented in openapi.yaml now; served from M7
  * PR (b), which validates with these schemas. A caller never sends a URL: only
  * integer repository ids and an opaque cursor.

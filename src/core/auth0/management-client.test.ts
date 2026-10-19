@@ -10,7 +10,7 @@ import {
 
 /**
  * The Management API client against a fake tenant over real HTTP
- * (docs/m7-plan.md §2.2): the M2M token, the queue, and each answer class.
+ * (docs/modules/m7/plan.md §2.2): the M2M token, the queue, and each answer class.
  */
 describe('Auth0ManagementClient', () => {
   let tenant: TestTenant;

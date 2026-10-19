@@ -54,7 +54,7 @@ services:
       # boot and says which; `docker compose up -d mysql` alone still works.
       AUTH0_ISSUER_BASE_URL: ${AUTH0_ISSUER_BASE_URL}
       AUTH0_AUDIENCE: ${AUTH0_AUDIENCE}
-      # GitHub connect (docs/m7-plan.md §8): optional; unset, its routes answer 503.
+      # GitHub connect (docs/modules/m7/plan.md §8): optional; unset, its routes answer 503.
       AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID:-}
       AUTH0_M2M_CLIENT_ID: ${AUTH0_M2M_CLIENT_ID:-}
       AUTH0_M2M_CLIENT_SECRET: ${AUTH0_M2M_CLIENT_SECRET:-}

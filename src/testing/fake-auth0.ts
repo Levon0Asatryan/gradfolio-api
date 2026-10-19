@@ -5,7 +5,7 @@ import type { TestTenant } from './jwks.js';
  * A stand-in for Auth0's Management API and its token endpoint, served by the
  * test tenant under its issuer (as Auth0 serves them under the tenant domain),
  * over real HTTP: the client's queue, timeouts, headers and error mapping run
- * against a real transport, never a mocked fetch (docs/m7-plan.md §10).
+ * against a real transport, never a mocked fetch (docs/modules/m7/plan.md §10).
  *
  * Its shapes follow Auth0's documentation (`POST /oauth/token`, `GET
  * /api/v2/users/{id}`, `POST /api/v2/users/{id}/identities`); they are not

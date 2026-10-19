@@ -72,7 +72,7 @@ const profileNow = (u: UserRow): ProfileNow => ({
 });
 
 /**
- * Suggestions (docs/m7-plan.md §6): what GitHub and the sign-in claims say the
+ * Suggestions (docs/modules/m7/plan.md §6): what GitHub and the sign-in claims say the
  * profile could hold, kept as rows the student accepts or dismisses. A refresh
  * computes them; nothing is written to the profile except by an accept, which
  * changes the field and the suggestion in one transaction.

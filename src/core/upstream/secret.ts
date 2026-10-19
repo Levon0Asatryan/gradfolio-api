@@ -7,7 +7,7 @@ const REDACTED = '[redacted]';
  * value is reachable only through `reveal()`: `JSON.stringify`, a template
  * string and `util.inspect` (what a logger or a stray `console.log` uses) all
  * print `[redacted]`, so logging the object by mistake writes nothing usable
- * (docs/m7-plan.md §2.2).
+ * (docs/modules/m7/plan.md §2.2).
  */
 export class Secret {
   readonly #value: string;

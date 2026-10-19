@@ -5,8 +5,8 @@ machine: Levon signs in once, headed, in the frontend; the API's own Cloud Run l
 instrument. Nothing here asks for a password, a token or a client secret.
 
 It starts when FE #101 (the integrations page) is merged and deployed. It answers the open
-questions of `m7-plan.md` §2.1 and §16 from how production behaves, and fills
-`m7-verification.md` (GitHub half).
+questions of [plan.md](plan.md) §2.1 and §16 from how production behaves, and fills
+`verification.md` (GitHub half).
 
 ## 0. Who does what
 

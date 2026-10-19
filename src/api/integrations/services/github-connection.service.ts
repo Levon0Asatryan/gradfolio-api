@@ -61,7 +61,7 @@ export const stateChanged = () =>
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
 
 /**
- * GitHub connect, link and disconnect (docs/m7-plan.md §2.3), and the
+ * GitHub connect, link and disconnect (docs/modules/m7/plan.md §2.3), and the
  * integrations card (§4.4).
  *
  * "Connected" is our consent flag (`integrations.status`), distinct from an
@@ -81,7 +81,7 @@ export class GithubConnectionService implements OnModuleInit {
   ) {}
 
   /**
-   * `AUTH0_DELETE_USERS` has a precondition that is not built yet (docs/m7-plan.md
+   * `AUTH0_DELETE_USERS` has a precondition that is not built yet (docs/modules/m7/plan.md
    * §2.8): a deletion marker, so a still-valid access token cannot re-provision a
    * public account from its claims after the Auth0 user is gone. Booting with the
    * flag on is allowed (the owner decides) and says so, loudly, every time.
@@ -359,7 +359,7 @@ export class GithubConnectionService implements OnModuleInit {
    * secondary one). Left linked, the next GitHub sign-in of the same person
    * resolves to this very login, and Auth0 refuses to link a user to what it
    * already holds. Auth0 re-creates each former secondary as a standalone
-   * `github|<id>` user (what remains, and why it is harmless: docs/m7-plan.md
+   * `github|<id>` user (what remains, and why it is harmless: docs/modules/m7/plan.md
    * §2.7). An identity already gone is success; any other failure stops the
    * deletion before anything is deleted. A login that *is* the GitHub one
    * (`github|<id>`) has nothing linked to unlink.

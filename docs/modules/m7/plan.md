@@ -785,12 +785,12 @@ identical `db:schema` dump (checked in the PR); timed on the 3,000-project perf 
 
 | PR           | Contents                                                                                                                                                                                       |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| plan (this)  | `docs/m7-plan.md`                                                                                                                                                                              |
+| plan (this)  | `docs/modules/m7/plan.md`                                                                                                                                                                      |
 | (a)          | OpenAPI contract for 1–10, config, migration 0008, token source + M2M client, `GithubClient`, connect/link/disconnect, `GET /me/integrations`, `verified` computation, account-deletion revoke |
 | (b)          | repos list, import, re-sync, README pipeline, `githubStars` test, seed update                                                                                                                  |
 | (c)          | LinkedIn uploads, preview, confirm, header script, synthetic fixtures; **after 7.6 headers are verified**                                                                                      |
 | (d)          | suggestions (§6)                                                                                                                                                                               |
-| verification | `docs/m7-verification.md`                                                                                                                                                                      |
+| verification | `docs/modules/m7/verification.md`                                                                                                                                                              |
 
 ### Queue rows (proposed text; the lead edits `manual-testing.md`)
 

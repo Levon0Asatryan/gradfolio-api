@@ -8,7 +8,7 @@ import { githubProfileSnapshotSchema } from '../../../core/validation/json-shape
 import { z } from 'zod';
 
 /**
- * `suggestions` (docs/m7-plan.md §6.4). Every statement is scoped to one
+ * `suggestions` (docs/modules/m7/plan.md §6.4). Every statement is scoped to one
  * `user_id`: a suggestion of someone else is "none".
  */
 

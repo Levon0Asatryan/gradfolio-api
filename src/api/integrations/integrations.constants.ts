@@ -17,7 +17,7 @@ export interface GithubConnect {
   /**
    * How long a link's Auth0 step may take in all (M2M token, queue, request):
    * twice the Management API timeout. A reservation older than this (plus a
-   * margin) cannot have a call still in flight (docs/m7-plan.md §2.3).
+   * margin) cannot have a call still in flight (docs/modules/m7/plan.md §2.3).
    */
   linkDeadlineMs: number;
   /**

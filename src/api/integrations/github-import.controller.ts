@@ -20,7 +20,7 @@ function tokenOf(req: AuthenticatedRequest): AccessTokenIdentity {
 }
 
 /**
- * The caller's GitHub repositories and import (docs/m7-plan.md §7 items 5–6).
+ * The caller's GitHub repositories and import (docs/modules/m7/plan.md §7 items 5–6).
  * No route takes a URL or a name: repository ids only. Listing is under the
  * `integration` budget; the import is under `import`, the tighter one.
  */

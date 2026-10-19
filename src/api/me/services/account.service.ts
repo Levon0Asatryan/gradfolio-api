@@ -34,7 +34,7 @@ export class AccountService {
    * recreates a blank account on its next request (Q7), so the frontend signs
    * the user out after this call.
    *
-   * A GitHub connection is revoked at GitHub first (docs/m7-plan.md D9): the
+   * A GitHub connection is revoked at GitHub first (docs/modules/m7/plan.md D9): the
    * token Auth0 holds dies with the account. A failed revocation stops the
    * deletion before anything is deleted (502 GITHUB_REVOKE_FAILED), and so
    * does a connection made between the revocation and the user lock (409
@@ -71,7 +71,7 @@ export class AccountService {
       const result = await trx.deleteFrom('users').where('id', '=', userId).executeTakeFirst();
       if (Number(result.numDeletedRows) === 0) throw new NotFoundError('account');
     });
-    // The login itself, when configured to (docs/m7-plan.md §2.8): after the data is gone.
+    // The login itself, when configured to (docs/modules/m7/plan.md §2.8): after the data is gone.
     await this.github.deleteAuth0UserAfterAccountDeletion(user);
     // Every object under the user's prefix, including uploads never registered.
     // After the commit: a failed delete is logged by `release` and swept later.

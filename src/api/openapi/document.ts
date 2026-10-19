@@ -474,7 +474,7 @@ function discoveryOperations(): Operation[] {
   ];
 }
 
-/** The caller's integrations: GitHub connect (docs/m7-plan.md §2.3, §7 items 1–4). */
+/** The caller's integrations: GitHub connect (docs/modules/m7/plan.md §2.3, §7 items 1–4). */
 function integrationOperations(): Operation[] {
   const base = { tag: 'integrations', bearer: true } as const;
   const unavailable = error(
@@ -603,7 +603,7 @@ function integrationOperations(): Operation[] {
 }
 
 /**
- * Suggestions (docs/m7-plan.md §6): proposals from GitHub and the sign-in
+ * Suggestions (docs/modules/m7/plan.md §6): proposals from GitHub and the sign-in
  * claims that the caller accepts or dismisses. Nothing changes the profile
  * except an accept.
  */
@@ -690,7 +690,7 @@ function suggestionOperations(): Operation[] {
 }
 
 /**
- * GitHub import and the LinkedIn export import (docs/m7-plan.md §3, §4; §7
+ * GitHub import and the LinkedIn export import (docs/modules/m7/plan.md §3, §4; §7
  * items 5–10): the contract, published with PR (a) so the frontend can build
  * against it. Those of PR (c) are still `planned`; the PR that serves one
  * drops the flag.

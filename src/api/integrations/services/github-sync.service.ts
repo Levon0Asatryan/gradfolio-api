@@ -37,7 +37,7 @@ interface FieldReport {
 type Value = string | string[] | null;
 
 /**
- * Re-sync of one imported project (docs/m7-plan.md §3.5). A field is compared
+ * Re-sync of one imported project (docs/modules/m7/plan.md §3.5). A field is compared
  * three ways, by hash: the project's value now, the value the last import or
  * re-sync wrote (the snapshot), and what GitHub says now. Only a field still as
  * written is updated; the comparison is made under the project's row lock, so

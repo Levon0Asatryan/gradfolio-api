@@ -5,7 +5,7 @@ import { Writable } from 'node:stream';
 import { GithubAccessToken } from '../github/github-access-token.js';
 import { Secret } from './secret.js';
 
-describe('Secret and GithubAccessToken (docs/m7-plan.md §10: prints nothing)', () => {
+describe('Secret and GithubAccessToken (docs/modules/m7/plan.md §10: prints nothing)', () => {
   const value = 'gho_SENTINEL_print';
 
   it.each([

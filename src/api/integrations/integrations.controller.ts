@@ -22,7 +22,7 @@ function tokenOf(req: AuthenticatedRequest): AccessTokenIdentity {
 }
 
 /**
- * The caller's integrations (docs/m7-plan.md §7 items 1–4). A token is
+ * The caller's integrations (docs/modules/m7/plan.md §7 items 1–4). A token is
  * required; no route takes an id, so nothing can point at another user's row.
  * Each route has its own counter under the `integration` budget.
  */

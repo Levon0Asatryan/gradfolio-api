@@ -15,7 +15,7 @@ import {
 } from './errors.js';
 
 /**
- * GitHub's REST API (docs/m7-plan.md §3.1): the base URL from configuration,
+ * GitHub's REST API (docs/modules/m7/plan.md §3.1): the base URL from configuration,
  * no redirects, a deadline, a body cap, the API version pinned, the token in
  * the `Authorization` header only. A caller passes no URL, host or path: each
  * method builds its own from configuration and validated values.
@@ -49,7 +49,7 @@ export type RevokeResult = 'revoked' | 'already_gone';
 export const GITHUB_API_VERSION = '2022-11-28';
 const MAX_BODY_BYTES = 1024 * 1024;
 
-/** GitHub's rate limit as of the last answer (docs/m7-plan.md §3.1). */
+/** GitHub's rate limit as of the last answer (docs/modules/m7/plan.md §3.1). */
 export interface GithubRateLimit {
   remaining: number | null;
   /** ISO 8601, UTC. */
@@ -108,7 +108,7 @@ export interface GithubRepoPage {
   rateLimit: GithubRateLimit;
 }
 
-/** The public profile fields of a GitHub account (docs/m7-plan.md §6.3). Never a token, never an email. */
+/** The public profile fields of a GitHub account (docs/modules/m7/plan.md §6.3). Never a token, never an email. */
 export interface GithubProfile {
   name: string | null;
   bio: string | null;
@@ -148,7 +148,7 @@ const userResponse = z.object({
 
 /**
  * The status GitHub gives a grant delete for a grant that no longer exists.
- * **Unverified** against the real service (docs/m7-plan.md §2.3, §2.1 step 6):
+ * **Unverified** against the real service (docs/modules/m7/plan.md §2.3, §2.1 step 6):
  * GitHub's documentation lists 422. Nothing else counts as gone: a 404 could
  * as well be a client id GitHub does not know, and reading that as "revoked"
  * would report a disconnect while the token stays alive. The tenant spike
@@ -219,7 +219,7 @@ export class GithubClient {
   /**
    * `DELETE /applications/{client_id}/grant` with the OAuth App's own
    * credentials (Basic auth): removes every token the user granted the app,
-   * including the one Auth0 holds (docs/m7-plan.md §2.5). Anything but a
+   * including the one Auth0 holds (docs/modules/m7/plan.md §2.5). Anything but a
    * confirmed removal, or a grant that is already gone, throws
    * GithubRevokeFailedError: a 401 here is our client credentials, not the
    * user's token.

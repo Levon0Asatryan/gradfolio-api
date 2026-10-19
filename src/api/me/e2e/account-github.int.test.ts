@@ -7,7 +7,7 @@ import { db } from '../../../testing/team.js';
 
 /**
  * Deleting an account with a connected GitHub revokes the grant at GitHub
- * first (docs/m7-plan.md D9, §2.5): the token Auth0 holds dies with the
+ * first (docs/modules/m7/plan.md D9, §2.5): the token Auth0 holds dies with the
  * account, and a failed revocation deletes nothing.
  */
 
@@ -153,7 +153,7 @@ describe('account deletion revokes first', () => {
     expect(await githubRow(s.id)).toMatchObject({ status: 'connected' });
   });
 
-  describe('the Auth0 side of the account (docs/m7-plan.md §2.7)', () => {
+  describe('the Auth0 side of the account (docs/modules/m7/plan.md §2.7)', () => {
     const identitiesOf = (sub: string) =>
       (h.auth0.users.get(sub) ?? []).map((i) => `${i.provider}:${i.user_id}`);
     const unlinks = () => h.auth0.calls.filter((c) => c.method === 'DELETE');
@@ -255,7 +255,7 @@ describe('account deletion revokes first', () => {
     });
   });
 
-  describe('deleting the Auth0 user too (AUTH0_DELETE_USERS, docs/m7-plan.md §2.8)', () => {
+  describe('deleting the Auth0 user too (AUTH0_DELETE_USERS, docs/modules/m7/plan.md §2.8)', () => {
     const deletes = () => h.auth0.calls.filter((c) => c.method === 'DELETE');
     const on = () => ({ ...h.env(), AUTH0_DELETE_USERS: 'true' });
 

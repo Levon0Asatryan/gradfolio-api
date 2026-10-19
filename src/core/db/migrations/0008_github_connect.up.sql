@@ -1,4 +1,4 @@
--- GitHub connect and import (docs/m7-plan.md §2.3, §2.6, §3.5, §9). Additive:
+-- GitHub connect and import (docs/modules/m7/plan.md §2.3, §2.6, §3.5, §9). Additive:
 -- the previous revision never reads the new column or tables, and never writes
 -- a token, so it serves unchanged while this applies.
 --

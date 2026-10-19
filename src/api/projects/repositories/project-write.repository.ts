@@ -50,7 +50,7 @@ export async function insertProject(
     .execute();
 }
 
-/** What an import knows about the repository, stored beside the project (docs/m7-plan.md §3.3). */
+/** What an import knows about the repository, stored beside the project (docs/modules/m7/plan.md §3.3). */
 export interface RepoFacts {
   githubRepoId: number;
   stars: number;

@@ -17,8 +17,8 @@ The folders, from the top:
 | [../README.md](../README.md)       | Running, developing, configuring, the layout and its rules                                                                                                                                       |
 | [../openapi.yaml](../openapi.yaml) | The API surface, generated from the zod schemas                                                                                                                                                  |
 
-M7's plan and production-run documents are still at `docs/m7-plan.md` and
-`docs/m7-prod-run.md` while M7 is in progress.
+M7 (in progress) keeps its plan and production run in [modules/m7/](modules/m7/README.md):
+`plan.md` and `prod-run.md`.
 
 ## What is not here
 

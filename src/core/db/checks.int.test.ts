@@ -184,7 +184,7 @@ describe('teams and notifications schema (0006)', () => {
 });
 
 /**
- * What 0008 adds for GitHub connect (docs/m7-plan.md §2.6, §9, §10): no token
+ * What 0008 adds for GitHub connect (docs/modules/m7/plan.md §2.6, §9, §10): no token
  * can be stored, one Gradfolio account per GitHub account, nonces and import
  * snapshots of the documented shape. Raw SQL, because the row types refuse a
  * token at compile time.

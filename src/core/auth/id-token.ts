@@ -10,7 +10,7 @@ import { AuthUnavailableError, InvalidIdTokenError } from './errors.js';
 
 /**
  * Verifies the id token of the secondary GitHub sign-in that `POST
- * /v1/me/integrations/github/link` forwards (docs/m7-plan.md §2.3 step 1):
+ * /v1/me/integrations/github/link` forwards (docs/modules/m7/plan.md §2.3 step 1):
  * RS256 only, signature against the tenant's JWKS, the tenant's issuer, the
  * audience the `Gradfolio` application's client id, `exp` required, `iat` at
  * most LINK_ID_TOKEN_MAX_AGE_S old, `sub` a GitHub identity, and a `nonce`

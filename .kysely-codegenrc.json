@@ -1,5 +1,5 @@
 {
-  "$comment": "npm run db:types regenerates src/core/db/types.generated.ts from a migrated database; npm run db:types:check (CI) fails when it is stale. Overrides encode what the database cannot: ids are supplied by the application (never Generated), TINYINT(1) is boolean, JSON columns take validated JsonText, DATE is YYYY-MM-DD text, and the integrations token columns take only NULL (0008 CHECK, docs/m7-plan.md \u00a72.6).",
+  "$comment": "npm run db:types regenerates src/core/db/types.generated.ts from a migrated database; npm run db:types:check (CI) fails when it is stale. Overrides encode what the database cannot: ids are supplied by the application (never Generated), TINYINT(1) is boolean, JSON columns take validated JsonText, DATE is YYYY-MM-DD text, and the integrations token columns take only NULL (0008 CHECK, docs/modules/m7/plan.md \u00a72.6).",
   "dialect": "mysql",
   "camelCase": true,
   "outFile": "src/core/db/types.generated.ts",

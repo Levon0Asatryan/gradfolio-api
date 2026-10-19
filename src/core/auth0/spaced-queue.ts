@@ -2,7 +2,7 @@
  * Runs calls one at a time, each starting at least `spacingMs` after the one
  * before it started, and none before a pause set by a rate-limit answer ends.
  * The Free tenant's Management API allows 2 requests per second with a burst
- * of 2 (docs/m7-plan.md §1.3), so every call to it goes through one queue.
+ * of 2 (docs/modules/m7/plan.md §1.3), so every call to it goes through one queue.
  *
  * A caller's signal bounds its whole wait: an aborted caller leaves the queue
  * without running, and the queue keeps its order for everyone behind it.

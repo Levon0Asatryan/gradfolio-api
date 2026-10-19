@@ -5,7 +5,7 @@ import type { DB } from '../../../core/db/types.generated.js';
 import { githubImportSnapshot } from '../../../core/validation/json-shapes.js';
 
 /**
- * Reads and writes of GitHub-imported projects (docs/m7-plan.md §3.3, §3.5).
+ * Reads and writes of GitHub-imported projects (docs/modules/m7/plan.md §3.3, §3.5).
  * Every statement is scoped to the caller's `user_id` (or goes through a
  * project the caller owns).
  */

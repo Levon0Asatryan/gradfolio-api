@@ -183,7 +183,7 @@ export async function seed(db: Database): Promise<void> {
     }
 
     // The imported draft's snapshot: what a re-sync compares edits against. As an
-    // import writes it, from the stored values (docs/m7-plan.md §3.5).
+    // import writes it, from the stored values (docs/modules/m7/plan.md §3.5).
     for (const p of projects) {
       if (p.source !== 'github') continue;
       await trx

@@ -11,7 +11,7 @@ import { startTestTenant, type TestTenant } from '../../../testing/jwks.js';
 import { db } from '../../../testing/team.js';
 
 /**
- * `verified` is "email verified or GitHub connected" (D5, docs/m7-plan.md §5.1),
+ * `verified` is "email verified or GitHub connected" (D5, docs/modules/m7/plan.md §5.1),
  * recomputed on every request: without the GitHub half, a connected student
  * with an unverified email flips back to false on the next request.
  */

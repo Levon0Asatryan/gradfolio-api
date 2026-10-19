@@ -1,7 +1,7 @@
 import { AppError } from '../errors/app-error.js';
 
 /**
- * How GitHub's answers reach our caller (docs/m7-plan.md §3.1). Each carries a
+ * How GitHub's answers reach our caller (docs/modules/m7/plan.md §3.1). Each carries a
  * fixed message; GitHub's status goes to the log, its body never does.
  */
 

@@ -1,4 +1,4 @@
-### api/integrations -- the caller's GitHub and LinkedIn connections (docs/m7-plan.md §7)
+### api/integrations -- the caller's GitHub and LinkedIn connections (docs/modules/m7/plan.md §7)
 #
 # Needs an Auth0 access token for the Gradfolio API audience (see me.http), and,
 # for the GitHub routes, a server with all five GitHub connect credentials set

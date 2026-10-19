@@ -354,7 +354,7 @@ describe('loadConfig', () => {
   });
 });
 
-describe('GitHub connect settings (docs/m7-plan.md §8)', () => {
+describe('GitHub connect settings (docs/modules/m7/plan.md §8)', () => {
   const GITHUB = {
     AUTH0_CLIENT_ID: 'spa-client',
     AUTH0_M2M_CLIENT_ID: 'm2m-client',
@@ -448,7 +448,7 @@ describe('GitHub connect settings (docs/m7-plan.md §8)', () => {
   });
 });
 
-describe('AUTH0_DELETE_USERS (docs/m7-plan.md §2.8)', () => {
+describe('AUTH0_DELETE_USERS (docs/modules/m7/plan.md §2.8)', () => {
   const FIVE = {
     AUTH0_CLIENT_ID: 'spa',
     AUTH0_M2M_CLIENT_ID: 'm2m',
@@ -467,7 +467,7 @@ describe('AUTH0_DELETE_USERS (docs/m7-plan.md §2.8)', () => {
   });
 });
 
-describe('suggestion settings (docs/m7-plan.md §6)', () => {
+describe('suggestion settings (docs/modules/m7/plan.md §6)', () => {
   it('default sensibly, and the university domains default to none', () => {
     expect(loadConfig(REQUIRED)).toMatchObject({
       SUGGESTIONS_MIN_INTERVAL_S: 900,

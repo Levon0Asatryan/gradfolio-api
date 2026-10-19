@@ -2,7 +2,7 @@ import sanitizeHtml from 'sanitize-html';
 import { sanitizeDescription, type SanitizedHtml } from '../validation/html.js';
 
 /**
- * A GitHub-rendered README to a project description (docs/m7-plan.md §3.4, D3).
+ * A GitHub-rendered README to a project description (docs/modules/m7/plan.md §3.4, D3).
  *
  * Two passes. The first only rewrites what GitHub leaves relative; the second
  * is `sanitizeDescription`, the same allow-list every description goes

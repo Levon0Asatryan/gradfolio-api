@@ -6,7 +6,7 @@ import {
 } from '../../profiles/dto/section.dto.js';
 
 /**
- * The contract of the LinkedIn export import (docs/m7-plan.md §4.2, §4.3; §7
+ * The contract of the LinkedIn export import (docs/modules/m7/plan.md §4.2, §4.3; §7
  * items 8–10). Documented in openapi.yaml now; served from M7 PR (c). The ZIP
  * goes from the browser straight to the bucket; the API derives its key from
  * the caller and the upload id, so a client never names a key or a URL.
