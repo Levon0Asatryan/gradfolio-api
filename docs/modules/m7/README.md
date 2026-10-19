@@ -45,11 +45,7 @@ finding. The findings were re-landed in #104, #123 and task M7-T30.
 **Status legend:** `todo` (not started), `in progress` (a task chat is working on it),
 `review` (PR open), `done` (merged and deployed), `blocked` (waiting on something that is
 not a task; the Depends column says what). The module chat updates this table in a small
-<<<<<<< HEAD
-docs PR whenever a task changes state. **Last updated: 2026-10-19** (done: T20–T24, T27, T28, T30, T29 (api #111), T31, T34 (fe #132), T36 (api #112); in progress: T25; free: T50, T52; blocked: T40–T43, T51).
-=======
-docs PR whenever a task changes state. **Last updated: 2026-10-19** (done: T20–T24, T25 (api #114), T27, T28, T30, T29 (api #111), T31, T34 (fe #132), T36 (api #112); in progress: none; free: T32, T33, T35, T50, T52; blocked: T40–T43, T51).
->>>>>>> origin/main
+docs PR whenever a task changes state. **Last updated: 2026-10-19** (done: T20–T24, T25 (api #114), T27, T28, T30, T29 (api #111), T31, T34 (fe #132), T36 (api #112); in progress: T32, T33, T35; free: T50, T52; blocked: T40–T43, T51).
 
 The **Status** column is the status of record. **Depends on** lists tasks that must be
 **merged** first. Task IDs start at T20 because **M7-T1 to M7-T13 are Levon's queue rows**
