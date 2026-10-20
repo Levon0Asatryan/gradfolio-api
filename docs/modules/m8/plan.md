@@ -6,8 +6,8 @@ Provider/domain and production acceptance remain open. See
 [verification.md](verification.md) and [email.md](email.md).
 
 The design below was based on the checkout before implementation on 2026-10-20.
-The tracker is older than several merged milestones; this plan uses source and
-the deployment runbook when they disagree with its status or hosting notes.
+The implementation has since been rebased on main at 3cd6f54. Existing M7
+changes are preserved, and the additive email migration is now 0012.
 
 ## 1. Scope and source of truth
 
@@ -19,9 +19,9 @@ the deployment runbook when they disagree with its status or hosting notes.
 | 8.8     | Settings for invitation emails and their language                                        | Settings and REL-03/04 |
 | 8.2–8.5 | **Stretch:** AI summary, tag suggestions, full portfolio PDF, share by email             | REL-02 only if enabled |
 
-Sources: [tracker.md](tracker.md) M8 and Q10,
-[feature-specification.md](spec/feature-specification.md) §§4, 7, and
-[test-cases.md](qa/test-cases.md) REL-01–03. The manually entered project
+Sources: [tracker.md](../../tracker.md) M8 and Q10,
+[feature-specification.md](../../reference/spec/feature-specification.md) §§4, 7, and
+[test-cases.md](../../qa/test-cases.md) REL-01–03. The manually entered project
 `summary` already exists and remains available without AI. An attachment of type
 `pdf` is not a generated resume. Sharing a resume by email is not part of 8.1.
 

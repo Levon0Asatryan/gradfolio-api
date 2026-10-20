@@ -1,0 +1,27 @@
+### M8: own resume and email preferences
+@baseUrl = {{$dotenv baseUrl}}
+@accessToken = {{$dotenv accessToken}}
+
+### Download the caller's resume; response is application/pdf, never cached
+POST {{baseUrl}}/v1/me/resume
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"sections":["bio","education","experience","projects","skills","certifications"],"language":"am","includePrivateProjects":false}
+
+### Read the caller's invitation email preferences
+GET {{baseUrl}}/v1/me/email-preferences
+Authorization: Bearer {{accessToken}}
+
+### Disable invitation email; the public contact email is unrelated
+PATCH {{baseUrl}}/v1/me/email-preferences
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"teamInvitesEnabled":false,"preferredLanguage":"am"}
+
+### Signed unsubscribe (public POST); use a locally generated test token only
+POST {{baseUrl}}/v1/email/unsubscribe
+Content-Type: application/json
+
+{"token":"replace-with-a-signed-test-token"}

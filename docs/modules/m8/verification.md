@@ -7,6 +7,43 @@ deployment or real email send was performed.
 The user requested provider-independent email infrastructure with sending disabled
 until a provider and domain are available. This is the implemented email scope.
 
+## PR revalidation on current main
+
+The implementation was rebased onto API `3cd6f54` and frontend `e0f3d53` before
+publication. M7 changes are preserved. The additive email migration is `0012_email`,
+after the existing deletion-tombstone and suggestions-notification migrations.
+
+- API: 1,119 unit tests / 66 files; coverage statements 95.39%, branches 91.12%,
+  functions 95.03%, lines 96.66%. ESLint, TypeScript, OpenAPI check, build and
+  `db:types:check` passed.
+- Frontend: 1,635 tests / 148 files; coverage statements 89.74%, branches 85.75%,
+  functions 86.20%, lines 91.03%. ESLint, TypeScript, knip and production build
+  passed. API snapshot matches byte for byte and pins API commit `0a80c0f`.
+- Prettier passed on tracked files in both repositories. Unrelated untracked QA
+  artifacts were excluded from the PRs. The npm hooks could not run on the host;
+  their checks were run explicitly with npm in Docker instead.
+- Full MySQL run: 1,026/1,028 passed, including every M8 HTTP/outbox test and the
+  new migration's up/down preservation tests. The two failures were a pre-existing
+  nonce expiry assertion comparing against the request start (5 ms discrepancy),
+  and the full-schema round trip exceeding the local 20-second timeout. The nonce
+  assertion now bounds issuance by the response time. Re-running both affected
+  files passed all 71 tests, using a local `--testTimeout=60000` override; the
+  full-schema round trip completed in 17.88 seconds. No production runtime or
+  global test timeout was changed.
+
+Manual review traced caller resolution, section/project allow-lists, SQL ownership,
+transactional invite/outbox writes, leases/idempotency and template escaping.
+Frontend review traced same-origin bounded input, server-only tokens, no-store
+responses, localized failure handling and dialog/Settings controls. The rule corpus
+and repository authorization/concurrency rules were checked. This was a manual
+four-pass review, not execution of the agent review workflow.
+
+Not verified: exhaustive guard-removal mutation tests, a signed-in deployed browser
+journey, or real provider delivery/webhook/scheduling. These remain explicit
+acceptance gaps; no deployed result is claimed. The evidence below records the
+earlier implementation checks and remains historical rather than replacing this
+current-main revalidation.
+
 ## Delivered
 
 | Item                     | Local result                                                                                                                                                                                                            |
