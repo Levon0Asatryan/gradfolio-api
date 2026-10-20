@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { APP_CONFIG } from '../../../core/config/config.module.js';
 import type { AppConfig } from '../../../core/config/schema.js';
+import { cancelInviteEmail, enqueueInviteEmail } from '../../../core/email/outbox.js';
 import { DbService } from '../../../core/db/db.service.js';
 import { newId } from '../../../core/db/ids.js';
 import { isMysqlError, MysqlErrno } from '../../../core/db/mysql-errors.js';
@@ -82,13 +83,24 @@ export class TeamWriteService {
         } else {
           throw new ConflictError('ALREADY_MEMBER', 'already invited or on the team');
         }
-        await insertTeamNotification(trx, {
+        const eventId = await insertTeamNotification(trx, {
           userId: invitee.id,
           type: 'team_invite',
           actor: owner,
           project,
           role: input.role,
         });
+        await enqueueInviteEmail(
+          trx,
+          {
+            id: eventId,
+            recipientId: invitee.id,
+            projectId,
+            actorName: owner.name,
+            projectTitle: project.title,
+          },
+          this.cfg,
+        );
         await recordActivity(trx, owner.id, 'teamInvited', {
           projectId,
           projectName: project.title,
@@ -131,7 +143,14 @@ export class TeamWriteService {
       if ((await lockOwnedProject(trx, ownerId, projectId)) === undefined) {
         throw new NotFoundError('project');
       }
+      const removed = await trx
+        .selectFrom('projectTeamMembers')
+        .select('userId')
+        .where('projectId', '=', projectId)
+        .where('id', '=', memberId)
+        .executeTakeFirst();
       if ((await deleteMember(trx, projectId, memberId)) === 0) throw new NotFoundError('member');
+      if (removed?.userId) await cancelInviteEmail(trx, projectId, removed.userId);
     });
   }
 
@@ -165,6 +184,7 @@ export class TeamWriteService {
       if ((await answerInvite(trx, mine.id, { status, name: user.name })) === 0) {
         throw new ConflictError('INVITE_NOT_PENDING', 'the invitation is not pending');
       }
+      await cancelInviteEmail(trx, projectId, user.id);
       await insertTeamNotification(trx, {
         userId: project.userId,
         type: status === 'accepted' ? 'team_accepted' : 'team_rejected',

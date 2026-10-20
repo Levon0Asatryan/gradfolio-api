@@ -3,6 +3,8 @@ export const RATE_BUDGETS = [
   'search',
   'import',
   'ai',
+  'pdf',
+  'email',
   'upload',
   'lookup',
   'browse',

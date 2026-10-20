@@ -113,6 +113,16 @@ export const COLUMN_LIMITS = {
   'notifications.reference_id': chars(36),
   'notifications.reference_type': chars(50),
   'notifications.link': TEXT,
+
+  'email_outbox.id': chars(36),
+  'email_outbox.recipient_user_id': chars(36),
+  'email_outbox.project_id': chars(36),
+  'email_outbox.actor_name': chars(255),
+  'email_outbox.project_title': chars(500),
+  'email_outbox.lease_token': chars(36),
+  'email_outbox.provider_message_id': chars(255),
+  'email_outbox.destination_hash': chars(64),
+  'email_outbox.failure_code': chars(50),
 } as const satisfies Record<string, ColumnLimit>;
 
 export type StringColumn = keyof typeof COLUMN_LIMITS;

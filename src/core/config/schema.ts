@@ -130,6 +130,36 @@ const rateLimit = {
   RATE_LIMIT_SEARCH: z.coerce.number().int().min(1).max(100_000).default(30),
   RATE_LIMIT_IMPORT: z.coerce.number().int().min(1).max(100_000).default(5),
   RATE_LIMIT_AI: z.coerce.number().int().min(1).max(100_000).default(10),
+  RATE_LIMIT_PDF: z.coerce.number().int().min(1).max(1000).default(5),
+  RESUME_MAX_PROJECTS: z.coerce.number().int().min(1).max(50).default(50),
+  RESUME_MAX_CHARS: z.coerce.number().int().min(1000).max(200_000).default(60_000),
+  RESUME_MAX_PAGES: z.coerce.number().int().min(1).max(30).default(10),
+  RESUME_MAX_BYTES: z.coerce.number().int().min(1000).max(4_000_000).default(2_000_000),
+  RESUME_RENDER_TIMEOUT_MS: z.coerce.number().int().min(100).max(10_000).default(5000),
+  RATE_LIMIT_EMAIL: z.coerce.number().int().min(1).max(1000).default(10),
+  EMAIL_DELIVERY_ENABLED: envBoolean('false'),
+  EMAIL_PUBLIC_URL: z.url().optional(),
+  EMAIL_UNSUBSCRIBE_SECRET: z.string().min(32).optional(),
+  EMAIL_UNSUBSCRIBE_TTL_S: z.coerce
+    .number()
+    .int()
+    .min(3600)
+    .max(90 * 86400)
+    .default(30 * 86400),
+  EMAIL_INVITE_COOLDOWN_S: z.coerce
+    .number()
+    .int()
+    .min(86400)
+    .max(30 * 86400)
+    .default(86400),
+  EMAIL_INVITE_MAX_AGE_S: z.coerce.number().int().min(60).max(86400).default(86400),
+  EMAIL_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
+  EMAIL_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
+  EMAIL_LEASE_S: z.coerce.number().int().min(30).max(3600).default(120),
+  EMAIL_RETRY_BASE_S: z.coerce.number().int().min(1).max(3600).default(60),
+  EMAIL_RETRY_MAX_S: z.coerce.number().int().min(60).max(86400).default(3600),
+  EMAIL_RETENTION_DAYS: z.coerce.number().int().min(2).max(90).default(30),
+  EMAIL_SEND_TIMEOUT_MS: z.coerce.number().int().min(100).max(30_000).default(10_000),
   RATE_LIMIT_LOOKUP: z.coerce.number().int().min(1).max(100_000).default(30),
   RATE_LIMIT_UPLOAD: z.coerce.number().int().min(1).max(100_000).default(20),
   // Browse, tag pages and the tag cloud (docs/modules/m6/plan.md §9).
@@ -510,6 +540,44 @@ export const configSchema = z
     ...integrations,
     ...suggestions,
   })
+  .refine((c) => c.EMAIL_SEND_TIMEOUT_MS < c.EMAIL_LEASE_S * 1000, {
+    message: 'must be shorter than EMAIL_LEASE_S',
+    path: ['EMAIL_SEND_TIMEOUT_MS'],
+  })
+  .refine((c) => c.EMAIL_UNSUBSCRIBE_TTL_S > c.EMAIL_INVITE_MAX_AGE_S, {
+    message: 'must exceed EMAIL_INVITE_MAX_AGE_S',
+    path: ['EMAIL_UNSUBSCRIBE_TTL_S'],
+  })
+  .refine((c) => c.EMAIL_RETENTION_DAYS * 86400 >= c.EMAIL_INVITE_COOLDOWN_S, {
+    message: 'must cover EMAIL_INVITE_COOLDOWN_S',
+    path: ['EMAIL_RETENTION_DAYS'],
+  })
+  .refine(
+    (c) =>
+      !c.EMAIL_DELIVERY_ENABLED ||
+      (c.EMAIL_UNSUBSCRIBE_SECRET !== undefined && c.EMAIL_PUBLIC_URL !== undefined),
+    {
+      message: 'enabled delivery needs EMAIL_PUBLIC_URL and EMAIL_UNSUBSCRIBE_SECRET',
+      path: ['EMAIL_DELIVERY_ENABLED'],
+    },
+  )
+  .refine(
+    (c) =>
+      c.EMAIL_PUBLIC_URL === undefined ||
+      (() => {
+        const url = new URL(c.EMAIL_PUBLIC_URL);
+        return (
+          (url.protocol === 'https:' ||
+            (c.NODE_ENV !== 'production' && url.protocol === 'http:')) &&
+          !url.username &&
+          !url.password &&
+          url.pathname === '/' &&
+          !url.search &&
+          !url.hash
+        );
+      })(),
+    { message: 'must be an http(s) origin, https in production', path: ['EMAIL_PUBLIC_URL'] },
+  )
   .refine(tlsInProduction, TLS_IN_PRODUCTION)
   .refine(noTlsOnSocket, NO_TLS_ON_SOCKET)
   .refine((c) => c.NODE_ENV !== 'production' || c.AUTH0_ISSUER_BASE_URL.startsWith('https:'), {

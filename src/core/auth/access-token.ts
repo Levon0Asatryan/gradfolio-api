@@ -17,6 +17,8 @@ export interface AccessTokenIdentity {
   email?: string;
   /** Absent claim = not verified. */
   emailVerified: boolean;
+  /** Whether Auth0 explicitly supplied the email verification claim. */
+  emailVerificationPresent?: boolean;
   name?: string;
   picture?: string;
   headline?: string;
@@ -115,6 +117,7 @@ function identityOf(payload: JWTPayload): AccessTokenIdentity {
     sub: sub.data,
     email: p.email,
     emailVerified: p.email_verified === true,
+    ...(p.email_verified !== undefined ? { emailVerificationPresent: true } : {}),
     name: p.name,
     picture: p.picture,
     headline: p.headline,

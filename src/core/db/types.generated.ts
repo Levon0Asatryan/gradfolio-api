@@ -48,6 +48,26 @@ export interface Education {
   userId: string;
 }
 
+export interface EmailOutbox {
+  actorName: string;
+  attempts: Generated<number>;
+  createdAt: Generated<Date>;
+  destinationHash: string | null;
+  failureCode: string | null;
+  firstAttemptAt: Date | null;
+  id: string;
+  language: "am" | "en" | "ru";
+  leaseExpiresAt: Date | null;
+  leaseToken: string | null;
+  nextAttemptAt: Generated<Date>;
+  projectId: string;
+  projectTitle: string;
+  providerMessageId: string | null;
+  recipientUserId: string;
+  sentAt: Date | null;
+  status: Generated<"bounced" | "canceled" | "complained" | "failed" | "leased" | "pending" | "sent" | "uncertain">;
+}
+
 export interface Experience {
   achievements: JsonColumn<StringList>;
   end: string | null;
@@ -198,6 +218,8 @@ export interface Users {
   contactEmail: string | null;
   createdAt: Generated<Date>;
   email: string | null;
+  emailSuppressed: Bool;
+  emailVerified: Bool;
   github: string | null;
   headline: Generated<string>;
   id: string;
@@ -207,6 +229,8 @@ export interface Users {
   name: string;
   onboardedAt: Date | null;
   phone: string | null;
+  preferredLanguage: Generated<"am" | "en" | "ru">;
+  teamInviteEmailEnabled: Bool;
   twitter: string | null;
   updatedAt: Generated<Date>;
   verified: Bool;
@@ -225,6 +249,7 @@ export interface DB {
   certifications: Certifications;
   deletedSubjects: DeletedSubjects;
   education: Education;
+  emailOutbox: EmailOutbox;
   experience: Experience;
   integrationNonces: IntegrationNonces;
   integrations: Integrations;

@@ -1,4 +1,11 @@
 import { z, type ZodObject, type ZodType } from 'zod';
+import { resumeRequestSchema } from '../resume/resume.dto.js';
+import {
+  emailPreferencesSchema,
+  emailPreferencesPatchSchema,
+  unsubscribeSchema,
+  unsubscribeResultSchema,
+} from '../email/email.dto.js';
 import { LIVENESS_PATH, READINESS_PATH } from '../health/constants.js';
 import { meResponseSchema } from '../me/dto/me.dto.js';
 import {
@@ -192,7 +199,7 @@ export interface Operation {
   body?: ZodType;
   /** The body may be left out (a request without one is valid). */
   bodyOptional?: boolean;
-  responses: Record<string, { description: string; schema?: ZodType }>;
+  responses: Record<string, { description: string; schema?: ZodType; contentType?: string }>;
   /** Needs `Authorization: Bearer <Auth0 access token>`. Every route except `@Public()` ones. */
   bearer?: boolean;
   /**
@@ -923,6 +930,73 @@ function plannedImportOperations(): Operation[] {
 export const OPERATIONS: readonly Operation[] = [
   {
     method: 'get',
+    path: '/v1/me/email-preferences',
+    operationId: 'getEmailPreferences',
+    tag: 'email',
+    bearer: true,
+    summary: 'Read your invitation email preference and language',
+    responses: {
+      '200': { description: 'Your preferences', schema: emailPreferencesSchema },
+      '404': notYours('account'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'patch',
+    path: '/v1/me/email-preferences',
+    operationId: 'updateEmailPreferences',
+    tag: 'email',
+    bearer: true,
+    summary: 'Change your invitation email preference and language',
+    body: emailPreferencesPatchSchema,
+    responses: {
+      '200': { description: 'Saved preferences', schema: emailPreferencesSchema },
+      '400': validationFailed,
+      '404': notYours('account'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'post',
+    path: '/v1/email/unsubscribe',
+    operationId: 'unsubscribeInvitationEmail',
+    tag: 'email',
+    summary: 'Disable invitation email with the signed link from an email',
+    body: unsubscribeSchema,
+    responses: {
+      '200': {
+        description: 'Unsubscribed, also for a replay or a deleted account',
+        schema: unsubscribeResultSchema,
+      },
+      '400': error('INVALID_UNSUBSCRIBE_TOKEN or VALIDATION_FAILED'),
+      '429': authenticatedFailures['429'],
+      '503': error('EMAIL_UNAVAILABLE'),
+    },
+  },
+  {
+    method: 'post',
+    path: '/v1/me/resume',
+    operationId: 'generateResume',
+    tag: 'resume',
+    summary: 'Download a resume PDF from selected sections of your profile',
+    bearer: true,
+    description:
+      'Private/draft own projects require explicit IDs and includePrivateProjects. Accepted-team projects must be public and published. Login email and internal fields are never included. Dedicated PDF budget; no stored copy.',
+    body: resumeRequestSchema,
+    responses: {
+      '200': {
+        description: 'Resume download; private, no-store',
+        schema: z.string().meta({ format: 'binary' }),
+        contentType: 'application/pdf',
+      },
+      '400': validationFailed,
+      '404': notYours('profile or project'),
+      '422': error('RESUME_TOO_LARGE: select less content'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'get',
     path: `/${LIVENESS_PATH}`,
     operationId: 'liveness',
     tag: 'health',
@@ -1611,7 +1685,7 @@ export function buildOpenApiDocument(
         ...(r.schema
           ? {
               content: {
-                'application/json': {
+                [r.contentType ?? 'application/json']: {
                   schema:
                     r.schema === errorResponseSchema
                       ? { $ref: '#/components/schemas/ErrorResponse' }

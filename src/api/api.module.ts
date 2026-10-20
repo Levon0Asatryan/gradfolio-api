@@ -26,6 +26,8 @@ import { RateLimitGuard } from './rate-limit/guards/rate-limit.guard.js';
 import { RateLimitModule } from './rate-limit/rate-limit.module.js';
 import { CurrentUserGuard } from './users/guards/current-user.guard.js';
 import { UsersModule } from './users/users.module.js';
+import { ResumeModule } from './resume/resume.module.js';
+import { EmailModule } from './email/email.module.js';
 
 @Module({
   imports: [
@@ -54,6 +56,8 @@ import { UsersModule } from './users/users.module.js';
     DashboardModule,
     IntegrationsModule,
     SuggestionsModule,
+    ResumeModule,
+    EmailModule,
   ],
   providers: [
     ErrorFilter,

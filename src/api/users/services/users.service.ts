@@ -92,6 +92,29 @@ export class UsersService implements OnModuleInit {
       const settled = await inTransaction(db, (trx) => syncVerified(trx, id, prefill.verified));
       if (settled !== undefined) user = { ...user, verified: settled };
     }
+    // Account email and its verification belong together; the public contactEmail is separate.
+    if (
+      identity.emailVerificationPresent &&
+      prefill.email !== null &&
+      (user.email !== prefill.email || user.emailVerified !== identity.emailVerified)
+    ) {
+      const emailChanged = user.email !== prefill.email;
+      await db
+        .updateTable('users')
+        .set({
+          email: prefill.email,
+          emailVerified: identity.emailVerified,
+          ...(emailChanged ? { emailSuppressed: false } : {}),
+        })
+        .where('id', '=', user.id)
+        .execute();
+      user = {
+        ...user,
+        email: prefill.email,
+        emailVerified: identity.emailVerified,
+        ...(emailChanged ? { emailSuppressed: false } : {}),
+      };
+    }
     return user;
   }
 }

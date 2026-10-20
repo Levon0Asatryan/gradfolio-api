@@ -70,6 +70,7 @@ describe('access token verification', () => {
       sub: 'google-oauth2|123',
       email: 'ani@example.com',
       emailVerified: true,
+      emailVerificationPresent: true,
       name: 'Ani',
       picture: 'https://example.com/a.png',
       headline: undefined,

@@ -49,6 +49,15 @@ export default defineConfig({
         'src/core/db/seed/perf-cli.ts',
         'src/core/db/resanitize-cli.ts',
         'src/core/storage/sweep-cli.ts',
+        // M8: snapshot visibility and transactional email delivery are exercised with
+        // real MySQL in resume.int.test.ts and email.int.test.ts. Pure rendering,
+        // tokens and templates remain in the unit coverage denominator.
+        'src/api/resume/resume.service.ts',
+        'src/api/resume/resume.controller.ts',
+        'src/api/email/email.controller.ts',
+        'src/core/email/outbox.ts',
+        'src/core/email/worker.ts',
+        'src/core/email/cli.ts',
         // Rows against objects: proved against MySQL by sweep.int.test.ts.
         'src/core/storage/sweep.ts',
         // Rows in, rows out against MySQL: proved by resanitize.int.test.ts.
