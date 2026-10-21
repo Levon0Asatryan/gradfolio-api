@@ -2,7 +2,7 @@ import { sql, type Transaction } from 'kysely';
 import type { AppConfig } from '../config/schema.js';
 import type { DB } from '../db/types.generated.js';
 
-/** Answered or removed invitations must not be mailed after a later re-invitation. */
+/** Cancel work before dispatch; an in-flight provider outcome must remain recordable. */
 export async function cancelInviteEmail(
   trx: Transaction<DB>,
   projectId: string,

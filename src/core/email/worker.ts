@@ -24,7 +24,7 @@ export class EmailWorker {
       )
       .where((eb) =>
         eb.or([
-          eb('status', '<>', 'leased'),
+          eb('status', 'not in', ['leased', 'dispatching']),
           eb('leaseExpiresAt', '<=', sql<Date>`UTC_TIMESTAMP(3)`),
         ]),
       )
@@ -36,6 +36,7 @@ export class EmailWorker {
     for (; processed < this.cfg.EMAIL_BATCH_SIZE; processed++) {
       const row = await this.claim();
       if (!row) break;
+      let dispatchStarted = row.status === 'dispatching';
       const settle = async (
         status: 'sent' | 'failed' | 'pending' | 'uncertain' | 'canceled',
         fields: { providerMessageId?: string; failureCode?: string } = {},
@@ -55,13 +56,13 @@ export class EmailWorker {
               : {}),
           })
           .where('id', '=', row.id)
-          .where('status', '=', 'leased')
+          .where('status', '=', dispatchStarted ? 'dispatching' : 'leased')
           .where('leaseToken', '=', row.leaseToken)
           .execute();
       };
       // A stale claim may have reached the provider. Only a still-valid idempotency promise makes retry safe.
       if (
-        row.status === 'leased' &&
+        row.status === 'dispatching' &&
         (!row.firstAttemptAt ||
           Date.now() - row.firstAttemptAt.getTime() >= this.mailer.idempotencyWindowMs)
       ) {
@@ -69,13 +70,13 @@ export class EmailWorker {
         continue;
       }
       if (row.attempts >= this.cfg.EMAIL_MAX_ATTEMPTS) {
-        await settle(row.status === 'leased' ? 'uncertain' : 'failed', {
+        await settle(row.status === 'dispatching' ? 'uncertain' : 'failed', {
           failureCode: 'ATTEMPTS_EXHAUSTED',
         });
         continue;
       }
       if (Date.now() - row.createdAt.getTime() > this.cfg.EMAIL_INVITE_MAX_AGE_S * 1000) {
-        await settle('canceled', { failureCode: 'EXPIRED' });
+        await settle(dispatchStarted ? 'uncertain' : 'canceled', { failureCode: 'EXPIRED' });
         continue;
       }
       const recipient = await this.db
@@ -97,7 +98,7 @@ export class EmailWorker {
         !recipient.teamInviteEmailEnabled ||
         !pending
       ) {
-        await settle('canceled', { failureCode: 'INELIGIBLE' });
+        await settle(dispatchStarted ? 'uncertain' : 'canceled', { failureCode: 'INELIGIBLE' });
         continue;
       }
       const destinationHash = createHash('sha256').update(recipient.email).digest('hex');
@@ -105,14 +106,17 @@ export class EmailWorker {
         await settle('uncertain', { failureCode: 'DESTINATION_CHANGED' });
         continue;
       }
+      // Dispatch is the cancellation boundary: either cancellation wins this CAS,
+      // or it must leave the lease intact so the provider outcome can be recorded.
       const claimed = await this.db
         .updateTable('emailOutbox')
-        .set({ destinationHash })
+        .set({ destinationHash, status: 'dispatching' })
         .where('id', '=', row.id)
         .where('leaseToken', '=', row.leaseToken)
-        .where('status', '=', 'leased')
+        .where('status', '=', dispatchStarted ? 'dispatching' : 'leased')
         .executeTakeFirst();
       if (Number(claimed.numUpdatedRows) === 0) continue;
+      dispatchStarted = true;
       try {
         const content = inviteEmail(
           row.language,
@@ -179,7 +183,7 @@ export class EmailWorker {
               eb('nextAttemptAt', '<=', sql<Date>`UTC_TIMESTAMP(3)`),
             ]),
             eb.and([
-              eb('status', '=', 'leased'),
+              eb('status', 'in', ['leased', 'dispatching']),
               eb('leaseExpiresAt', '<=', sql<Date>`UTC_TIMESTAMP(3)`),
             ]),
           ]),
@@ -195,7 +199,7 @@ export class EmailWorker {
       await trx
         .updateTable('emailOutbox')
         .set({
-          status: 'leased',
+          status: row.status === 'dispatching' ? 'dispatching' : 'leased',
           leaseToken,
           leaseExpiresAt: sql<Date>`DATE_ADD(UTC_TIMESTAMP(3), INTERVAL ${this.cfg.EMAIL_LEASE_S} SECOND)`,
           firstAttemptAt: row.firstAttemptAt ?? sql<Date>`UTC_TIMESTAMP(3)`,

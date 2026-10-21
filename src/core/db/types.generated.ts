@@ -65,7 +65,7 @@ export interface EmailOutbox {
   providerMessageId: string | null;
   recipientUserId: string;
   sentAt: Date | null;
-  status: Generated<"bounced" | "canceled" | "complained" | "failed" | "leased" | "pending" | "sent" | "uncertain">;
+  status: Generated<"bounced" | "canceled" | "complained" | "dispatching" | "failed" | "leased" | "pending" | "sent" | "uncertain">;
 }
 
 export interface Experience {

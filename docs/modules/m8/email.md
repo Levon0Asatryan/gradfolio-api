@@ -96,3 +96,16 @@ Rollback the API revision as described in [deploy.md](../../ops/deploy.md); the 
 schema remains compatible with the old revision. Keep delivery disabled during
 provider changes. Do not run the down migration in production to undo a code
 deployment: it removes preferences and delivery records.
+
+## Dispatch and snapshots
+
+Cancellation wins while work is pending or leased. Immediately before the provider
+call, the worker atomically changes the owned lease to `dispatching`. Cancellation
+leaves that state intact, so the provider outcome and message ID can still be
+recorded. Work already dispatched cannot be recalled. Expired dispatches require
+the provider idempotency guarantee or become uncertain; they are never silently
+recorded as canceled.
+
+The email language is snapshotted at enqueue with the actor/project text. Changing
+the preference affects future invitations. Retries keep the same language and body
+for the stable provider idempotency key.

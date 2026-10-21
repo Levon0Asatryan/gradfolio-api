@@ -3,14 +3,14 @@ import { sql } from 'kysely';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { buildApp, captureLogs } from '../../testing/app.js';
-import { testConfig, testDatabase } from '../../testing/database.js';
-import { createProject, createUser } from '../../testing/factories.js';
-import { startTestTenant, type TestTenant } from '../../testing/jwks.js';
-import { enqueueInviteEmail } from '../../core/email/outbox.js';
-import { EmailWorker } from '../../core/email/worker.js';
-import { MailDeliveryError, type EmailMessage, type Mailer } from '../../core/email/mailer.js';
-import { unsubscribeToken } from '../../core/email/unsubscribe.js';
+import { buildApp, captureLogs } from '../../../testing/app.js';
+import { testConfig, testDatabase } from '../../../testing/database.js';
+import { createProject, createUser } from '../../../testing/factories.js';
+import { startTestTenant, type TestTenant } from '../../../testing/jwks.js';
+import { enqueueInviteEmail } from '../../../core/email/outbox.js';
+import { EmailWorker } from '../../../core/email/worker.js';
+import { MailDeliveryError, type EmailMessage, type Mailer } from '../../../core/email/mailer.js';
+import { unsubscribeToken } from '../../../core/email/unsubscribe.js';
 
 const db = testDatabase();
 const secret = 'email-test-secret-'.repeat(3);
@@ -76,6 +76,98 @@ async function people() {
 const rows = () => db.selectFrom('emailOutbox').selectAll().orderBy('createdAt').execute();
 
 describe('email preferences and invitation outbox', () => {
+  it.each(['reject', 'remove'] as const)(
+    'records an in-flight delivery when the invitation is %s',
+    async (action) => {
+      const { invite, project, invitee, owner } = await people();
+      await invite().expect(201);
+      let entered!: () => void;
+      let finish!: () => void;
+      const sending = new Promise<void>((resolve) => {
+        entered = resolve;
+      });
+      const release = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      const worker = new EmailWorker(db, cfg, {
+        idempotencyWindowMs: 86400_000,
+        async send() {
+          entered();
+          await release;
+          return { messageId: 'delivered-after-answer' };
+        },
+      });
+      const run = worker.runBatch();
+      await sending;
+      try {
+        expect((await rows())[0]?.status).toBe('dispatching');
+        if (action === 'reject') {
+          await request(app.getHttpServer())
+            .post(`/v1/projects/${project.id}/team/me/reject`)
+            .set({ Authorization: `Bearer ${await tenant.sign({ sub: invitee.auth0Id })}` })
+            .expect(200);
+        } else {
+          const member = await db
+            .selectFrom('projectTeamMembers')
+            .select('id')
+            .where('projectId', '=', project.id)
+            .executeTakeFirstOrThrow();
+          await request(app.getHttpServer())
+            .delete(`/v1/projects/${project.id}/team/${member.id}`)
+            .set({ Authorization: `Bearer ${await tenant.sign({ sub: owner.auth0Id })}` })
+            .expect(204);
+        }
+        expect((await rows())[0]?.status).toBe('dispatching');
+      } finally {
+        finish();
+        await run;
+      }
+      expect((await rows())[0]).toMatchObject({
+        status: 'sent',
+        providerMessageId: 'delivered-after-answer',
+      });
+    },
+  );
+
+  it('cancellation wins over a reserved lease before dispatch', async () => {
+    const { invite, project, invitee } = await people();
+    await invite().expect(201);
+    await db
+      .updateTable('emailOutbox')
+      .set({ status: 'leased', leaseToken: randomUUID(), leaseExpiresAt: new Date(0) })
+      .execute();
+    await request(app.getHttpServer())
+      .post(`/v1/projects/${project.id}/team/me/reject`)
+      .set({ Authorization: `Bearer ${await tenant.sign({ sub: invitee.auth0Id })}` })
+      .expect(200);
+    const fake = new FakeMailer();
+    await new EmailWorker(db, cfg, fake).runBatch();
+    expect(fake.accepted.size).toBe(0);
+    expect((await rows())[0]?.status).toBe('canceled');
+  });
+
+  it('keeps an expired dispatch uncertain after cancellation instead of losing its outcome', async () => {
+    const { invite, project, invitee } = await people();
+    await invite().expect(201);
+    await db
+      .updateTable('emailOutbox')
+      .set({
+        status: 'dispatching',
+        leaseToken: randomUUID(),
+        leaseExpiresAt: new Date(0),
+        firstAttemptAt: new Date(),
+      })
+      .execute();
+    await request(app.getHttpServer())
+      .post(`/v1/projects/${project.id}/team/me/reject`)
+      .set({ Authorization: `Bearer ${await tenant.sign({ sub: invitee.auth0Id })}` })
+      .expect(200);
+    const fake = new FakeMailer();
+    await new EmailWorker(db, cfg, fake).runBatch();
+    expect(fake.accepted.size).toBe(0);
+    expect((await rows())[0]?.status).toBe('uncertain');
+  });
+
   it('refreshes the account email and verification together, preserving known state for absent claims', async () => {
     const user = await createUser(db, {
       auth0Id: `auth0|email-sync-${randomUUID()}`,
@@ -336,7 +428,7 @@ describe('email preferences and invitation outbox', () => {
     // Simulate the DB acknowledgment being lost after acceptance: the old claim expires.
     await db
       .updateTable('emailOutbox')
-      .set({ status: 'leased', leaseToken: randomUUID(), leaseExpiresAt: new Date(0) })
+      .set({ status: 'dispatching', leaseToken: randomUUID(), leaseExpiresAt: new Date(0) })
       .execute();
     await new EmailWorker(db, cfg, fake).runBatch();
     expect(fake.accepted.size).toBe(1);

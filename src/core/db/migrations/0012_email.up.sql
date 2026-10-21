@@ -15,7 +15,7 @@ CREATE TABLE email_outbox (
   actor_name VARCHAR(255) NOT NULL,
   project_title VARCHAR(500) NOT NULL,
   language ENUM('en','ru','am') NOT NULL,
-  status ENUM('pending','leased','sent','failed','canceled','uncertain','bounced','complained') NOT NULL DEFAULT 'pending',
+  status ENUM('pending','leased','dispatching','sent','failed','canceled','uncertain','bounced','complained') NOT NULL DEFAULT 'pending',
   attempts INT UNSIGNED NOT NULL DEFAULT 0,
   next_attempt_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   first_attempt_at DATETIME(3) NULL,
