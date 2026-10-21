@@ -31,6 +31,11 @@ after the existing deletion-tombstone and suggestions-notification migrations.
   full-schema round trip completed in 17.88 seconds. No production runtime or
   global test timeout was changed.
 
+GitHub CI on the initial PR head passed static checks, unit coverage, the entire
+MySQL integration suite and migration checks. Its container-stack smoke still
+expected 18 application tables; migration 0012 correctly creates the nineteenth,
+`email_outbox`. The smoke assertion is updated to 19 with this migration.
+
 Manual review traced caller resolution, section/project allow-lists, SQL ownership,
 transactional invite/outbox writes, leases/idempotency and template escaping.
 Frontend review traced same-origin bounded input, server-only tokens, no-store
