@@ -1,0 +1,11 @@
+### M8: own resume
+@baseUrl = {{$dotenv baseUrl}}
+@accessToken = {{$dotenv accessToken}}
+
+### Download the caller's resume; response is application/pdf, never cached
+POST {{baseUrl}}/v1/me/resume
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{"sections":["bio","education","experience","projects","skills","certifications"],"language":"am","includePrivateProjects":false}
+

@@ -1,12 +1,12 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { buildApp } from '../../testing/app.js';
-import { testConfig, testDatabase } from '../../testing/database.js';
-import { createProfile, createProject, createUser } from '../../testing/factories.js';
-import { startTestTenant, type TestTenant } from '../../testing/jwks.js';
-import { resumeRequestSchema } from './resume.dto.js';
-import { ResumeService } from './resume.service.js';
+import { buildApp } from '../../../testing/app.js';
+import { testConfig, testDatabase } from '../../../testing/database.js';
+import { createProfile, createProject, createUser } from '../../../testing/factories.js';
+import { startTestTenant, type TestTenant } from '../../../testing/jwks.js';
+import { resumeRequestSchema } from '../dto/resume.dto.js';
+import { ResumeService } from '../services/resume.service.js';
 
 const db = testDatabase();
 let app: NestExpressApplication;

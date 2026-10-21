@@ -1,20 +1,30 @@
-import { z, type ZodObject, type ZodType } from 'zod';
-import { resumeRequestSchema } from '../resume/resume.dto.js';
+import { activityPageSchema, activityQuerySchema } from '../activities/dto/activity.dto.js';
+import { dashboardSchema } from '../dashboard/dto/dashboard.dto.js';
+import {
+  browseProjectsQuerySchema,
+  browseUsersQuerySchema,
+  discoveryProjectPageSchema,
+  personPageSchema,
+  searchPageQuerySchema,
+  searchQuerySchema,
+  searchResultsSchema,
+  suggestionsQuerySchema,
+  suggestionsSchema,
+  tagPageQuerySchema,
+  tagQuerySchema,
+  tagCloudQuerySchema,
+  tagCloudSchema,
+  tagSummarySchema,
+  userFacetsSchema,
+} from '../discovery/dto/discovery.dto.js';
 import {
   emailPreferencesSchema,
   emailPreferencesPatchSchema,
   unsubscribeSchema,
   unsubscribeResultSchema,
-} from '../email/email.dto.js';
+} from '../email/dto/email.dto.js';
+import { uploadRequestSchema, uploadResponseSchema } from '../files/dto/upload.dto.js';
 import { LIVENESS_PATH, READINESS_PATH } from '../health/constants.js';
-import { meResponseSchema } from '../me/dto/me.dto.js';
-import {
-  attachmentParamsSchema,
-  createAttachmentSchema,
-  patchAttachmentSchema,
-} from '../projects/dto/attachment.dto.js';
-import { activityPageSchema, activityQuerySchema } from '../activities/dto/activity.dto.js';
-import { dashboardSchema } from '../dashboard/dto/dashboard.dto.js';
 import {
   githubImportRequestSchema,
   githubImportResponseSchema,
@@ -40,23 +50,7 @@ import {
   linkedinUploadRequestSchema,
   linkedinUploadResponseSchema,
 } from '../integrations/dto/linkedin-import.dto.js';
-import {
-  browseProjectsQuerySchema,
-  browseUsersQuerySchema,
-  discoveryProjectPageSchema,
-  personPageSchema,
-  searchPageQuerySchema,
-  searchQuerySchema,
-  searchResultsSchema,
-  suggestionsQuerySchema,
-  suggestionsSchema,
-  tagPageQuerySchema,
-  tagQuerySchema,
-  tagCloudQuerySchema,
-  tagCloudSchema,
-  tagSummarySchema,
-  userFacetsSchema,
-} from '../discovery/dto/discovery.dto.js';
+import { meResponseSchema } from '../me/dto/me.dto.js';
 import {
   notificationIdParamSchema,
   notificationPageSchema,
@@ -64,35 +58,6 @@ import {
   readAllResultSchema,
   unreadCountSchema,
 } from '../notifications/dto/notification.dto.js';
-import { myTeamsQuerySchema, myTeamsSchema } from '../team/dto/my-teams.dto.js';
-import {
-  acceptBodySchema,
-  refreshResponseSchema,
-  resolveResponseSchema,
-  suggestionIdParamSchema,
-  suggestionPageSchema,
-  suggestionQuerySchema,
-} from '../suggestions/dto/suggestion.dto.js';
-import {
-  addExternalMemberSchema,
-  inviteMemberSchema,
-  lookupQuerySchema,
-  lookupResultSchema,
-  memberParamsSchema,
-  projectTeamParamSchema,
-  teamListSchema,
-  teamMemberSchema,
-} from '../team/dto/team.dto.js';
-import { uploadRequestSchema, uploadResponseSchema } from '../files/dto/upload.dto.js';
-import { documentedProjectSchemas } from '../projects/dto/project-write.dto.js';
-import {
-  myProjectsQuerySchema,
-  projectDetailSchema,
-  projectAttachmentSchema,
-  projectIdParamSchema,
-  projectPageSchema,
-  userProjectsQuerySchema,
-} from '../projects/dto/project.dto.js';
 import {
   certificationSchema,
   educationSchema,
@@ -116,6 +81,41 @@ import {
   replaceSkillsSchema,
   skillsResponseSchema,
 } from '../profiles/dto/section.dto.js';
+import {
+  attachmentParamsSchema,
+  createAttachmentSchema,
+  patchAttachmentSchema,
+} from '../projects/dto/attachment.dto.js';
+import { documentedProjectSchemas } from '../projects/dto/project-write.dto.js';
+import {
+  myProjectsQuerySchema,
+  projectDetailSchema,
+  projectAttachmentSchema,
+  projectIdParamSchema,
+  projectPageSchema,
+  userProjectsQuerySchema,
+} from '../projects/dto/project.dto.js';
+import { resumeRequestSchema } from '../resume/dto/resume.dto.js';
+import {
+  acceptBodySchema,
+  refreshResponseSchema,
+  resolveResponseSchema,
+  suggestionIdParamSchema,
+  suggestionPageSchema,
+  suggestionQuerySchema,
+} from '../suggestions/dto/suggestion.dto.js';
+import { myTeamsQuerySchema, myTeamsSchema } from '../team/dto/my-teams.dto.js';
+import {
+  addExternalMemberSchema,
+  inviteMemberSchema,
+  lookupQuerySchema,
+  lookupResultSchema,
+  memberParamsSchema,
+  projectTeamParamSchema,
+  teamListSchema,
+  teamMemberSchema,
+} from '../team/dto/team.dto.js';
+import { z, type ZodObject, type ZodType } from 'zod';
 
 /**
  * The OpenAPI document, built from the same zod schemas the request pipeline
@@ -981,7 +981,7 @@ export const OPERATIONS: readonly Operation[] = [
     summary: 'Download a resume PDF from selected sections of your profile',
     bearer: true,
     description:
-      'Private/draft own projects require explicit IDs and includePrivateProjects. Accepted-team projects must be public and published. Login email and internal fields are never included. Dedicated PDF budget; no stored copy.',
+      'Private/draft own projects require explicit IDs and includePrivateProjects. Accepted-team projects must be public and published. Login email and internal fields are never included. Projects are sorted newest first (createdAt descending, then ID), regardless of projectIds order. Dedicated PDF budget; no stored copy.',
     body: resumeRequestSchema,
     responses: {
       '200': {

@@ -51,6 +51,34 @@ current-main revalidation.
 
 ## Delivered
 
+### Review corrections (2026-10-21)
+
+- Dispatch now has an atomic `leased` to `dispatching` boundary. Cancellation can
+  win before that transition; an in-flight send keeps its lease and provider result.
+  Expired dispatches are retried only under the provider's deduplication guarantee,
+  or recorded as uncertain. Barrier tests cover concurrent rejection and removal.
+- Email and resume follow the role folders: DTOs, services, repositories, e2e and
+  pure utils. Controllers contain no SQL. Font assets and coverage paths moved with
+  the renderer. HTTP examples are split by module.
+- The email language snapshot is documented; it stays stable across retries.
+  OpenAPI states that projects are sorted newest first rather than by input ID order.
+- Backend: all 1,119 unit tests and all 1,032 MySQL tests passed. The full local MySQL
+  run used `--testTimeout=60000`; repository defaults are unchanged. Coverage remains
+  95.39% statements, 91.12% branches, 95.03% functions, 96.66% lines. Lint, types,
+  generated OpenAPI, build and DB type verification passed. Built-font smoke returned
+  a 5,231-byte PDF from the new runtime path and found the bundled license.
+- Removing the cancellation boundary in an isolated container made both new
+  in-flight tests fail (`canceled` instead of `dispatching`). All 19 focused
+  email/resume/migration tests pass without that mutation.
+- Frontend: all 1,645 tests passed. Coverage is 89.88% statements, 85.95% branches,
+  86.42% functions, 91.18% lines; lint, types, knip and production build passed.
+  Six targeted assertions fail against the old implementation, proving the language,
+  unsubscribe and project-limit regressions. UI and email language are independent;
+  valid unsubscribe links remain retryable on transient errors; project selection is
+  capped at 50; empty downloads are disabled; a missing project prompts a reload.
+
+The production login journey and real email provider acceptance remain open.
+
 | Item                     | Local result                                                                                                                                                                                                            |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 8.1 Resume PDF           | Owner profile button, section/project selection, private/draft consent, server-side binary download, one template, en/ru/am, embedded font                                                                              |
@@ -76,7 +104,7 @@ production image uses Node **24.22.0** and PDFKit **0.20.2**.
 | Frontend ESLint, TypeScript and knip                               | PASS                                                                                                                                                                                                        |
 | Frontend unit coverage (`npm run test:coverage -- --maxWorkers=2`) | **1,453 tests passed**, 136 files; statements 89.74%, branches 85.94%, functions 85.91%, lines 90.98%; all configured gates met                                                                             |
 | Frontend production build                                          | PASS, including `/api/resume`, email routes, dynamic Settings and the public unsubscribe page                                                                                                               |
-| API production Docker build                                        | PASS; font and license copied into `dist/api/resume/fonts/`                                                                                                                                                 |
+| API production Docker build                                        | PASS; font and license copied into `dist/api/resume/utils/fonts/`                                                                                                                                           |
 | Built-image disabled worker                                        | PASS: `{"processed":0,"disabled":true}` against the test DB                                                                                                                                                 |
 | Built-image PDF                                                    | PASS as the image's non-root user: 20,715-byte, two-page A4 sample; embedded font and license present; both rendered pages visually inspected                                                               |
 

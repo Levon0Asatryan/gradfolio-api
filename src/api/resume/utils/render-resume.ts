@@ -1,8 +1,8 @@
 import { fileURLToPath } from 'node:url';
 import PDFDocument from 'pdfkit';
-import type { AppConfig } from '../../core/config/schema.js';
-import { AppError } from '../../core/errors/app-error.js';
-import type { ResumeData } from './resume.dto.js';
+import type { AppConfig } from '../../../core/config/schema.js';
+import { AppError } from '../../../core/errors/app-error.js';
+import type { ResumeData } from './resume-data.js';
 
 type Limits = Pick<
   AppConfig,

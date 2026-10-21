@@ -1,8 +1,9 @@
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { describe, expect, it, vi } from 'vitest';
-import { testConfig } from '../../testing/database.js';
-import { renderResume } from './resume.renderer.js';
-import { resumeRequestSchema, resumeUrl } from './resume.dto.js';
+import { testConfig } from '../../../testing/database.js';
+import { renderResume } from './render-resume.js';
+import { resumeRequestSchema } from '../dto/resume.dto.js';
+import { resumeUrl } from './resume-data.js';
 
 describe('resume PDF', () => {
   it('also rejects a single text operation that finishes beyond the render budget', async () => {

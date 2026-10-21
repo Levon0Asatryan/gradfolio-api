@@ -1,14 +1,13 @@
-import { Inject, Injectable } from '@nestjs/common';
 import { APP_CONFIG } from '../../../core/config/config.module.js';
 import type { AppConfig } from '../../../core/config/schema.js';
-import { cancelInviteEmail, enqueueInviteEmail } from '../../../core/email/outbox.js';
 import { DbService } from '../../../core/db/db.service.js';
 import { newId } from '../../../core/db/ids.js';
 import { isMysqlError, MysqlErrno } from '../../../core/db/mysql-errors.js';
 import { inTransaction } from '../../../core/db/transaction.js';
+import { cancelInviteEmail, enqueueInviteEmail } from '../../../core/email/outbox.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../core/errors/app-error.js';
-import { FileUrlService } from '../../files/services/file-url.service.js';
 import { recordActivity } from '../../activities/repositories/activity-write.repository.js';
+import { FileUrlService } from '../../files/services/file-url.service.js';
 import { insertTeamNotification } from '../../notifications/repositories/notification-write.repository.js';
 import type { UserRow } from '../../users/repositories/user.repository.js';
 import { type AddExternalMember, type InviteMember, type TeamMember } from '../dto/team.dto.js';
@@ -26,6 +25,7 @@ import {
   readMember,
   renewInvite,
 } from '../repositories/team.repository.js';
+import { Inject, Injectable } from '@nestjs/common';
 
 /**
  * Team writes. Each is one transaction: the project lock (ownership checked in

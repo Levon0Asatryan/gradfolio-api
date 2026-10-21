@@ -52,9 +52,12 @@ export default defineConfig({
         // M8: snapshot visibility and transactional email delivery are exercised with
         // real MySQL in resume.int.test.ts and email.int.test.ts. Pure rendering,
         // tokens and templates remain in the unit coverage denominator.
-        'src/api/resume/resume.service.ts',
+        'src/api/resume/services/resume.service.ts',
+        'src/api/resume/repositories/**',
         'src/api/resume/resume.controller.ts',
         'src/api/email/email.controller.ts',
+        'src/api/email/services/**',
+        'src/api/email/repositories/**',
         'src/core/email/outbox.ts',
         'src/core/email/worker.ts',
         'src/core/email/cli.ts',

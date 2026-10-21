@@ -1,33 +1,33 @@
-import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
-import { LoggerModule } from 'nestjs-pino';
 import { APP_CONFIG, ConfigModule } from '../core/config/config.module.js';
 import type { AppConfig } from '../core/config/schema.js';
 import { DbModule } from '../core/db/db.module.js';
 import { LOG_DESTINATION, loggerOptions } from '../core/logging/index.js';
 import { LoggingModule } from '../core/logging/logging.module.js';
-import type { DestinationStream } from 'pino';
+import { ActivitiesModule } from './activities/activities.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { AccessTokenGuard } from './auth/guards/access-token.guard.js';
 import { ErrorFilter } from './common/filters/error.filter.js';
+import { DashboardModule } from './dashboard/dashboard.module.js';
+import { DiscoveryModule } from './discovery/discovery.module.js';
+import { EmailModule } from './email/email.module.js';
 import { FilesModule } from './files/files.module.js';
 import { HealthModule } from './health/health.module.js';
 import { IntegrationsModule } from './integrations/integrations.module.js';
-import { SuggestionsModule } from './suggestions/suggestions.module.js';
-import { DashboardModule } from './dashboard/dashboard.module.js';
-import { DiscoveryModule } from './discovery/discovery.module.js';
-import { ActivitiesModule } from './activities/activities.module.js';
 import { MeModule } from './me/me.module.js';
-import { ProfilesModule } from './profiles/profiles.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
+import { ProfilesModule } from './profiles/profiles.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
-import { TeamModule } from './team/team.module.js';
 import { RateLimitGuard } from './rate-limit/guards/rate-limit.guard.js';
 import { RateLimitModule } from './rate-limit/rate-limit.module.js';
+import { ResumeModule } from './resume/resume.module.js';
+import { SuggestionsModule } from './suggestions/suggestions.module.js';
+import { TeamModule } from './team/team.module.js';
 import { CurrentUserGuard } from './users/guards/current-user.guard.js';
 import { UsersModule } from './users/users.module.js';
-import { ResumeModule } from './resume/resume.module.js';
-import { EmailModule } from './email/email.module.js';
+import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { LoggerModule } from 'nestjs-pino';
+import type { DestinationStream } from 'pino';
 
 @Module({
   imports: [
