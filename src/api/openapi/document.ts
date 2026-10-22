@@ -1,13 +1,30 @@
-import { z, type ZodObject, type ZodType } from 'zod';
-import { LIVENESS_PATH, READINESS_PATH } from '../health/constants.js';
-import { meResponseSchema } from '../me/dto/me.dto.js';
-import {
-  attachmentParamsSchema,
-  createAttachmentSchema,
-  patchAttachmentSchema,
-} from '../projects/dto/attachment.dto.js';
 import { activityPageSchema, activityQuerySchema } from '../activities/dto/activity.dto.js';
 import { dashboardSchema } from '../dashboard/dto/dashboard.dto.js';
+import {
+  browseProjectsQuerySchema,
+  browseUsersQuerySchema,
+  discoveryProjectPageSchema,
+  personPageSchema,
+  searchPageQuerySchema,
+  searchQuerySchema,
+  searchResultsSchema,
+  suggestionsQuerySchema,
+  suggestionsSchema,
+  tagPageQuerySchema,
+  tagQuerySchema,
+  tagCloudQuerySchema,
+  tagCloudSchema,
+  tagSummarySchema,
+  userFacetsSchema,
+} from '../discovery/dto/discovery.dto.js';
+import {
+  emailPreferencesSchema,
+  emailPreferencesPatchSchema,
+  unsubscribeSchema,
+  unsubscribeResultSchema,
+} from '../email/dto/email.dto.js';
+import { uploadRequestSchema, uploadResponseSchema } from '../files/dto/upload.dto.js';
+import { LIVENESS_PATH, READINESS_PATH } from '../health/constants.js';
 import {
   githubImportRequestSchema,
   githubImportResponseSchema,
@@ -33,23 +50,7 @@ import {
   linkedinUploadRequestSchema,
   linkedinUploadResponseSchema,
 } from '../integrations/dto/linkedin-import.dto.js';
-import {
-  browseProjectsQuerySchema,
-  browseUsersQuerySchema,
-  discoveryProjectPageSchema,
-  personPageSchema,
-  searchPageQuerySchema,
-  searchQuerySchema,
-  searchResultsSchema,
-  suggestionsQuerySchema,
-  suggestionsSchema,
-  tagPageQuerySchema,
-  tagQuerySchema,
-  tagCloudQuerySchema,
-  tagCloudSchema,
-  tagSummarySchema,
-  userFacetsSchema,
-} from '../discovery/dto/discovery.dto.js';
+import { meResponseSchema } from '../me/dto/me.dto.js';
 import {
   notificationIdParamSchema,
   notificationPageSchema,
@@ -57,35 +58,6 @@ import {
   readAllResultSchema,
   unreadCountSchema,
 } from '../notifications/dto/notification.dto.js';
-import { myTeamsQuerySchema, myTeamsSchema } from '../team/dto/my-teams.dto.js';
-import {
-  acceptBodySchema,
-  refreshResponseSchema,
-  resolveResponseSchema,
-  suggestionIdParamSchema,
-  suggestionPageSchema,
-  suggestionQuerySchema,
-} from '../suggestions/dto/suggestion.dto.js';
-import {
-  addExternalMemberSchema,
-  inviteMemberSchema,
-  lookupQuerySchema,
-  lookupResultSchema,
-  memberParamsSchema,
-  projectTeamParamSchema,
-  teamListSchema,
-  teamMemberSchema,
-} from '../team/dto/team.dto.js';
-import { uploadRequestSchema, uploadResponseSchema } from '../files/dto/upload.dto.js';
-import { documentedProjectSchemas } from '../projects/dto/project-write.dto.js';
-import {
-  myProjectsQuerySchema,
-  projectDetailSchema,
-  projectAttachmentSchema,
-  projectIdParamSchema,
-  projectPageSchema,
-  userProjectsQuerySchema,
-} from '../projects/dto/project.dto.js';
 import {
   certificationSchema,
   educationSchema,
@@ -109,6 +81,41 @@ import {
   replaceSkillsSchema,
   skillsResponseSchema,
 } from '../profiles/dto/section.dto.js';
+import {
+  attachmentParamsSchema,
+  createAttachmentSchema,
+  patchAttachmentSchema,
+} from '../projects/dto/attachment.dto.js';
+import { documentedProjectSchemas } from '../projects/dto/project-write.dto.js';
+import {
+  myProjectsQuerySchema,
+  projectDetailSchema,
+  projectAttachmentSchema,
+  projectIdParamSchema,
+  projectPageSchema,
+  userProjectsQuerySchema,
+} from '../projects/dto/project.dto.js';
+import { resumeRequestSchema } from '../resume/dto/resume.dto.js';
+import {
+  acceptBodySchema,
+  refreshResponseSchema,
+  resolveResponseSchema,
+  suggestionIdParamSchema,
+  suggestionPageSchema,
+  suggestionQuerySchema,
+} from '../suggestions/dto/suggestion.dto.js';
+import { myTeamsQuerySchema, myTeamsSchema } from '../team/dto/my-teams.dto.js';
+import {
+  addExternalMemberSchema,
+  inviteMemberSchema,
+  lookupQuerySchema,
+  lookupResultSchema,
+  memberParamsSchema,
+  projectTeamParamSchema,
+  teamListSchema,
+  teamMemberSchema,
+} from '../team/dto/team.dto.js';
+import { z, type ZodObject, type ZodType } from 'zod';
 
 /**
  * The OpenAPI document, built from the same zod schemas the request pipeline
@@ -192,7 +199,7 @@ export interface Operation {
   body?: ZodType;
   /** The body may be left out (a request without one is valid). */
   bodyOptional?: boolean;
-  responses: Record<string, { description: string; schema?: ZodType }>;
+  responses: Record<string, { description: string; schema?: ZodType; contentType?: string }>;
   /** Needs `Authorization: Bearer <Auth0 access token>`. Every route except `@Public()` ones. */
   bearer?: boolean;
   /**
@@ -923,6 +930,73 @@ function plannedImportOperations(): Operation[] {
 export const OPERATIONS: readonly Operation[] = [
   {
     method: 'get',
+    path: '/v1/me/email-preferences',
+    operationId: 'getEmailPreferences',
+    tag: 'email',
+    bearer: true,
+    summary: 'Read your invitation email preference and language',
+    responses: {
+      '200': { description: 'Your preferences', schema: emailPreferencesSchema },
+      '404': notYours('account'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'patch',
+    path: '/v1/me/email-preferences',
+    operationId: 'updateEmailPreferences',
+    tag: 'email',
+    bearer: true,
+    summary: 'Change your invitation email preference and language',
+    body: emailPreferencesPatchSchema,
+    responses: {
+      '200': { description: 'Saved preferences', schema: emailPreferencesSchema },
+      '400': validationFailed,
+      '404': notYours('account'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'post',
+    path: '/v1/email/unsubscribe',
+    operationId: 'unsubscribeInvitationEmail',
+    tag: 'email',
+    summary: 'Disable invitation email with the signed link from an email',
+    body: unsubscribeSchema,
+    responses: {
+      '200': {
+        description: 'Unsubscribed, also for a replay or a deleted account',
+        schema: unsubscribeResultSchema,
+      },
+      '400': error('INVALID_UNSUBSCRIBE_TOKEN or VALIDATION_FAILED'),
+      '429': authenticatedFailures['429'],
+      '503': error('EMAIL_UNAVAILABLE'),
+    },
+  },
+  {
+    method: 'post',
+    path: '/v1/me/resume',
+    operationId: 'generateResume',
+    tag: 'resume',
+    summary: 'Download a resume PDF from selected sections of your profile',
+    bearer: true,
+    description:
+      'Private/draft own projects require explicit IDs and includePrivateProjects. Accepted-team projects must be public and published. Login email and internal fields are never included. Projects are sorted newest first (createdAt descending, then ID), regardless of projectIds order. Dedicated PDF budget; no stored copy.',
+    body: resumeRequestSchema,
+    responses: {
+      '200': {
+        description: 'Resume download; private, no-store',
+        schema: z.string().meta({ format: 'binary' }),
+        contentType: 'application/pdf',
+      },
+      '400': validationFailed,
+      '404': notYours('profile or project'),
+      '422': error('RESUME_TOO_LARGE: select less content'),
+      ...authenticatedFailures,
+    },
+  },
+  {
+    method: 'get',
     path: `/${LIVENESS_PATH}`,
     operationId: 'liveness',
     tag: 'health',
@@ -1611,7 +1685,7 @@ export function buildOpenApiDocument(
         ...(r.schema
           ? {
               content: {
-                'application/json': {
+                [r.contentType ?? 'application/json']: {
                   schema:
                     r.schema === errorResponseSchema
                       ? { $ref: '#/components/schemas/ErrorResponse' }

@@ -47,3 +47,5 @@ code rather than written by hand, so it cannot drift.
 
 Setting `API_DOCS_ENABLED=true` serves the same document as Swagger UI at `/docs`.
 `docker compose` sets it.
+
+M8 implementation: [plan](modules/m8/plan.md), [verification](modules/m8/verification.md), [email operations](modules/m8/email.md).

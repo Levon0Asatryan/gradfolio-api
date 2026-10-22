@@ -28,7 +28,7 @@ describe('0009_suggestions', () => {
   });
 
   const opts = async () => ({
-    migrations: await loadMigrations(),
+    migrations: (await loadMigrations()).filter((m) => m.name <= '0009_suggestions'),
     report: () => undefined,
     lockTimeoutS: 5,
   });

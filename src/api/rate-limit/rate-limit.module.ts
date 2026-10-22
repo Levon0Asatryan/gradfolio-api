@@ -72,6 +72,8 @@ function onlyWhereOptedIn(name: RateBudgetName): ThrottlerOptions['skipIf'] {
               skipIf: onlyWhereOptedIn('import'),
             },
             { name: 'ai', ttl, limit: cfg.RATE_LIMIT_AI, skipIf: onlyWhereOptedIn('ai') },
+            { name: 'pdf', ttl, limit: cfg.RATE_LIMIT_PDF, skipIf: onlyWhereOptedIn('pdf') },
+            { name: 'email', ttl, limit: cfg.RATE_LIMIT_EMAIL, skipIf: onlyWhereOptedIn('email') },
             {
               name: 'lookup',
               ttl,

@@ -35,11 +35,12 @@ export interface TeamNotification {
 export async function insertTeamNotification(
   trx: Transaction<DB>,
   n: TeamNotification,
-): Promise<void> {
+): Promise<string> {
+  const id = newId();
   await trx
     .insertInto('notifications')
     .values({
-      id: newId(),
+      id,
       userId: n.userId,
       type: n.type,
       title: TITLES[n.type],
@@ -54,6 +55,7 @@ export async function insertTeamNotification(
       }),
     })
     .execute();
+  return id;
 }
 
 /**

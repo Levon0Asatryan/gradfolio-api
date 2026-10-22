@@ -110,7 +110,8 @@ describe('connect', () => {
     expect(res.body.nonce).toMatch(/^[A-Za-z0-9_-]{43}$/);
     const expiresAt = Date.parse(res.body.expiresAt as string);
     expect(expiresAt).toBeGreaterThan(before + 595_000);
-    expect(expiresAt).toBeLessThanOrEqual(before + 600_000);
+    // The nonce is issued during the request, after `before` was captured.
+    expect(expiresAt).toBeLessThanOrEqual(Date.now() + 600_000);
 
     const stored = await db.selectFrom('integrationNonces').selectAll().execute();
     expect(stored).toHaveLength(1);
