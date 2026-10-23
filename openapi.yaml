@@ -179,6 +179,73 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /v1/email/webhooks/resend:
+    post:
+      operationId: receiveResendWebhook
+      tags:
+        - email
+      summary: Receive signed Resend bounce and complaint events
+      description: Requires svix-id, svix-timestamp and svix-signature headers. Signature covers the exact JSON bytes and expires after five minutes. No Auth0 token. Duplicate feedback is harmless; unrelated signed events are acknowledged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                data:
+                  type: object
+                  properties:
+                    email_id:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    tags:
+                      type: object
+                      additionalProperties:
+                        type: string
+                  additionalProperties: {}
+              required:
+                - type
+                - data
+              additionalProperties: {}
+      responses:
+        "200":
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+                    enum:
+                      - true
+                required:
+                  - received
+                additionalProperties: false
+        "400":
+          description: INVALID_WEBHOOK_SIGNATURE or INVALID_EMAIL_EVENT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: "RATE_LIMITED: over budget; see the Retry-After header"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: EMAIL_UNAVAILABLE
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/me/resume:
     post:
       operationId: generateResume

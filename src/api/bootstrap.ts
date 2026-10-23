@@ -28,6 +28,7 @@ export function configureApp(app: NestExpressApplication, cfg: AppConfig): INest
   app.useGlobalFilters(app.get(ErrorFilter));
 
   // Rejecting an oversized body early keeps a hostile payload from a parser.
+  // Nest's rawBody option retains these bounded bytes for signed webhooks.
   app.useBodyParser('json', { limit: cfg.API_BODY_LIMIT });
 
   // A free hint naming the framework to fingerprint; nothing legitimate reads it.

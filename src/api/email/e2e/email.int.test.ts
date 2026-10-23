@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import { sql } from 'kysely';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
@@ -14,6 +14,8 @@ import { unsubscribeToken } from '../../../core/email/unsubscribe.js';
 
 const db = testDatabase();
 const secret = 'email-test-secret-'.repeat(3);
+const webhookSecret =
+  'whsec_' + Buffer.from('webhook-test-secret-material-32bytes').toString('base64');
 const cfg = testConfig({
   EMAIL_DELIVERY_ENABLED: 'true',
   EMAIL_PUBLIC_URL: 'https://app.example',
@@ -30,6 +32,8 @@ beforeAll(async () => {
       AUTH0_ISSUER_BASE_URL: tenant.issuer,
       AUTH0_AUDIENCE: tenant.audience,
       EMAIL_UNSUBSCRIBE_SECRET: secret,
+      RESEND_WEBHOOK_SECRET: webhookSecret,
+      RATE_LIMIT_EMAIL: '100',
     }),
     undefined,
     { logs },
@@ -74,6 +78,130 @@ async function people() {
 }
 
 const rows = () => db.selectFrom('emailOutbox').selectAll().orderBy('createdAt').execute();
+
+describe('signed Resend feedback over HTTP', () => {
+  const post = (body: string, timestamp = String(Math.floor(Date.now() / 1000)), valid = true) => {
+    const id = 'msg_test';
+    const signature = createHmac('sha256', Buffer.from(webhookSecret.slice(6), 'base64'))
+      .update(`${id}.${timestamp}.${body}`)
+      .digest('base64');
+    return request(app.getHttpServer())
+      .post('/v1/email/webhooks/resend')
+      .set('Content-Type', 'application/json')
+      .set('svix-id', id)
+      .set('svix-timestamp', timestamp)
+      .set('svix-signature', valid ? `v1,${signature}` : 'v1,invalid')
+      .send(body);
+  };
+
+  it.each(['email.bounced', 'email.complained'] as const)(
+    'records %s and suppresses later sends; replay is harmless',
+    async (type) => {
+      const { invite, invitee } = await people();
+      await invite().expect(201);
+      const [row] = await rows();
+      const messageId = randomUUID();
+      await new EmailWorker(db, cfg, {
+        idempotencyWindowMs: 86400_000,
+        send: () => Promise.resolve({ messageId }),
+      }).runBatch();
+      // Spaces and Unicode prove verification uses the raw bytes, not stringify(parsedJSON).
+      const body = JSON.stringify(
+        {
+          type,
+          data: {
+            email_id: messageId,
+            tags: { outbox_id: row!.id },
+            subject: 'Թիմ',
+            to: ['private-inbox@example.com'],
+          },
+        },
+        null,
+        2,
+      );
+      await post(body).expect(200, { received: true });
+      await post(body).expect(200, { received: true });
+      expect((await rows())[0]!.status).toBe(type === 'email.bounced' ? 'bounced' : 'complained');
+      expect(
+        (
+          await db
+            .selectFrom('users')
+            .select('emailSuppressed')
+            .where('id', '=', invitee.id)
+            .executeTakeFirstOrThrow()
+        ).emailSuppressed,
+      ).toBe(true);
+      expect(logs.text()).not.toContain('private-inbox@example.com');
+      expect(logs.text()).not.toContain(webhookSecret);
+    },
+  );
+
+  it('rejects unsigned/tampered/stale events without suppressing a recipient', async () => {
+    const { invite, invitee } = await people();
+    await invite().expect(201);
+    const [row] = await rows();
+    const body = JSON.stringify({
+      type: 'email.bounced',
+      data: { email_id: randomUUID(), tags: { outbox_id: row!.id } },
+    });
+    await post(body, undefined, false).expect(400);
+    await post(body, String(Math.floor(Date.now() / 1000) - 301)).expect(400);
+    await request(app.getHttpServer())
+      .post('/v1/email/webhooks/resend')
+      .send(JSON.parse(body) as object)
+      .expect(400);
+    expect((await rows())[0]!.status).toBe('pending');
+    expect(
+      (
+        await db
+          .selectFrom('users')
+          .select('emailSuppressed')
+          .where('id', '=', invitee.id)
+          .executeTakeFirstOrThrow()
+      ).emailSuppressed,
+    ).toBe(false);
+  });
+
+  it('ignores other signed events; refuses missing correlation and ignores wrong message IDs', async () => {
+    await post('{"type":"email.delivered","data":{}}').expect(200);
+    await post('{"type":"email.bounced","data":{}}').expect(400);
+    await post('{"data":{}}').expect(400);
+    const { invite } = await people();
+    await invite().expect(201);
+    const messageId = randomUUID();
+    await new EmailWorker(db, cfg, {
+      idempotencyWindowMs: 86400_000,
+      send: () => Promise.resolve({ messageId }),
+    }).runBatch();
+    const [row] = await rows();
+    await post(
+      JSON.stringify({
+        type: 'email.bounced',
+        data: { email_id: randomUUID(), tags: { outbox_id: row!.id } },
+      }),
+    ).expect(200);
+    expect((await rows())[0]!.status).toBe('sent');
+  });
+
+  it('does not retry a known rejection beyond the provider deduplication window', async () => {
+    const { invite } = await people();
+    await invite().expect(201);
+    await db
+      .updateTable('emailOutbox')
+      .set({ attempts: 1, firstAttemptAt: sql<Date>`DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 1 HOUR)` })
+      .execute();
+    let sends = 0;
+    await new EmailWorker(db, cfg, {
+      idempotencyWindowMs: 1000,
+      send: () => {
+        sends++;
+        return Promise.resolve({ messageId: randomUUID() });
+      },
+    }).runBatch();
+    expect(sends).toBe(0);
+    expect((await rows())[0]!.status).toBe('uncertain');
+  });
+});
 
 describe('email preferences and invitation outbox', () => {
   it.each(['reject', 'remove'] as const)(

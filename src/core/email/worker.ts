@@ -62,7 +62,8 @@ export class EmailWorker {
       };
       // A stale claim may have reached the provider. Only a still-valid idempotency promise makes retry safe.
       if (
-        row.status === 'dispatching' &&
+        (row.status === 'dispatching' ||
+          (row.attempts > 0 && this.mailer.idempotencyWindowMs > 0)) &&
         (!row.firstAttemptAt ||
           Date.now() - row.firstAttemptAt.getTime() >= this.mailer.idempotencyWindowMs)
       ) {
