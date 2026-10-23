@@ -51,7 +51,10 @@ export async function buildApp(
   if (logs) builder = builder.overrideProvider(LOG_DESTINATION).useValue(logs.stream);
 
   const moduleRef = await builder.compile();
-  const app = moduleRef.createNestApplication<NestExpressApplication>({ bufferLogs: true });
+  const app = moduleRef.createNestApplication<NestExpressApplication>({
+    bufferLogs: true,
+    rawBody: true,
+  });
   app.useLogger(app.get(Logger));
   configureApp(app, cfg);
   setupApiDocs(app, cfg);

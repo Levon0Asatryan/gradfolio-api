@@ -56,6 +56,7 @@ export default defineConfig({
         'src/api/resume/repositories/**',
         'src/api/resume/resume.controller.ts',
         'src/api/email/email.controller.ts',
+        'src/api/email/resend-webhook.controller.ts',
         'src/api/email/services/**',
         'src/api/email/repositories/**',
         'src/core/email/outbox.ts',

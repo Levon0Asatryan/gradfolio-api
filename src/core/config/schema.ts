@@ -138,6 +138,20 @@ const rateLimit = {
   RESUME_RENDER_TIMEOUT_MS: z.coerce.number().int().min(100).max(10_000).default(5000),
   RATE_LIMIT_EMAIL: z.coerce.number().int().min(1).max(1000).default(10),
   EMAIL_DELIVERY_ENABLED: envBoolean('false'),
+  RESEND_API_KEY: z
+    .string()
+    .min(10)
+    .max(500)
+    .regex(/^re_[A-Za-z0-9_-]+$/)
+    .optional(),
+  RESEND_WEBHOOK_SECRET: z
+    .string()
+    .min(32)
+    .max(500)
+    .regex(/^whsec_[A-Za-z0-9+/]+={0,2}$/)
+    .optional(),
+  EMAIL_FROM: z.email().max(254).optional(),
+  EMAIL_REPLY_TO: z.email().max(254).optional(),
   EMAIL_PUBLIC_URL: z.url().optional(),
   EMAIL_UNSUBSCRIBE_SECRET: z.string().min(32).optional(),
   EMAIL_UNSUBSCRIBE_TTL_S: z.coerce

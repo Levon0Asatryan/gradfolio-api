@@ -1,6 +1,6 @@
 # M8: Utilities and email
 
-**Status:** local implementation; PR verification in progress. **Owner:** Narek (module chat and task chats), from 2026-10-18.
+**Status:** PDF/preferences merged and accepted; production email integration in progress. **Owner:** Narek (module chat and task chats), from 2026-10-18.
 **Repos:** gradfolio-api, gradfolio.
 
 **Goal:** a student downloads a résumé PDF built from their portfolio, and a teammate
@@ -11,28 +11,30 @@ tasks, and only if Levon keeps them in scope.
 Tracker rows: 8.1–8.8 in [../../tracker.md](../../tracker.md#m8-utilities). Decision
 Q10 (AI, PDF, email) is in the tracker's Decisions table.
 
-The PDF and preferences implementation is in review preparation. Email delivery
-remains disabled at Narek's request until a provider and domain are selected.
+The PDF and preferences implementation is merged and the user verified both on
+production. Resend is selected for transactional email; the sending domain is
+still missing, and delivery remains disabled. The provider adapter, signed
+webhook and job runbook are in a new PR preparation as of 2026-10-23.
 See [plan](plan.md), [verification](verification.md), and [email operations](email.md).
-No production acceptance or email delivery is claimed.
+No production email delivery is claimed.
 
 ## Tasks
 
 The **Status** column is the status of record for these tasks; the module chat keeps it
 current. **Depends on** lists tasks that must be **merged** first.
 
-| ID     | Task                                                                 | Repo     | Depends on | Tracker  | Status | Brief                                        |
-| ------ | -------------------------------------------------------------------- | -------- | ---------- | -------- | ------ | -------------------------------------------- |
-| M8-T1  | Résumé PDF: generator spike and decision                             | api, fe  | —          | 8.1      | local  | [T1](tasks/M8-T1-resume-pdf-decision.md)     |
-| M8-T2  | Résumé PDF: generation, where T1 decided                             | per T1   | T1         | 8.1      | local  | [T2](tasks/M8-T2-resume-pdf-generation.md)   |
-| M8-T3  | Résumé PDF: download UI (options, entry points, en/ru/am)            | fe       | T2         | 8.1      | local  | [T3](tasks/M8-T3-resume-pdf-ui.md)           |
-| M8-T4  | Email: provider and sending domain, a proposal for Levon             | docs     | —          | Q10      | todo   | [T4](tasks/M8-T4-email-provider-decision.md) |
-| M8-T5  | Email: mailer module, outbox table, sender job (fake provider first) | api      | —          | 8.6      | local  | [T5](tasks/M8-T5-mailer-outbox.md)           |
-| M8-T6  | Email: provider adapter and production sending                       | api, ops | T4, T5     | 8.6      | todo   | [T6](tasks/M8-T6-provider-adapter.md)        |
-| M8-T7  | Preferred language and email preferences (API)                       | api      | —          | 8.7, 8.8 | local  | [T7](tasks/M8-T7-preferences-api.md)         |
-| M8-T8  | Team invite email                                                    | api      | T5, T7     | 8.7      | local  | [T8](tasks/M8-T8-invite-email.md)            |
-| M8-T9  | Settings: email preferences and language (FE)                        | fe       | T7         | 8.8      | local  | [T9](tasks/M8-T9-settings-preferences-ui.md) |
-| M8-T10 | Module verification and report                                       | api, fe  | T1–T9      | —        | todo   | [T10](tasks/M8-T10-verification.md)          |
+| ID     | Task                                                                 | Repo     | Depends on | Tracker  | Status      | Brief                                        |
+| ------ | -------------------------------------------------------------------- | -------- | ---------- | -------- | ----------- | -------------------------------------------- |
+| M8-T1  | Résumé PDF: generator spike and decision                             | api, fe  | —          | 8.1      | done        | [T1](tasks/M8-T1-resume-pdf-decision.md)     |
+| M8-T2  | Résumé PDF: generation, where T1 decided                             | per T1   | T1         | 8.1      | done        | [T2](tasks/M8-T2-resume-pdf-generation.md)   |
+| M8-T3  | Résumé PDF: download UI (options, entry points, en/ru/am)            | fe       | T2         | 8.1      | done        | [T3](tasks/M8-T3-resume-pdf-ui.md)           |
+| M8-T4  | Email: provider and sending domain, a proposal for Levon             | docs     | —          | Q10      | review      | [T4](tasks/M8-T4-email-provider-decision.md) |
+| M8-T5  | Email: mailer module, outbox table, sender job (fake provider first) | api      | —          | 8.6      | done        | [T5](tasks/M8-T5-mailer-outbox.md)           |
+| M8-T6  | Email: provider adapter and production sending                       | api, ops | T4, T5     | 8.6      | in progress | [T6](tasks/M8-T6-provider-adapter.md)        |
+| M8-T7  | Preferred language and email preferences (API)                       | api      | —          | 8.7, 8.8 | done        | [T7](tasks/M8-T7-preferences-api.md)         |
+| M8-T8  | Team invite email                                                    | api      | T5, T7     | 8.7      | done        | [T8](tasks/M8-T8-invite-email.md)            |
+| M8-T9  | Settings: email preferences and language (FE)                        | fe       | T7         | 8.8      | done        | [T9](tasks/M8-T9-settings-preferences-ui.md) |
+| M8-T10 | Module verification and report                                       | api, fe  | T1–T9      | —        | todo        | [T10](tasks/M8-T10-verification.md)          |
 
 **Stretch.** No briefs yet. Levon decides at the T4 stop point whether any of these stay
 in v1.0.

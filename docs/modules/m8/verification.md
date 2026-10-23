@@ -77,7 +77,8 @@ current-main revalidation.
   valid unsubscribe links remain retryable on transient errors; project selection is
   capped at 50; empty downloads are disabled; a missing project prompts a reload.
 
-The production login journey and real email provider acceptance remain open.
+The production login journey was later completed by the user; real email
+provider acceptance remains open.
 
 | Item                     | Local result                                                                                                                                                                                                            |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -142,14 +143,33 @@ code remains in the unit coverage denominator. Coverage thresholds were not lowe
   working tree. Before a frontend PR, pin `openapi.source` to the API commit that
   includes M8; no commit was invented to label uncommitted source.
 
+## 2026-10-23 Resend preparation
+
+The user verified the signed-in production PDF download and Settings persistence
+after API/FE PRs #119/#137 merged. Anonymous production `/readyz` and auth guards
+also passed. This does not prove a real invite email. The Resend adapter, signed
+webhook, OpenAPI update, worker image deploy hook and domain/runbook are now under
+review. Resend sends remain disabled without a domain, account and secrets.
+
+Local evidence: the complete API unit run passed **1,141 tests in 68 files**
+(statements 95.44%, branches 91.86%, functions 94.90%, lines 96.78%). The
+complete MySQL 8.4 integration run passed **1,037 tests in 61 files**, including
+19 email integration tests. The new cases include raw signed bounce/complaint
+delivery, replay, tampering, stale timestamp, wrong provider ID and retry
+expiry. Windows bind-mounted Docker required longer test timeouts (30 seconds
+for unit, 60 seconds for integration); no assertions or coverage gates changed.
+TypeScript, ESLint, generated OpenAPI and changed-file formatting passed. The
+production Docker image built successfully, and its compiled worker returned
+`{"processed":0,"disabled":true}` against the migrated test database. PR and
+production gates are recorded separately when complete.
+
 ## Production gates still open
 
-Choose the provider and domain, verify sender DNS, implement its adapter and signed
-webhook, provision secrets, and prove real idempotency/reconciliation behavior.
-Then configure the scheduled Cloud Run worker and operational alerts. Delivery
-stays off until those checks pass; the CLI refuses enabled sending without a
-production adapter. See [email.md](email.md) for the connection/runbook steps.
+Obtain an owned domain, verify sender DNS, create the Resend account and provision
+secrets. Then configure the scheduled Cloud Run worker and operational alerts,
+and prove real delivery, idempotency/reconciliation, bounce and unsubscribe.
+Delivery stays off until those checks pass. See [email.md](email.md) and the
+[decision](email-decision.md) for the connection steps.
 
-Run the signed-in browser journey and production download/delivery checks after
-deployment. Local component tests and a successful build do not establish that
-the deployed Auth0 session, routing and new migration are already working there.
+The user completed the signed-in PDF and Settings journey on production.
+Repeat the invite/delivery journey after the Resend revision and DNS are live.
