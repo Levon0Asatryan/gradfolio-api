@@ -77,7 +77,8 @@ current-main revalidation.
   valid unsubscribe links remain retryable on transient errors; project selection is
   capped at 50; empty downloads are disabled; a missing project prompts a reload.
 
-The production login journey and real email provider acceptance remain open.
+The production login journey was later completed by the user; real email
+provider acceptance remains open.
 
 | Item                     | Local result                                                                                                                                                                                                            |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
