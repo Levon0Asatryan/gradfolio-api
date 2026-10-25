@@ -1,10 +1,11 @@
 # M8 invitation email operations
 
-The outbox, preferences and localized templates are deployed. The Resend sender
-adapter and signed bounce/complaint webhook are in PR preparation.
+The outbox, preferences and localized templates are deployed. The user selected
+SendGrid; its adapter and signed bounce/spam-report webhook are in PR #123.
 **Production delivery is disabled.** The user confirmed no sending domain is
 available (2026-10-23). Do not interpret a saved invitation or preference as a sent
 email. In-app team notifications continue independently of mail delivery.
+Use [SendGrid setup](sendgrid.md) for the active account, sender and trial steps.
 
 ## Current behavior
 
@@ -39,7 +40,7 @@ node dist/core/email/cli.js
 
 The disabled worker reports `{"processed":0,"disabled":true}` and performs only
 retention cleanup. With `EMAIL_DELIVERY_ENABLED=true`, the new CLI requires a
-Resend sending key, verified sender, frontend origin and unsubscribe secret; it
+SendGrid sending key, verified sender, frontend origin and unsubscribe secret; it
 fails before database access if provider settings are missing. Tests inject a
 fake mailer or stub HTTP transport; no real inbox has been contacted.
 
@@ -51,7 +52,7 @@ Unknown delivery outcomes become `uncertain`. An expired claim is retried only
 inside the injected provider's advertised idempotency window; otherwise it also
 becomes `uncertain`. The account email's hash binds retries to one destination.
 
-## Connect Resend after domain verification
+## Optional Resend adapter after domain verification
 
 1. Verify `mail.<owned-domain>` with SPF/DKIM/DMARC in Resend. See
    [decision](email-decision.md) and the exact [deployment steps](../../ops/deploy.md).

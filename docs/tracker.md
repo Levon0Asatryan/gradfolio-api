@@ -150,20 +150,20 @@ relevant checks, and Levon decides the product calls.
 
 ## Milestones
 
-| #      | Name                                           | Repos          | Status                                                                                          | Depends on                | Plan                                       | Verification                                   |
-| ------ | ---------------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------ | ---------------------------------------------- |
-| M0     | Foundations: setup + architecture plan         | api, all       | done; 0.5, 0.7–0.9 open                                                                         | —                         | —                                          | —                                              |
-| M1     | Data layer, schema ownership, DB fixes         | api, sql       | done (2026-09-29)                                                                               | M0                        | [modules/m1](modules/m1/README.md)         | [verification](modules/m1/verification.md)     |
-| M2     | Auth and identity, end to end                  | auth0, api, fe | done (2026-10-04); auth0 2.17 partly                                                            | M0, M1                    | [modules/m2](modules/m2/README.md)         | [verification](modules/m2/verification.md)     |
-| M3     | Profiles                                       | api, fe        | done (2026-10-08); the UI redesign ran beside it (UI track)                                     | M2                        | [modules/m3](modules/m3/README.md)         | [verification](modules/m3/verification.md)     |
-| Deploy | API on Google Cloud (ahead of M9)              | ops, api       | done (2026-10-05)                                                                               | M2                        | [modules/deploy](modules/deploy/README.md) | [verification](modules/deploy/verification.md) |
-| M4     | Projects and media                             | api, fe        | done (2026-10-10); logged-in production runs M4-T2/T3 still open                                | M3                        | [modules/m4](modules/m4/README.md)         | [verification](modules/m4/verification.md)     |
-| M5     | Teams and notifications                        | api, fe        | done (2026-10-10), Teams page added                                                             | M4                        | [modules/m5](modules/m5/README.md)         | [verification](modules/m5/verification.md)     |
-| M6     | Discovery and dashboard                        | api, fe        | done (2026-10-11); 6.6 out, 6.7 not built                                                       | M4 (M5 for team projects) | [modules/m6](modules/m6/README.md)         | [verification](modules/m6/verification.md)     |
-| M7     | GitHub + LinkedIn (export) import              | api, fe, auth0 | in progress (GitHub connect, import and suggestions live; LinkedIn not started)                 | M4                        | [modules/m7](modules/m7/README.md)         | —                                              |
-| M8     | Utilities and email: résumé PDF, invite emails | api, fe        | PDF/Settings live and user-verified; Resend integration in review; domain and live mail pending | M3, M4 (T8 needs M5)      | [modules/m8](modules/m8/README.md)         | [verification](modules/m8/verification.md)     |
-| M9     | Hardening, deployment and v1.0 release         | all            | todo; split into tasks when M8 is nearly closed                                                 | M1–M8                     | [modules/m9](modules/m9/README.md)         | —                                              |
-| UI     | UI/UX redesign, then motion and polish         | fe, auth0      | UI-1–UI-6 done; UI-8 partly; UI-7, UI-9–UI-16 todo                                              | M3 (UI-9+ after M8, UI-8) | [modules/ui](modules/ui/README.md)         | —                                              |
+| #      | Name                                           | Repos          | Status                                                                                  | Depends on                | Plan                                       | Verification                                   |
+| ------ | ---------------------------------------------- | -------------- | --------------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------ | ---------------------------------------------- |
+| M0     | Foundations: setup + architecture plan         | api, all       | done; 0.5, 0.7–0.9 open                                                                 | —                         | —                                          | —                                              |
+| M1     | Data layer, schema ownership, DB fixes         | api, sql       | done (2026-09-29)                                                                       | M0                        | [modules/m1](modules/m1/README.md)         | [verification](modules/m1/verification.md)     |
+| M2     | Auth and identity, end to end                  | auth0, api, fe | done (2026-10-04); auth0 2.17 partly                                                    | M0, M1                    | [modules/m2](modules/m2/README.md)         | [verification](modules/m2/verification.md)     |
+| M3     | Profiles                                       | api, fe        | done (2026-10-08); the UI redesign ran beside it (UI track)                             | M2                        | [modules/m3](modules/m3/README.md)         | [verification](modules/m3/verification.md)     |
+| Deploy | API on Google Cloud (ahead of M9)              | ops, api       | done (2026-10-05)                                                                       | M2                        | [modules/deploy](modules/deploy/README.md) | [verification](modules/deploy/verification.md) |
+| M4     | Projects and media                             | api, fe        | done (2026-10-10); logged-in production runs M4-T2/T3 still open                        | M3                        | [modules/m4](modules/m4/README.md)         | [verification](modules/m4/verification.md)     |
+| M5     | Teams and notifications                        | api, fe        | done (2026-10-10), Teams page added                                                     | M4                        | [modules/m5](modules/m5/README.md)         | [verification](modules/m5/verification.md)     |
+| M6     | Discovery and dashboard                        | api, fe        | done (2026-10-11); 6.6 out, 6.7 not built                                               | M4 (M5 for team projects) | [modules/m6](modules/m6/README.md)         | [verification](modules/m6/verification.md)     |
+| M7     | GitHub + LinkedIn (export) import              | api, fe, auth0 | in progress (GitHub connect, import and suggestions live; LinkedIn not started)         | M4                        | [modules/m7](modules/m7/README.md)         | —                                              |
+| M8     | Utilities and email: résumé PDF, invite emails | api, fe        | PDF/Settings user-verified; SendGrid code in PR #123; cloud setup and live mail pending | M3, M4 (T8 needs M5)      | [modules/m8](modules/m8/README.md)         | [verification](modules/m8/verification.md)     |
+| M9     | Hardening, deployment and v1.0 release         | all            | todo; split into tasks when M8 is nearly closed                                         | M1–M8                     | [modules/m9](modules/m9/README.md)         | —                                              |
+| UI     | UI/UX redesign, then motion and polish         | fe, auth0      | UI-1–UI-6 done; UI-8 partly; UI-7, UI-9–UI-16 todo                                      | M3 (UI-9+ after M8, UI-8) | [modules/ui](modules/ui/README.md)         | —                                              |
 
 **Working in parallel** once M2 lands:
 
@@ -383,9 +383,12 @@ and the user's edits survive. Disconnecting deletes the tokens. A real LinkedIn 
 
 ## M8: Utilities
 
-**2026-10-20 local status:** 8.1 and 8.8 are implemented and tested; 8.6–8.7 are
-prepared with a fake mailer and delivery disabled at the user's request. Provider,
-domain, signed provider webhook, scheduling and production acceptance remain open.
+**2026-10-25 status:** PDF and Settings are deployed and user-verified. The user
+selected SendGrid's trial with Single Sender Verification and saved the API and
+signed webhook keys privately. PR #123 adds the adapter/webhook, with delivery
+disabled. Levon must install secrets in the existing GCP project and complete
+the worker/feedback/live-mail checks in [the handoff](modules/m8/sendgrid-handoff.md).
+Permanent delivery after the 2026-12-22 trial expiry remains a product decision.
 `local` means verified in the working tree, and `partial` means infrastructure
 only. See [M8 verification](modules/m8/verification.md) and [M8 email operations](modules/m8/email.md).
 

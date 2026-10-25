@@ -1,5 +1,10 @@
 # M8 production email decision
 
+**Superseded 2026-10-23:** the user selected SendGrid for a test/demo without
+purchasing a domain. See [SendGrid decision and setup](sendgrid.md). The comparison
+below records the earlier Resend investigation; it is not the active selection.
+SendGrid's 60-day trial does not resolve permanent free delivery.
+
 2026-10-22. Narek asked to finish M8 and delegated provider selection. Choose
 **Resend Free**, subject to verifying an owned sending domain and a real mailbox
 smoke. No provider account, DNS access or paid resources have been created or

@@ -163,13 +163,47 @@ production Docker image built successfully, and its compiled worker returned
 `{"processed":0,"disabled":true}` against the migrated test database. PR and
 production gates are recorded separately when complete.
 
+## 2026-10-25 SendGrid revalidation
+
+The user selected SendGrid instead of purchasing a domain. They confirmed Single
+Sender verification and privately saved sending/API and signed-webhook keys.
+The dashboard showed trial expiry on **2026-12-22**. Cloud secret installation,
+worker creation, endpoint enablement and real provider delivery remain for Levon.
+See [the deployment handoff](sendgrid-handoff.md).
+
+- TypeScript, ESLint, generated OpenAPI and whole-repository Prettier passed.
+- Full unit coverage: **1,159 tests in 69 files**; statements 95.36%, branches
+  91.99%, functions 94.49%, lines 96.86%. Thresholds remain unchanged.
+- Full MySQL 8.4 integration: **1,041 tests in 61 files**, including 23 email
+  tests. New cases exercise real ECDSA signatures over raw HTTP bodies,
+  bounce/spam suppression and replay, wrong provider IDs, uncorrelated provider
+  test events, invalid/stale signatures and expired dispatch quarantine.
+- Four isolated mutations (signature check, timestamp freshness, provider-ID
+  comparison and expired-dispatch protection) each produced the expected
+  assertion failure. The workspace was not mutated during these checks.
+- Production Docker image built; its compiled worker returned
+  `{"processed":0,"disabled":true}` against the migrated test database.
+  A separately started API process in that image passed `/readyz`, rejected an
+  unsigned webhook with 400 and accepted an ECDSA-signed provider test with 200.
+  The initial 10-second startup allowance was too short on Docker Desktop;
+  a 30-second readiness allowance passed without an application change.
+- Linux Node 24 containers used 30-second unit and 60-second integration test
+  timeouts for Windows bind-mount overhead. Logs are under `tmp/m8-logs/sendgrid-*`.
+
+No actual SendGrid credential, private postal address or provider request body is
+stored in the repository. No real provider send or GCP configuration change was
+performed. CI, review and deployment results must be checked on the PR head.
+
 ## Production gates still open
 
-Obtain an owned domain, verify sender DNS, create the Resend account and provision
-secrets. Then configure the scheduled Cloud Run worker and operational alerts,
+The user changed the provider to SendGrid on 2026-10-23. Verify the account and
+Single Sender for trial testing, provision sending credentials and the signed
+Event Webhook key, then configure the Cloud Run worker and operational alerts,
 and prove real delivery, idempotency/reconciliation, bounce and unsubscribe.
 Delivery stays off until those checks pass. See [email.md](email.md) and the
 [decision](email-decision.md) for the connection steps.
 
 The user completed the signed-in PDF and Settings journey on production.
-Repeat the invite/delivery journey after the Resend revision and DNS are live.
+Repeat the invite/delivery journey after the SendGrid revision and sender are live.
+The SendGrid trial is time-limited; record its expiry and a permanent delivery
+decision before calling ongoing production email complete. See [sendgrid.md](sendgrid.md).

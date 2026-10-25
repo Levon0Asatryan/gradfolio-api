@@ -67,14 +67,16 @@ Nothing to do: the pipeline runs it. To see the last run:
 `gcloud run jobs executions list --job gradfolio-migrate --region us-east1`.
 A second run prints `migrations: nothing to apply`.
 
-## M8: invitation email (off until domain verification)
+## M8: invitation email (SendGrid, disabled until acceptance)
 
 Provider choice and acceptance gates: [email-decision.md](../modules/m8/email-decision.md).
-No Resend account or sending domain is known to exist. The application defaults
+The user confirmed sender verification and privately saved keys on 2026-10-25;
+cloud installation and real delivery remain pending. See [the owner handoff](../modules/m8/sendgrid-handoff.md). The application defaults
 to `EMAIL_DELIVERY_ENABLED=false`. Deploying the code alone sends no email.
 
-**Cost before creating resources:** Resend Free allows 3,000 sends/month and
-100/day. A Cloud Scheduler job is $0.10/month beyond the billing account's first
+**Cost before creating resources:** SendGrid's trial permits 100 emails/day for
+60 days. Sending then stops unless upgraded; no paid plan is authorized.
+A Cloud Scheduler job is $0.10/month beyond the billing account's first
 three free jobs; Cloud Run executions, network, Secret Manager and logs are
 usage-dependent. Confirm the budget with the project owner before creating a
 job/schedule. Buying a domain needs a separate agreed registration and renewal
@@ -82,15 +84,16 @@ price. The current `gradfolio.app` Auth0 audience does not establish ownership.
 
 On Levon's sandboxed gcloud host, first verify
 `gcloud info --format='value(config.paths.global_config_dir)'` is
-`/Users/levon/Dev/university/.sandbox/gcloud`. Obtain an owned domain and verify
-`mail.<domain>` in Resend with the DNS records it displays (SPF/DKIM/DMARC).
+`/Users/levon/Dev/university/.sandbox/gcloud`. Verify the project mailbox through
+Single Sender Verification for the initial trial. Domain authentication remains
+SendGrid's production recommendation; no domain purchase is authorized.
 Use a monitored reply-to mailbox. Do not paste API keys into commands or chat:
 enter them as secret versions through the Cloud Console or `gcloud secrets
 versions add ... --data-file=-` from a private terminal. Give the sender job a
-domain-scoped Resend sending key; give the API the webhook signing secret.
+Mail Send-only SendGrid key; give the API the signed webhook public verification key.
 
 After the secrets exist, the owner can provision the disabled worker. Replace
-`<owned-domain>`, `<reply-to>`, `<auth0-issuer>`, `<image-sha>` with values checked
+`<verified-sender>`, `<reply-to>`, `<auth0-issuer>`, `<image-sha>` with values checked
 in the current deployment. The worker has its own service identity with DML
 database access and only its own sending secrets. The API identity receives only
 the webhook and unsubscribe secrets. The exact job definition is:
@@ -104,20 +107,20 @@ gcloud projects add-iam-policy-binding project-33e407b5-7fd5-485d-8dc \
 gcloud secrets add-iam-policy-binding gradfolio-database-url \
   --member='serviceAccount:gradfolio-email-run@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com' \
   --role='roles/secretmanager.secretAccessor'
-gcloud secrets add-iam-policy-binding gradfolio-resend-api-key \
+gcloud secrets add-iam-policy-binding gradfolio-sendgrid-api-key \
   --member='serviceAccount:gradfolio-email-run@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com' \
   --role='roles/secretmanager.secretAccessor'
 gcloud secrets add-iam-policy-binding gradfolio-email-unsubscribe-secret \
   --member='serviceAccount:gradfolio-email-run@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com' \
   --role='roles/secretmanager.secretAccessor'
-gcloud secrets add-iam-policy-binding gradfolio-resend-webhook-secret \
+gcloud secrets add-iam-policy-binding gradfolio-sendgrid-webhook-key \
   --member='serviceAccount:gradfolio-api-run@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com' \
   --role='roles/secretmanager.secretAccessor'
 gcloud secrets add-iam-policy-binding gradfolio-email-unsubscribe-secret \
   --member='serviceAccount:gradfolio-api-run@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com' \
   --role='roles/secretmanager.secretAccessor'
 gcloud run services update gradfolio-api --region us-east1 \
-  --update-secrets RESEND_WEBHOOK_SECRET=gradfolio-resend-webhook-secret:latest,EMAIL_UNSUBSCRIBE_SECRET=gradfolio-email-unsubscribe-secret:latest
+  --update-secrets SENDGRID_WEBHOOK_PUBLIC_KEY=gradfolio-sendgrid-webhook-key:latest,EMAIL_UNSUBSCRIBE_SECRET=gradfolio-email-unsubscribe-secret:latest
 gcloud run jobs create gradfolio-email-worker --region us-east1 \
   --image us-east1-docker.pkg.dev/project-33e407b5-7fd5-485d-8dc/gradfolio/api:<image-sha> \
   --service-account gradfolio-email-run@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com \
@@ -125,14 +128,14 @@ gcloud run jobs create gradfolio-email-worker --region us-east1 \
   --set-cloudsql-instances project-33e407b5-7fd5-485d-8dc:us-east1:gradfolio-db \
   --task-timeout 300s --max-retries 0 --tasks 1 --parallelism 1 \
   --command node --args dist/core/email/cli.js \
-  --set-env-vars NODE_ENV=production,DATABASE_SOCKET_PATH=/cloudsql/project-33e407b5-7fd5-485d-8dc:us-east1:gradfolio-db,DATABASE_POOL_MAX=2,AUTH0_ISSUER_BASE_URL=<auth0-issuer>,AUTH0_AUDIENCE=https://api.gradfolio.app,EMAIL_DELIVERY_ENABLED=false,EMAIL_PUBLIC_URL=https://gradfolio-navy.vercel.app,EMAIL_FROM=invites@mail.<owned-domain>,EMAIL_REPLY_TO=<reply-to> \
-  --set-secrets DATABASE_URL=gradfolio-database-url:latest,RESEND_API_KEY=gradfolio-resend-api-key:latest,EMAIL_UNSUBSCRIBE_SECRET=gradfolio-email-unsubscribe-secret:latest
+  --set-env-vars NODE_ENV=production,DATABASE_SOCKET_PATH=/cloudsql/project-33e407b5-7fd5-485d-8dc:us-east1:gradfolio-db,DATABASE_POOL_MAX=2,AUTH0_ISSUER_BASE_URL=<auth0-issuer>,AUTH0_AUDIENCE=https://api.gradfolio.app,EMAIL_PROVIDER=sendgrid,EMAIL_DELIVERY_ENABLED=false,EMAIL_PUBLIC_URL=https://gradfolio-navy.vercel.app,EMAIL_FROM=<verified-sender>,EMAIL_REPLY_TO=<reply-to> \
+  --set-secrets DATABASE_URL=gradfolio-database-url:latest,SENDGRID_API_KEY=gradfolio-sendgrid-api-key:latest,EMAIL_UNSUBSCRIBE_SECRET=gradfolio-email-unsubscribe-secret:latest
 ```
 
-Create a Resend webhook for
-`https://gradfolio-api-1058577031182.us-east1.run.app/v1/email/webhooks/resend`,
-subscribe to `email.bounced` and `email.complained`, and store its `whsec_…` key
-in `gradfolio-resend-webhook-secret`. Confirm the API returns 400 on unsigned
+Create a SendGrid webhook for
+`https://gradfolio-api-1058577031182.us-east1.run.app/v1/email/webhooks/sendgrid`,
+enable Signed Event Webhook, subscribe to Bounce and Spam Reports, and store its base64 ECDSA public key
+in `gradfolio-sendgrid-webhook-key`. Confirm the API returns 400 on unsigned
 requests and 200 for a signed test event. The API and job must share the same
 unsubscribe secret; rotating it invalidates earlier links.
 

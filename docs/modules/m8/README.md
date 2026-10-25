@@ -12,9 +12,10 @@ Tracker rows: 8.1–8.8 in [../../tracker.md](../../tracker.md#m8-utilities). De
 Q10 (AI, PDF, email) is in the tracker's Decisions table.
 
 The PDF and preferences implementation is merged and the user verified both on
-production. Resend is selected for transactional email; the sending domain is
-still missing, and delivery remains disabled. The provider adapter, signed
-webhook and job runbook are in a new PR preparation as of 2026-10-23.
+production. The user selected SendGrid for initial testing without a domain
+purchase. Delivery remains disabled pending account/sender verification and
+credentials. The adapter, signed webhook and job runbook are in PR #123.
+See [SendGrid setup and trial limitations](sendgrid.md).
 See [plan](plan.md), [verification](verification.md), and [email operations](email.md).
 No production email delivery is claimed.
 
@@ -28,13 +29,13 @@ current. **Depends on** lists tasks that must be **merged** first.
 | M8-T1  | Résumé PDF: generator spike and decision                             | api, fe  | —          | 8.1      | done        | [T1](tasks/M8-T1-resume-pdf-decision.md)     |
 | M8-T2  | Résumé PDF: generation, where T1 decided                             | per T1   | T1         | 8.1      | done        | [T2](tasks/M8-T2-resume-pdf-generation.md)   |
 | M8-T3  | Résumé PDF: download UI (options, entry points, en/ru/am)            | fe       | T2         | 8.1      | done        | [T3](tasks/M8-T3-resume-pdf-ui.md)           |
-| M8-T4  | Email: provider and sending domain, a proposal for Levon             | docs     | —          | Q10      | review      | [T4](tasks/M8-T4-email-provider-decision.md) |
+| M8-T4  | Email: provider and sending domain, a proposal for Levon             | docs     | —          | Q10      | done        | [T4](tasks/M8-T4-email-provider-decision.md) |
 | M8-T5  | Email: mailer module, outbox table, sender job (fake provider first) | api      | —          | 8.6      | done        | [T5](tasks/M8-T5-mailer-outbox.md)           |
 | M8-T6  | Email: provider adapter and production sending                       | api, ops | T4, T5     | 8.6      | in progress | [T6](tasks/M8-T6-provider-adapter.md)        |
 | M8-T7  | Preferred language and email preferences (API)                       | api      | —          | 8.7, 8.8 | done        | [T7](tasks/M8-T7-preferences-api.md)         |
 | M8-T8  | Team invite email                                                    | api      | T5, T7     | 8.7      | done        | [T8](tasks/M8-T8-invite-email.md)            |
 | M8-T9  | Settings: email preferences and language (FE)                        | fe       | T7         | 8.8      | done        | [T9](tasks/M8-T9-settings-preferences-ui.md) |
-| M8-T10 | Module verification and report                                       | api, fe  | T1–T9      | —        | todo        | [T10](tasks/M8-T10-verification.md)          |
+| M8-T10 | Module verification and report                                       | api, fe  | T1–T9      | —        | in progress | [T10](tasks/M8-T10-verification.md)          |
 
 **Stretch.** No briefs yet. Levon decides at the T4 stop point whether any of these stay
 in v1.0.
