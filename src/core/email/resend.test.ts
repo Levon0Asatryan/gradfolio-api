@@ -3,7 +3,8 @@ import { randomUUID, createHmac } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { testConfig } from '../../testing/database.js';
 import { DisabledMailer, MailDeliveryError, type EmailMessage } from './mailer.js';
-import { productionMailer, ResendMailer } from './resend.js';
+import { ResendMailer } from './resend.js';
+import { productionMailer } from './production-mailer.js';
 import { verifyResendWebhook } from './resend-webhook.js';
 
 const message: EmailMessage = {
@@ -128,11 +129,12 @@ describe('Resend HTTP adapter', () => {
   it('keeps the worker disabled by default and fails before DB access without sending settings', () => {
     expect(productionMailer(testConfig())).toBeInstanceOf(DisabledMailer);
     const base = {
+      EMAIL_PROVIDER: 'resend',
       EMAIL_DELIVERY_ENABLED: 'true',
       EMAIL_PUBLIC_URL: 'https://app.example',
       EMAIL_UNSUBSCRIBE_SECRET: 's'.repeat(32),
     };
-    expect(() => productionMailer(testConfig(base))).toThrow('RESEND_API_KEY');
+    expect(() => productionMailer(testConfig(base))).toThrow('EMAIL_FROM');
     expect(
       productionMailer(
         testConfig({ ...base, RESEND_API_KEY: 're_testonly', EMAIL_FROM: 'invites@example.com' }),

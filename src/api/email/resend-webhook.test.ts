@@ -18,3 +18,10 @@ it('fails closed without a configured webhook secret', async () => {
     .send({ type: 'email.bounced', data: {} })
     .expect(503, { code: 'EMAIL_UNAVAILABLE', message: 'email settings unavailable' });
 });
+
+it('fails closed without a configured SendGrid verification key', async () => {
+  await request(app.getHttpServer())
+    .post('/v1/email/webhooks/sendgrid')
+    .send([])
+    .expect(503, { code: 'EMAIL_UNAVAILABLE', message: 'email settings unavailable' });
+});

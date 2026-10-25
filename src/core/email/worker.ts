@@ -217,6 +217,7 @@ export class EmailWorker {
     id: string,
     messageId: string,
     status: 'bounced' | 'complained',
+    provider: 'exact' | 'sendgrid' = 'exact',
   ): Promise<void> {
     await inTransaction(this.db, async (trx) => {
       const row = await trx
@@ -225,10 +226,21 @@ export class EmailWorker {
         .where('id', '=', id)
         .forUpdate()
         .executeTakeFirst();
-      if (!row || (row.providerMessageId !== null && row.providerMessageId !== messageId)) return;
+      if (
+        !row ||
+        (row.providerMessageId !== null &&
+          row.providerMessageId !== messageId &&
+          !(provider === 'sendgrid' && messageId.startsWith(`${row.providerMessageId}.`)))
+      )
+        return;
       await trx
         .updateTable('emailOutbox')
-        .set({ status, providerMessageId: messageId, leaseToken: null, leaseExpiresAt: null })
+        .set({
+          status,
+          providerMessageId: row.providerMessageId ?? messageId,
+          leaseToken: null,
+          leaseExpiresAt: null,
+        })
         .where('id', '=', id)
         .execute();
       const recipient = await trx

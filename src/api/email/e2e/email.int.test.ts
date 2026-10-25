@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from 'node:crypto';
+import { createHmac, generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { sql } from 'kysely';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
@@ -13,6 +13,10 @@ import { MailDeliveryError, type EmailMessage, type Mailer } from '../../../core
 import { unsubscribeToken } from '../../../core/email/unsubscribe.js';
 
 const db = testDatabase();
+const sendgridKeys = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+const sendgridPublicKey = sendgridKeys.publicKey
+  .export({ format: 'der', type: 'spki' })
+  .toString('base64');
 const secret = 'email-test-secret-'.repeat(3);
 const webhookSecret =
   'whsec_' + Buffer.from('webhook-test-secret-material-32bytes').toString('base64');
@@ -33,6 +37,7 @@ beforeAll(async () => {
       AUTH0_AUDIENCE: tenant.audience,
       EMAIL_UNSUBSCRIBE_SECRET: secret,
       RESEND_WEBHOOK_SECRET: webhookSecret,
+      SENDGRID_WEBHOOK_PUBLIC_KEY: sendgridPublicKey,
       RATE_LIMIT_EMAIL: '100',
     }),
     undefined,
@@ -78,6 +83,108 @@ async function people() {
 }
 
 const rows = () => db.selectFrom('emailOutbox').selectAll().orderBy('createdAt').execute();
+
+describe('signed SendGrid feedback over HTTP', () => {
+  const post = (body: string, timestamp = String(Math.floor(Date.now() / 1000)), valid = true) => {
+    const signature = sign(
+      'sha256',
+      Buffer.concat([Buffer.from(timestamp), Buffer.from(body)]),
+      sendgridKeys.privateKey,
+    ).toString('base64');
+    return request(app.getHttpServer())
+      .post('/v1/email/webhooks/sendgrid')
+      .set('content-type', 'application/json')
+      .set('x-twilio-email-event-webhook-timestamp', timestamp)
+      .set('x-twilio-email-event-webhook-signature', valid ? signature : 'invalid')
+      .send(body);
+  };
+  it.each(['bounce', 'spamreport'])(
+    'records %s with provider suffix correlation and harmless replay',
+    async (event) => {
+      const { invite, invitee } = await people();
+      await invite().expect(201);
+      await new EmailWorker(db, cfg, {
+        idempotencyWindowMs: 0,
+        send: () => Promise.resolve({ messageId: 'sg-request' }),
+      }).runBatch();
+      const [row] = await rows();
+      const body = JSON.stringify(
+        [
+          {
+            event,
+            outbox_id: row!.id,
+            sg_message_id: 'sg-request.filter-0.0',
+            email: 'private-inbox@example.com',
+            subject: 'Թիմ',
+          },
+        ],
+        null,
+        2,
+      );
+      await post(body).expect(200);
+      await post(body).expect(200);
+      expect((await rows())[0]).toMatchObject({
+        status: event === 'bounce' ? 'bounced' : 'complained',
+        providerMessageId: 'sg-request',
+      });
+      expect(
+        (
+          await db
+            .selectFrom('users')
+            .select('emailSuppressed')
+            .where('id', '=', invitee.id)
+            .executeTakeFirstOrThrow()
+        ).emailSuppressed,
+      ).toBe(true);
+      expect(logs.text()).not.toContain('private-inbox@example.com');
+    },
+  );
+  it('rejects invalid signatures and correlation before mutating any row; ignores wrong message IDs', async () => {
+    const { invite } = await people();
+    await invite().expect(201);
+    const [row] = await rows();
+    const body = JSON.stringify([
+      { event: 'bounce', outbox_id: row!.id, sg_message_id: 'sg-request.filter' },
+    ]);
+    await post(body, undefined, false).expect(400);
+    await post(body, String(Math.floor(Date.now() / 1000) - 301)).expect(400);
+    await request(app.getHttpServer()).post('/v1/email/webhooks/sendgrid').send([]).expect(400);
+    await post('[{"event":"bounce"}]').expect(200);
+    await post(JSON.stringify([{ event: 'bounce', outbox_id: row!.id }])).expect(400);
+    await post('{}').expect(400);
+    await post('[{"event":"delivered"}]').expect(200);
+    expect((await rows())[0]!.status).toBe('pending');
+    await new EmailWorker(db, cfg, {
+      idempotencyWindowMs: 0,
+      send: () => Promise.resolve({ messageId: 'other-request' }),
+    }).runBatch();
+    await post(body).expect(200);
+    expect((await rows())[0]!.status).toBe('sent');
+  });
+  it('quarantines expired dispatches without a SendGrid deduplication guarantee', async () => {
+    const { invite } = await people();
+    await invite().expect(201);
+    await db
+      .updateTable('emailOutbox')
+      .set({
+        status: 'dispatching',
+        leaseExpiresAt: new Date(0),
+        attempts: 1,
+        firstAttemptAt: new Date(),
+      })
+      .execute();
+    let sends = 0;
+    await new EmailWorker(db, cfg, {
+      idempotencyWindowMs: 0,
+      send: () => {
+        sends++;
+        return Promise.resolve({ messageId: 'duplicate' });
+      },
+    }).runBatch();
+    expect(sends).toBe(0);
+    expect((await rows())[0]!.status).toBe('uncertain');
+  });
+});
 
 describe('signed Resend feedback over HTTP', () => {
   const post = (body: string, timestamp = String(Math.floor(Date.now() / 1000)), valid = true) => {

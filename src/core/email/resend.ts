@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import type { AppConfig } from '../config/index.js';
-import { DisabledMailer, MailDeliveryError, type EmailMessage, type Mailer } from './mailer.js';
+import { MailDeliveryError, type EmailMessage, type Mailer } from './mailer.js';
 
 const responseSchema = z.object({ id: z.uuid() });
 const rejectionSchema = z.object({ name: z.string() });
@@ -106,12 +105,4 @@ export class ResendMailer implements Mailer {
       throw new MailDeliveryError('permanent');
     throw new Error('unknown mail delivery outcome');
   }
-}
-
-/** Only the worker needs the sending credential; the API can serve with none. */
-export function productionMailer(cfg: AppConfig): Mailer {
-  if (!cfg.EMAIL_DELIVERY_ENABLED) return new DisabledMailer();
-  if (!cfg.RESEND_API_KEY || !cfg.EMAIL_FROM)
-    throw new Error('enabled mail worker needs RESEND_API_KEY and EMAIL_FROM');
-  return new ResendMailer(cfg.RESEND_API_KEY, cfg.EMAIL_FROM, cfg.EMAIL_REPLY_TO);
 }

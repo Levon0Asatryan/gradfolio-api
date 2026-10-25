@@ -1,7 +1,7 @@
 import { loadConfig } from '../config/index.js';
 import { createDatabase } from '../db/database.js';
 import { createPool } from '../db/pool.js';
-import { productionMailer } from './resend.js';
+import { productionMailer } from './production-mailer.js';
 import { EmailWorker } from './worker.js';
 
 const cfg = loadConfig(process.env);
