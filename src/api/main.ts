@@ -14,7 +14,10 @@ async function bootstrap(): Promise<void> {
   // value fails at boot rather than at first use.
   const cfg = loadConfig();
 
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+    rawBody: true,
+  });
   app.useLogger(app.get(Logger));
   checkGithubSettings(app.get(Logger), cfg);
 

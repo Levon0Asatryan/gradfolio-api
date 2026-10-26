@@ -77,7 +77,8 @@ current-main revalidation.
   valid unsubscribe links remain retryable on transient errors; project selection is
   capped at 50; empty downloads are disabled; a missing project prompts a reload.
 
-The production login journey and real email provider acceptance remain open.
+The production login journey was later completed by the user; real email
+provider acceptance remains open.
 
 | Item                     | Local result                                                                                                                                                                                                            |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -142,14 +143,67 @@ code remains in the unit coverage denominator. Coverage thresholds were not lowe
   working tree. Before a frontend PR, pin `openapi.source` to the API commit that
   includes M8; no commit was invented to label uncommitted source.
 
+## 2026-10-23 Resend preparation
+
+The user verified the signed-in production PDF download and Settings persistence
+after API/FE PRs #119/#137 merged. Anonymous production `/readyz` and auth guards
+also passed. This does not prove a real invite email. The Resend adapter, signed
+webhook, OpenAPI update, worker image deploy hook and domain/runbook are now under
+review. Resend sends remain disabled without a domain, account and secrets.
+
+Local evidence: the complete API unit run passed **1,141 tests in 68 files**
+(statements 95.44%, branches 91.86%, functions 94.90%, lines 96.78%). The
+complete MySQL 8.4 integration run passed **1,037 tests in 61 files**, including
+19 email integration tests. The new cases include raw signed bounce/complaint
+delivery, replay, tampering, stale timestamp, wrong provider ID and retry
+expiry. Windows bind-mounted Docker required longer test timeouts (30 seconds
+for unit, 60 seconds for integration); no assertions or coverage gates changed.
+TypeScript, ESLint, generated OpenAPI and changed-file formatting passed. The
+production Docker image built successfully, and its compiled worker returned
+`{"processed":0,"disabled":true}` against the migrated test database. PR and
+production gates are recorded separately when complete.
+
+## 2026-10-25 SendGrid revalidation
+
+The user selected SendGrid instead of purchasing a domain. They confirmed Single
+Sender verification and privately saved sending/API and signed-webhook keys.
+The dashboard showed trial expiry on **2026-12-22**. Cloud secret installation,
+worker creation, endpoint enablement and real provider delivery remain for Levon.
+See [the deployment handoff](sendgrid-handoff.md).
+
+- TypeScript, ESLint, generated OpenAPI and whole-repository Prettier passed.
+- Full unit coverage: **1,159 tests in 69 files**; statements 95.36%, branches
+  91.99%, functions 94.49%, lines 96.86%. Thresholds remain unchanged.
+- Full MySQL 8.4 integration: **1,041 tests in 61 files**, including 23 email
+  tests. New cases exercise real ECDSA signatures over raw HTTP bodies,
+  bounce/spam suppression and replay, wrong provider IDs, uncorrelated provider
+  test events, invalid/stale signatures and expired dispatch quarantine.
+- Four isolated mutations (signature check, timestamp freshness, provider-ID
+  comparison and expired-dispatch protection) each produced the expected
+  assertion failure. The workspace was not mutated during these checks.
+- Production Docker image built; its compiled worker returned
+  `{"processed":0,"disabled":true}` against the migrated test database.
+  A separately started API process in that image passed `/readyz`, rejected an
+  unsigned webhook with 400 and accepted an ECDSA-signed provider test with 200.
+  The initial 10-second startup allowance was too short on Docker Desktop;
+  a 30-second readiness allowance passed without an application change.
+- Linux Node 24 containers used 30-second unit and 60-second integration test
+  timeouts for Windows bind-mount overhead. Logs are under `tmp/m8-logs/sendgrid-*`.
+
+No actual SendGrid credential, private postal address or provider request body is
+stored in the repository. No real provider send or GCP configuration change was
+performed. CI, review and deployment results must be checked on the PR head.
+
 ## Production gates still open
 
-Choose the provider and domain, verify sender DNS, implement its adapter and signed
-webhook, provision secrets, and prove real idempotency/reconciliation behavior.
-Then configure the scheduled Cloud Run worker and operational alerts. Delivery
-stays off until those checks pass; the CLI refuses enabled sending without a
-production adapter. See [email.md](email.md) for the connection/runbook steps.
+The user changed the provider to SendGrid on 2026-10-23. Verify the account and
+Single Sender for trial testing, provision sending credentials and the signed
+Event Webhook key, then configure the Cloud Run worker and operational alerts,
+and prove real delivery, idempotency/reconciliation, bounce and unsubscribe.
+Delivery stays off until those checks pass. See [email.md](email.md) and the
+[decision](email-decision.md) for the connection steps.
 
-Run the signed-in browser journey and production download/delivery checks after
-deployment. Local component tests and a successful build do not establish that
-the deployed Auth0 session, routing and new migration are already working there.
+The user completed the signed-in PDF and Settings journey on production.
+Repeat the invite/delivery journey after the SendGrid revision and sender are live.
+The SendGrid trial is time-limited; record its expiry and a permanent delivery
+decision before calling ongoing production email complete. See [sendgrid.md](sendgrid.md).

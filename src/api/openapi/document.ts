@@ -116,6 +116,8 @@ import {
   teamMemberSchema,
 } from '../team/dto/team.dto.js';
 import { z, type ZodObject, type ZodType } from 'zod';
+import { resendEventSchema } from '../../core/email/resend-webhook.js';
+import { sendgridEventsSchema } from '../../core/email/sendgrid-webhook.js';
 
 /**
  * The OpenAPI document, built from the same zod schemas the request pipeline
@@ -969,6 +971,38 @@ export const OPERATIONS: readonly Operation[] = [
         schema: unsubscribeResultSchema,
       },
       '400': error('INVALID_UNSUBSCRIBE_TOKEN or VALIDATION_FAILED'),
+      '429': authenticatedFailures['429'],
+      '503': error('EMAIL_UNAVAILABLE'),
+    },
+  },
+  {
+    method: 'post',
+    path: '/v1/email/webhooks/resend',
+    operationId: 'receiveResendWebhook',
+    tag: 'email',
+    summary: 'Receive signed Resend bounce and complaint events',
+    description:
+      'Requires svix-id, svix-timestamp and svix-signature headers. Signature covers the exact JSON bytes and expires after five minutes. No Auth0 token. Duplicate feedback is harmless; unrelated signed events are acknowledged.',
+    body: resendEventSchema,
+    responses: {
+      '200': { description: 'Acknowledged', schema: z.object({ received: z.literal(true) }) },
+      '400': error('INVALID_WEBHOOK_SIGNATURE or INVALID_EMAIL_EVENT'),
+      '429': authenticatedFailures['429'],
+      '503': error('EMAIL_UNAVAILABLE'),
+    },
+  },
+  {
+    method: 'post',
+    path: '/v1/email/webhooks/sendgrid',
+    operationId: 'receiveSendGridWebhook',
+    tag: 'email',
+    summary: 'Receive signed SendGrid bounce and spam-report events',
+    description:
+      'Requires X-Twilio-Email-Event-Webhook-Signature and X-Twilio-Email-Event-Webhook-Timestamp. Verifies ECDSA against exact JSON bytes. Duplicate feedback is harmless; no Auth0 token.',
+    body: sendgridEventsSchema,
+    responses: {
+      '200': { description: 'Acknowledged', schema: z.object({ received: z.literal(true) }) },
+      '400': error('INVALID_WEBHOOK_SIGNATURE or INVALID_EMAIL_EVENT'),
       '429': authenticatedFailures['429'],
       '503': error('EMAIL_UNAVAILABLE'),
     },

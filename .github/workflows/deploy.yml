@@ -98,3 +98,13 @@ jobs:
         run: |
           gcloud run services update-traffic "${SERVICE}" --region "${REGION}" --to-latest
           gcloud run services update-traffic "${SERVICE}" --region "${REGION}" --remove-tags candidate
+
+      # Set GCP_EMAIL_JOB only after the owner has verified the sending identity,
+      # installed secrets and created the job. This updates code, not its enabled
+      # flag or its schedule; first sends remain a separate acceptance gate.
+      - name: Update optional email worker image
+        if: vars.GCP_EMAIL_JOB != ''
+        run: gcloud run jobs update "${MAIL_JOB}" --region "${REGION}" --image "${IMAGE}:${SHA}"
+        env:
+          MAIL_JOB: ${{ vars.GCP_EMAIL_JOB }}
+          SHA: ${{ github.event.workflow_run.head_sha }}

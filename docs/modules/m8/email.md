@@ -1,9 +1,11 @@
 # M8 invitation email operations
 
-The outbox, preferences, localized templates and worker are implemented locally.
-**Production delivery is disabled.** The user has not chosen a provider or sending
-domain (2026-10-20). Do not interpret a saved invitation or preference as a sent
+The outbox, preferences and localized templates are deployed. The user selected
+SendGrid; its adapter and signed bounce/spam-report webhook are in PR #123.
+**Production delivery is disabled.** The user confirmed no sending domain is
+available (2026-10-23). Do not interpret a saved invitation or preference as a sent
 email. In-app team notifications continue independently of mail delivery.
+Use [SendGrid setup](sendgrid.md) for the active account, sender and trial steps.
 
 ## Current behavior
 
@@ -37,9 +39,10 @@ node dist/core/email/cli.js
 ```
 
 The disabled worker reports `{"processed":0,"disabled":true}` and performs only
-retention cleanup. `EMAIL_DELIVERY_ENABLED=true` currently makes the CLI fail with
-an explicit “No production mailer is configured” error. Tests inject a fake mailer
-directly into `EmailWorker`; no real inbox is contacted.
+retention cleanup. With `EMAIL_DELIVERY_ENABLED=true`, the new CLI requires a
+SendGrid sending key, verified sender, frontend origin and unsubscribe secret; it
+fails before database access if provider settings are missing. Tests inject a
+fake mailer or stub HTTP transport; no real inbox has been contacted.
 
 The worker claims rows with `FOR UPDATE SKIP LOCKED` and a lease, commits, then
 sends. Provider requests have a timeout shorter than the lease. Each attempt uses
@@ -49,21 +52,17 @@ Unknown delivery outcomes become `uncertain`. An expired claim is retried only
 inside the injected provider's advertised idempotency window; otherwise it also
 becomes `uncertain`. The account email's hash binds retries to one destination.
 
-## Connect a provider later
+## Optional Resend adapter after domain verification
 
-1. Choose and verify a sending domain and a provider. Confirm SPF/DKIM/DMARC,
-   allowed sender, region, cost, timeout and bounce/complaint support. Record the
-   provider's deduplication window and behavior for the same key and payload.
-2. Implement `src/core/email/mailer.ts` for that provider, honoring its AbortSignal.
-   The adapter returns a bounded provider message ID. Raise `MailDeliveryError`
-   only when the response establishes non-acceptance; a timeout or ambiguous
-   response must remain an unknown outcome. Never log message payloads, recipient
-   addresses, credentials, unsubscribe tokens or raw provider response bodies.
-3. Wire the adapter into the worker CLI. Add a provider-specific webhook adapter
-   that verifies signatures and correlates the row ID/message ID before calling
-   `EmailWorker.recordFeedback`. There is deliberately no unsigned webhook route.
-   Duplicate feedback is harmless; a bounce for an old address must not suppress
-   a new account email.
+1. Verify `mail.<owned-domain>` with SPF/DKIM/DMARC in Resend. See
+   [decision](email-decision.md) and the exact [deployment steps](../../ops/deploy.md).
+2. `src/core/email/resend.ts` honors the caller's AbortSignal, uses a stable
+   idempotency key and bounds the provider response. Unknown transport outcomes
+   remain uncertain. Keep the configured sender stable while rows may retry.
+3. `POST /v1/email/webhooks/resend` verifies a raw-body Svix signature and
+   timestamp, then correlates the signed outbox tag and provider ID before
+   recording bounce/complaint. Missing secrets return 503. No unsigned event can
+   suppress an address. Duplicate feedback is harmless.
 4. Supply `EMAIL_PUBLIC_URL` as the frontend origin and a random
    `EMAIL_UNSUBSCRIBE_SECRET` of at least 32 characters through Secret Manager.
    Set provider credentials only in the worker/webhook runtime. Rotating the

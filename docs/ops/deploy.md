@@ -67,6 +67,115 @@ Nothing to do: the pipeline runs it. To see the last run:
 `gcloud run jobs executions list --job gradfolio-migrate --region us-east1`.
 A second run prints `migrations: nothing to apply`.
 
+## M8: invitation email (SendGrid, disabled until acceptance)
+
+Provider choice and acceptance gates: [email-decision.md](../modules/m8/email-decision.md).
+The user confirmed sender verification and privately saved keys on 2026-10-25;
+cloud installation and real delivery remain pending. See [the owner handoff](../modules/m8/sendgrid-handoff.md). The application defaults
+to `EMAIL_DELIVERY_ENABLED=false`. Deploying the code alone sends no email.
+
+**Cost before creating resources:** SendGrid's trial permits 100 emails/day for
+60 days. Sending then stops unless upgraded; no paid plan is authorized.
+A Cloud Scheduler job is $0.10/month beyond the billing account's first
+three free jobs; Cloud Run executions, network, Secret Manager and logs are
+usage-dependent. Confirm the budget with the project owner before creating a
+job/schedule. Buying a domain needs a separate agreed registration and renewal
+price. The current `gradfolio.app` Auth0 audience does not establish ownership.
+
+On Levon's sandboxed gcloud host, first verify
+`gcloud info --format='value(config.paths.global_config_dir)'` is
+`/Users/levon/Dev/university/.sandbox/gcloud`. Verify the project mailbox through
+Single Sender Verification for the initial trial. Domain authentication remains
+SendGrid's production recommendation; no domain purchase is authorized.
+Use a monitored reply-to mailbox. Do not paste API keys into commands or chat:
+enter them as secret versions through the Cloud Console or `gcloud secrets
+versions add ... --data-file=-` from a private terminal. Give the sender job a
+Mail Send-only SendGrid key; give the API the signed webhook public verification key.
+
+After the secrets exist, the owner can provision the disabled worker. Replace
+`<verified-sender>`, `<reply-to>`, `<auth0-issuer>`, `<image-sha>` with values checked
+in the current deployment. The worker has its own service identity with DML
+database access and only its own sending secrets. The API identity receives only
+the webhook and unsubscribe secrets. The exact job definition is:
+
+```sh
+gcloud iam service-accounts create gradfolio-email-run \
+  --display-name='Gradfolio invitation email worker'
+gcloud projects add-iam-policy-binding project-33e407b5-7fd5-485d-8dc \
+  --member='serviceAccount:gradfolio-email-run@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com' \
+  --role='roles/cloudsql.client'
+gcloud secrets add-iam-policy-binding gradfolio-database-url \
+  --member='serviceAccount:gradfolio-email-run@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com' \
+  --role='roles/secretmanager.secretAccessor'
+gcloud secrets add-iam-policy-binding gradfolio-sendgrid-api-key \
+  --member='serviceAccount:gradfolio-email-run@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com' \
+  --role='roles/secretmanager.secretAccessor'
+gcloud secrets add-iam-policy-binding gradfolio-email-unsubscribe-secret \
+  --member='serviceAccount:gradfolio-email-run@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com' \
+  --role='roles/secretmanager.secretAccessor'
+gcloud secrets add-iam-policy-binding gradfolio-sendgrid-webhook-key \
+  --member='serviceAccount:gradfolio-api-run@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com' \
+  --role='roles/secretmanager.secretAccessor'
+gcloud secrets add-iam-policy-binding gradfolio-email-unsubscribe-secret \
+  --member='serviceAccount:gradfolio-api-run@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com' \
+  --role='roles/secretmanager.secretAccessor'
+gcloud run services update gradfolio-api --region us-east1 \
+  --update-secrets SENDGRID_WEBHOOK_PUBLIC_KEY=gradfolio-sendgrid-webhook-key:latest,EMAIL_UNSUBSCRIBE_SECRET=gradfolio-email-unsubscribe-secret:latest
+gcloud run jobs create gradfolio-email-worker --region us-east1 \
+  --image us-east1-docker.pkg.dev/project-33e407b5-7fd5-485d-8dc/gradfolio/api:<image-sha> \
+  --service-account gradfolio-email-run@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com \
+  --network default --subnet default --vpc-egress private-ranges-only \
+  --set-cloudsql-instances project-33e407b5-7fd5-485d-8dc:us-east1:gradfolio-db \
+  --task-timeout 300s --max-retries 0 --tasks 1 --parallelism 1 \
+  --command node --args dist/core/email/cli.js \
+  --set-env-vars NODE_ENV=production,DATABASE_SOCKET_PATH=/cloudsql/project-33e407b5-7fd5-485d-8dc:us-east1:gradfolio-db,DATABASE_POOL_MAX=2,AUTH0_ISSUER_BASE_URL=<auth0-issuer>,AUTH0_AUDIENCE=https://api.gradfolio.app,EMAIL_PROVIDER=sendgrid,EMAIL_DELIVERY_ENABLED=false,EMAIL_PUBLIC_URL=https://gradfolio-navy.vercel.app,EMAIL_FROM=<verified-sender>,EMAIL_REPLY_TO=<reply-to> \
+  --set-secrets DATABASE_URL=gradfolio-database-url:latest,SENDGRID_API_KEY=gradfolio-sendgrid-api-key:latest,EMAIL_UNSUBSCRIBE_SECRET=gradfolio-email-unsubscribe-secret:latest
+```
+
+Create a SendGrid webhook for
+`https://gradfolio-api-1058577031182.us-east1.run.app/v1/email/webhooks/sendgrid`,
+enable Signed Event Webhook, subscribe to Bounce and Spam Reports, and store its base64 ECDSA public key
+in `gradfolio-sendgrid-webhook-key`. Confirm the API returns 400 on unsigned
+requests and 200 for a signed test event. The API and job must share the same
+unsubscribe secret; rotating it invalidates earlier links.
+
+Test one controlled invitation before enabling the job. Set
+`EMAIL_DELIVERY_ENABLED=true` **on the job only** with
+`gcloud run jobs update gradfolio-email-worker --region us-east1 --update-env-vars EMAIL_DELIVERY_ENABLED=true`,
+then run `gcloud run jobs execute gradfolio-email-worker --region us-east1 --wait`
+once and inspect
+the test mailbox. Confirm SPF/DKIM, sender, three scripts, `/teams`, unsubscribe,
+signed bounce/complaint, and that a second execution sends no duplicate. Query
+failed/uncertain rows using [email.md](../modules/m8/email.md) without logging
+addresses. If any check fails, set the job back to false with the same command
+and reconcile the row.
+Do not enable a schedule until the full [M8 verification](../modules/m8/verification.md)
+is recorded.
+
+When ready, create one Cloud Scheduler HTTP job that calls the Cloud Run Jobs
+`run` API every five minutes, using an OAuth token from a dedicated invoker
+identity scoped to this one job:
+
+```sh
+gcloud iam service-accounts create gradfolio-email-scheduler \
+  --display-name='Invoke Gradfolio email job'
+gcloud run jobs add-iam-policy-binding gradfolio-email-worker --region us-east1 \
+  --member='serviceAccount:gradfolio-email-scheduler@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com' \
+  --role='roles/run.invoker'
+gcloud scheduler jobs create http gradfolio-email-worker-schedule \
+  --location us-east1 --schedule='*/5 * * * *' --time-zone=Etc/UTC \
+  --uri='https://run.googleapis.com/v2/projects/project-33e407b5-7fd5-485d-8dc/locations/us-east1/jobs/gradfolio-email-worker:run' \
+  --http-method=POST \
+  --oauth-service-account-email=gradfolio-email-scheduler@project-33e407b5-7fd5-485d-8dc.iam.gserviceaccount.com
+```
+
+Add a log-based alert for job failures and nonzero failed/uncertain outbox
+counts. Set GitHub Actions variable
+`GCP_EMAIL_JOB=gradfolio-email-worker` so future deploys update the worker image.
+Pause the schedule and set delivery false before rotating credentials, changing
+sender or rolling back. The API's old revision is compatible with the additive
+email schema; leave it in place on rollback.
+
 ## Roll back
 
 ```sh
