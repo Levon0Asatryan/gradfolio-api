@@ -252,11 +252,11 @@ describe('profile', () => {
       headline: 'Student developer',
       summary: 'I like parsers.',
       industry: 'Software',
-      location: 'Yerevan, Armenia',
+      location: 'Faketown, Exampleland',
       websites: '[PERSONAL:https://example.org/anna]',
     });
     const text = JSON.stringify(out);
-    for (const secret of ['SENTINEL', 'Nowhere Street', 'Faketown']) {
+    for (const secret of ['SENTINEL', 'Nowhere Street', 'Addressburg']) {
       expect(text).not.toContain(secret);
     }
   });
