@@ -52,32 +52,32 @@ The **Status** column is the status of record. **Depends on** lists tasks that m
 in `manual-testing.md` (the things only he can do), and the two must never collide. In a
 brief, "queue M7-T1" always means a queue row.
 
-| ID     | Task                                                                        | Repo    | Depends on        | Tracker | Status  | Brief                                              |
-| ------ | --------------------------------------------------------------------------- | ------- | ----------------- | ------- | ------- | -------------------------------------------------- |
-| M7-T20 | Skill suggestions from repo languages/topics and the student's own projects | api     | —                 | 7.13    | done    | [T20](tasks/M7-T20-skill-suggestions.md)           |
-| M7-T21 | Links suggestions from GitHub social accounts                               | api     | T20               | 7.13    | done    | [T21](tasks/M7-T21-links-suggestions.md)           |
-| M7-T22 | Repo-change suggestions and a notification (d2)                             | api     | T20               | 7.13    | done    | [T22](tasks/M7-T22-repo-change-suggestions.md)     |
-| M7-T23 | Deletion tombstone: precondition of `AUTH0_DELETE_USERS`                    | api     | —                 | 7.2     | done    | [T23](tasks/M7-T23-deletion-tombstone.md)          |
-| M7-T24 | Startup check: log which of the five GitHub settings is missing             | api     | —                 | 7.2     | done    | [T24](tasks/M7-T24-startup-check.md)               |
-| M7-T25 | Education and organisation suggestions from verified emails and orgs        | api     | —                 | 7.13    | done    | [T25](tasks/M7-T25-education-suggestions.md)       |
-| M7-T27 | Stuck GitHub connection: refused token, Disconnect cannot finish            | api     | —                 | 7.2     | done    | [T27](tasks/M7-T27-stuck-github-connection.md)     |
-| M7-T28 | `GET /v1/me/suggestions?limit=100` answers 400                              | api, fe | —                 | 7.13    | done    | [T28](tasks/M7-T28-suggestions-limit-400.md)       |
-| M7-T29 | Re-check the repository when accepting a `project.new` suggestion           | api     | —                 | 7.13    | done    | [T29](tasks/M7-T29-project-new-recheck.md)         |
-| M7-T34 | Offer the import after every successful connect, and keep offering it       | fe      | —                 | 7.14    | done    | [T34](tasks/M7-T34-offer-import-after-connect.md)  |
-| M7-T35 | Import dialog wording when only profile data is imported                    | fe      | —                 | 7.14    | done    | [T35](tasks/M7-T35-profile-only-import-wording.md) |
-| M7-T36 | Reconnect after a dead token: connect re-runs the GitHub sign-in            | api, fe | —                 | 7.2     | done    | [T36](tasks/M7-T36-reconnect-after-dead-token.md)  |
+| ID     | Task                                                                        | Repo    | Depends on        | Tracker | Status      | Brief                                              |
+| ------ | --------------------------------------------------------------------------- | ------- | ----------------- | ------- | ----------- | -------------------------------------------------- |
+| M7-T20 | Skill suggestions from repo languages/topics and the student's own projects | api     | —                 | 7.13    | done        | [T20](tasks/M7-T20-skill-suggestions.md)           |
+| M7-T21 | Links suggestions from GitHub social accounts                               | api     | T20               | 7.13    | done        | [T21](tasks/M7-T21-links-suggestions.md)           |
+| M7-T22 | Repo-change suggestions and a notification (d2)                             | api     | T20               | 7.13    | done        | [T22](tasks/M7-T22-repo-change-suggestions.md)     |
+| M7-T23 | Deletion tombstone: precondition of `AUTH0_DELETE_USERS`                    | api     | —                 | 7.2     | done        | [T23](tasks/M7-T23-deletion-tombstone.md)          |
+| M7-T24 | Startup check: log which of the five GitHub settings is missing             | api     | —                 | 7.2     | done        | [T24](tasks/M7-T24-startup-check.md)               |
+| M7-T25 | Education and organisation suggestions from verified emails and orgs        | api     | —                 | 7.13    | done        | [T25](tasks/M7-T25-education-suggestions.md)       |
+| M7-T27 | Stuck GitHub connection: refused token, Disconnect cannot finish            | api     | —                 | 7.2     | done        | [T27](tasks/M7-T27-stuck-github-connection.md)     |
+| M7-T28 | `GET /v1/me/suggestions?limit=100` answers 400                              | api, fe | —                 | 7.13    | done        | [T28](tasks/M7-T28-suggestions-limit-400.md)       |
+| M7-T29 | Re-check the repository when accepting a `project.new` suggestion           | api     | —                 | 7.13    | done        | [T29](tasks/M7-T29-project-new-recheck.md)         |
+| M7-T34 | Offer the import after every successful connect, and keep offering it       | fe      | —                 | 7.14    | done        | [T34](tasks/M7-T34-offer-import-after-connect.md)  |
+| M7-T35 | Import dialog wording when only profile data is imported                    | fe      | —                 | 7.14    | done        | [T35](tasks/M7-T35-profile-only-import-wording.md) |
+| M7-T36 | Reconnect after a dead token: connect re-runs the GitHub sign-in            | api, fe | —                 | 7.2     | done        | [T36](tasks/M7-T36-reconnect-after-dead-token.md)  |
 | M7-T37 | Disconnect unlinks the GitHub identity at Auth0                             | api     | —                 | 7.4     | todo        | [T37](tasks/M7-T37-disconnect-unlinks-github.md)   |
-| M7-T30 | Focus and announcement after Publish on cards and the project page          | fe      | —                 | 7.14    | done    | [T30](tasks/M7-T30-publish-focus.md)               |
-| M7-T31 | Import entry points: after connect, Projects → Add                          | fe      | —                 | 7.14    | done    | [T31](tasks/M7-T31-import-entry-points.md)         |
-| M7-T32 | Suggestions inbox: skills, links, project changes, notification             | fe      | T20 (T21, T22)    | 7.13    | done    | [T32](tasks/M7-T32-suggestions-inbox.md)           |
-| M7-T33 | One source for the Auth0 settings read by the app                           | fe      | —                 | 7.11    | done    | [T33](tasks/M7-T33-auth0-settings-source.md)       |
+| M7-T30 | Focus and announcement after Publish on cards and the project page          | fe      | —                 | 7.14    | done        | [T30](tasks/M7-T30-publish-focus.md)               |
+| M7-T31 | Import entry points: after connect, Projects → Add                          | fe      | —                 | 7.14    | done        | [T31](tasks/M7-T31-import-entry-points.md)         |
+| M7-T32 | Suggestions inbox: skills, links, project changes, notification             | fe      | T20 (T21, T22)    | 7.13    | done        | [T32](tasks/M7-T32-suggestions-inbox.md)           |
+| M7-T33 | One source for the Auth0 settings read by the app                           | fe      | —                 | 7.11    | done        | [T33](tasks/M7-T33-auth0-settings-source.md)       |
 | M7-T40 | LinkedIn export: real headers, synthetic fixtures, parser                   | api     | —                 | 7.6     | in progress | [T40](tasks/M7-T40-linkedin-parser.md)             |
 | M7-T41 | LinkedIn ZIP upload, guards and preview                                     | api     | T40               | 7.7     | in progress | [T41](tasks/M7-T41-linkedin-upload-preview.md)     |
 | M7-T42 | LinkedIn confirm: selected items become profile rows                        | api     | T41               | 7.8     | in progress | [T42](tasks/M7-T42-linkedin-confirm.md)            |
 | M7-T43 | LinkedIn import wizard (onboarding and integrations page)                   | fe      | T41, T42 deployed | 7.9     | in progress | [T43](tasks/M7-T43-linkedin-wizard.md)             |
-| M7-T50 | Real GitHub run on production                                               | api, fe | T20, T30, T31     | 7.1–7.5 | done    | [T50](tasks/M7-T50-github-real-run.md)             |
-| M7-T51 | Real LinkedIn run on production                                             | api, fe | T43, Levon's run | 7.6–7.9 | blocked | [T51](tasks/M7-T51-linkedin-real-run.md)           |
-| M7-T52 | Verification records and the module report                                  | api, fe | all above         | —       | todo    | [T52](tasks/M7-T52-verification.md)                |
+| M7-T50 | Real GitHub run on production                                               | api, fe | T20, T30, T31     | 7.1–7.5 | done        | [T50](tasks/M7-T50-github-real-run.md)             |
+| M7-T51 | Real LinkedIn run on production                                             | api, fe | T43, Levon's run  | 7.6–7.9 | blocked     | [T51](tasks/M7-T51-linkedin-real-run.md)           |
+| M7-T52 | Verification records and the module report                                  | api, fe | all above         | —       | todo        | [T52](tasks/M7-T52-verification.md)                |
 
 **Follow-up from T23 (open, not yet a task):** Codex P2 on `src/core/config/schema.ts`:
 `ACCOUNT_TOMBSTONE_TTL_S` accepts values below the access-token lifetime plus the clock
@@ -158,15 +158,15 @@ LinkedIn (T40–T43): unblocked 2026-11-01, the real English export confirmed th
 
 ## Needs Levon (queue, kept in `manual-testing.md`)
 
-| Queue    | What                                                                                                                                                   | Blocks       |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| Queue    | What                                                                                                                                                   | Blocks               |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------- |
 | M7-T1    | Request the LinkedIn export (the larger archive); Narek and Pargev send header lines only                                                              | done (en) 2026-11-01 |
-| M7-T4/T6 | Headed login and the real GitHub run on production                                                                                                     | T50          |
-| M7-T5    | The real LinkedIn run                                                                                                                                  | T51          |
-| M7-T7    | Capture and redact the LinkedIn export-download screenshots (four per language)                                                                        | T43          |
-| M7-T8    | Bucket lifecycle for `imports/` (age one day)                                                                                                          | T41          |
-| M7-T10   | The NPUA mail domains for `UNIVERSITY_DOMAINS`                                                                                                         | T25          |
-| M7-T13   | Auth0 Management API scope `delete:users` on the M2M app, then `AUTH0_DELETE_USERS=true` on Cloud Run. **Only after T23 is merged.** Levon decided yes | —            |
+| M7-T4/T6 | Headed login and the real GitHub run on production                                                                                                     | T50                  |
+| M7-T5    | The real LinkedIn run                                                                                                                                  | T51                  |
+| M7-T7    | Capture and redact the LinkedIn export-download screenshots (four per language)                                                                        | T43                  |
+| M7-T8    | Bucket lifecycle for `imports/` (age one day)                                                                                                          | T41                  |
+| M7-T10   | The NPUA mail domains for `UNIVERSITY_DOMAINS`                                                                                                         | T25                  |
+| M7-T13   | Auth0 Management API scope `delete:users` on the M2M app, then `AUTH0_DELETE_USERS=true` on Cloud Run. **Only after T23 is merged.** Levon decided yes | —                    |
 
 ## Exit
 

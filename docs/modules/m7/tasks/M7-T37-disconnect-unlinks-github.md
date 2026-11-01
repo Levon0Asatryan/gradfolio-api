@@ -12,6 +12,7 @@ Management API call the account-deletion path already uses (`update:users` scope
 ## Scope
 
 In:
+
 - Disconnect: revoke the grant (existing rules), then unlink the identity. Order and failure
   rules: if revocation is unconfirmed, keep the `linking`/unconfirmed behaviour from T27;
   if unlinking fails, the answer says honestly that GitHub access was removed but the
