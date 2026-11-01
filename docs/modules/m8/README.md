@@ -1,6 +1,6 @@
 # M8: Utilities and email
 
-**Status:** PDF/preferences merged and accepted; production email integration in progress. **Owner:** Narek (module chat and task chats), from 2026-10-18.
+**Status:** the original ten tasks are closed (2026-11-01). Left: the email worker and first real email (T20–T22), PDF and browser evidence (T23, T24), a small decision (T25) and the close-out (T26). **Owner:** Narek (module chat and task chats), from 2026-10-18.
 **Repos:** gradfolio-api, gradfolio.
 
 **Goal:** a student downloads a résumé PDF built from their portfolio, and a teammate
@@ -26,21 +26,21 @@ No production email delivery is claimed.
 The **Status** column is the status of record for these tasks; the module chat keeps it
 current. **Depends on** lists tasks that must be **merged** first.
 
-| ID     | Task                                                                 | Repo     | Depends on | Tracker  | Status      | Brief                                        |
-| ------ | -------------------------------------------------------------------- | -------- | ---------- | -------- | ----------- | -------------------------------------------- |
-| M8-T1  | Résumé PDF: generator spike and decision                             | api, fe  | —          | 8.1      | done        | [T1](tasks/M8-T1-resume-pdf-decision.md)     |
-| M8-T2  | Résumé PDF: generation, where T1 decided                             | per T1   | T1         | 8.1      | done        | [T2](tasks/M8-T2-resume-pdf-generation.md)   |
-| M8-T3  | Résumé PDF: download UI (options, entry points, en/ru/am)            | fe       | T2         | 8.1      | done        | [T3](tasks/M8-T3-resume-pdf-ui.md)           |
-| M8-T4  | Email: provider and sending domain, a proposal for Levon             | docs     | —          | Q10      | done        | [T4](tasks/M8-T4-email-provider-decision.md) |
-| M8-T5  | Email: mailer module, outbox table, sender job (fake provider first) | api      | —          | 8.6      | done        | [T5](tasks/M8-T5-mailer-outbox.md)           |
-| M8-T6  | Email: provider adapter and production sending                       | api, ops | T4, T5     | 8.6      | in progress | [T6](tasks/M8-T6-provider-adapter.md)        |
-| M8-T7  | Preferred language and email preferences (API)                       | api      | —          | 8.7, 8.8 | done        | [T7](tasks/M8-T7-preferences-api.md)         |
-| M8-T8  | Team invite email                                                    | api      | T5, T7     | 8.7      | done        | [T8](tasks/M8-T8-invite-email.md)            |
-| M8-T9  | Settings: email preferences and language (FE)                        | fe       | T7         | 8.8      | done        | [T9](tasks/M8-T9-settings-preferences-ui.md) |
-| M8-T10 | Module verification and report                                       | api, fe  | T1–T9      | —        | in progress | [T10](tasks/M8-T10-verification.md)          |
+| ID     | Task                                                                 | Repo     | Depends on | Tracker  | Status                                                                                                       | Brief                                        |
+| ------ | -------------------------------------------------------------------- | -------- | ---------- | -------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| M8-T1  | Résumé PDF: generator spike and decision                             | api, fe  | —          | 8.1      | closed 2026-11-01: PDFKit chosen and shipped. The missing comparison is in T23                               | [T1](tasks/M8-T1-resume-pdf-decision.md)     |
+| M8-T2  | Résumé PDF: generation, where T1 decided                             | per T1   | T1         | 8.1      | closed 2026-11-01: endpoint live. Measurements and guard proofs moved to T23                                 | [T2](tasks/M8-T2-resume-pdf-generation.md)   |
+| M8-T3  | Résumé PDF: download UI (options, entry points, en/ru/am)            | fe       | T2         | 8.1      | closed 2026-11-01: live, checked by hand. Browser checks moved to T24                                        | [T3](tasks/M8-T3-resume-pdf-ui.md)           |
+| M8-T4  | Email: provider and sending domain, a proposal for Levon             | docs     | —          | Q10      | closed 2026-11-01: Resend proposal, superseded by SendGrid; Levon approved                                   | [T4](tasks/M8-T4-email-provider-decision.md) |
+| M8-T5  | Email: mailer module, outbox table, sender job (fake provider first) | api      | —          | 8.6      | closed 2026-11-01: outbox, mailer, CLI merged                                                                | [T5](tasks/M8-T5-mailer-outbox.md)           |
+| M8-T6  | Email: provider adapter and production sending                       | api, ops | T4, T5     | 8.6      | closed 2026-11-01: adapter, signed webhook and secrets done. The worker and a real send moved to T20 and T21 | [T6](tasks/M8-T6-provider-adapter.md)        |
+| M8-T7  | Preferred language and email preferences (API)                       | api      | —          | 8.7, 8.8 | closed 2026-11-01: merged, checked on production                                                             | [T7](tasks/M8-T7-preferences-api.md)         |
+| M8-T8  | Team invite email                                                    | api      | T5, T7     | 8.7      | closed 2026-11-01: code and tests merged. The production run moved to T21                                    | [T8](tasks/M8-T8-invite-email.md)            |
+| M8-T9  | Settings: email preferences and language (FE)                        | fe       | T7         | 8.8      | closed 2026-11-01: live, checked by hand. Browser checks moved to T24                                        | [T9](tasks/M8-T9-settings-preferences-ui.md) |
+| M8-T10 | Module verification and report                                       | api, fe  | T1–T9      | —        | closed 2026-11-01: superseded by T26                                                                         | [T10](tasks/M8-T10-verification.md)          |
 
-**Stretch.** No briefs yet. Levon decides at the T4 stop point whether any of these stay
-in v1.0.
+**Stretch: closed on 2026-11-01 as not in v1.0.** Nobody built them, and the core tasks are not
+finished. They can be reopened as new tasks after M9 if there is time.
 
 | ID    | Task                                       | Tracker | Depends on |
 | ----- | ------------------------------------------ | ------- | ---------- |
@@ -49,7 +49,26 @@ in v1.0.
 | M8-S3 | Portfolio PDF export                       | 8.4     | T2         |
 | M8-S4 | Share a portfolio by email                 | 8.5     | T6         |
 
-## Order and parallel lanes
+## New tasks (opened 2026-11-01 for the work that is left)
+
+Task IDs start at T20, because T1–T19 would collide with the queue rows `M8-T11` to `M8-T14`
+in Levon's `manual-testing.md` (the things only he can do). In a brief, "queue M8-T11" always
+means a queue row.
+
+| ID     | Task                                                                      | Repo     | Depends on        | Tracker  | Status | Brief                                          |
+| ------ | ------------------------------------------------------------------------- | -------- | ----------------- | -------- | ------ | ---------------------------------------------- |
+| M8-T20 | Email worker: create the Cloud Run job (delivery off) and the way it runs | api, ops | queue M8-T11      | 8.6      | todo   | [T20](tasks/M8-T20-email-worker.md)            |
+| M8-T21 | First real invite email on production, and the acceptance steps for it    | api, fe  | T20, queue M8-T14 | 8.6, 8.7 | todo   | [T21](tasks/M8-T21-first-real-email.md)        |
+| M8-T22 | Email operations: alerts, the pause switch, and the trial-end decision    | api, ops | T21, queue M8-T12 | 8.6      | todo   | [T22](tasks/M8-T22-email-operations.md)        |
+| M8-T23 | Résumé PDF evidence: generator rationale, p95 and memory, guard proofs    | api      | —                 | 8.1      | todo   | [T23](tasks/M8-T23-pdf-evidence.md)            |
+| M8-T24 | Browser checks for the PDF dialog, Settings and the unsubscribe page      | fe       | —                 | 8.1, 8.8 | todo   | [T24](tasks/M8-T24-browser-checks.md)          |
+| M8-T25 | Decide the Resend adapter: keep it documented or remove it                | api      | —                 | 8.6      | todo   | [T25](tasks/M8-T25-resend-adapter-decision.md) |
+| M8-T26 | Module close-out: the PASS/FAIL table and `report.md`                     | api, fe  | T21, T23, T24     | —        | todo   | [T26](tasks/M8-T26-closeout.md)                |
+
+Lanes: **T20 → T21 → T22** (email, needs Levon's queue rows), **T23** and **T24** (evidence,
+independent, can start now), **T25** (small decision), then **T26**.
+
+## Order and parallel lanes (original plan)
 
 ```
 Lane A (PDF):     T1 ──► T2 ──► T3
