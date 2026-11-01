@@ -38,6 +38,10 @@ selection, disabled duplicates, no secrets in the browser) fail named tests.
 
 Queue M7-T7: capture and redact the screenshots.
 
+## Guide texts
+
+The wizard's "how to get your file" steps come from [../linkedin-export-guide.md](../linkedin-export-guide.md) (steps 1–6, link to the LinkedIn page, ZIP not unzipped). en/ru/am; screenshots are queue M7-T7.
+
 ## Rules
 
 Follow [../../README.md](../../README.md) (chat levels, merging, "Needs Levon") and
