@@ -156,7 +156,7 @@ function readHeader(spec: DatasetSpec, record: string[]): Columns | null {
   const skipped: string[] = [];
   names.forEach((name, i) => {
     if (name === '' || spec.ignored.includes(name)) return;
-    if (name in spec.mapped && !index.has(name)) {
+    if (Object.hasOwn(spec.mapped, name) && !index.has(name)) {
       index.set(name, i);
       return;
     }

@@ -126,6 +126,16 @@ describe('positions', () => {
     expect(JSON.stringify(out)).not.toContain('SECRET-VALUE');
   });
 
+  it('treats a header named like an Object.prototype property as unknown', async () => {
+    const out = await ok(
+      'positions',
+      'Company Name,Title,Started On,constructor,toString,__proto__\nAcme,Dev,Sep 2022,X,Y,Z\n,,,only-here,,\n',
+    );
+    expect(out.skippedColumns).toEqual(['constructor', 'toString', '__proto__']);
+    expect(out.items).toHaveLength(1);
+    expect(JSON.stringify(out)).not.toMatch(/only-here/);
+  });
+
   it('reports a duplicate of a mapped column once, and reads the first', async () => {
     const out = await ok(
       'positions',
