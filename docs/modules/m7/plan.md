@@ -573,7 +573,8 @@ existing row (§4.3). Nothing is saved.
   `gcloud storage buckets update gs://<bucket> --lifecycle-file=docker/gcs-lifecycle.json`) and
   `npm run storage:sweep -- --prefix imports/ [--apply] [--hours N]`.
 - `IMPORT_MAX_PENDING` counts the bucket listing plus the caller's unexpired tickets not yet
-  uploaded (in this process, Q9), so tickets cannot be collected past the cap; a preview releases its slot.
+  uploaded (in this process, Q9), so tickets cannot be collected past the cap. Each user's list-count-reserve step is serialised;
+  a preview releases its slot only when it found the object (a missing one keeps the ticket until it expires).
 - A signed URL that outlives the delete (TTL 300 s) can write the same key once more; that object
   has no reader and is removed by the lifecycle rule or the sweep.
 

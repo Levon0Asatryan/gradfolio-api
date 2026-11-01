@@ -176,6 +176,51 @@ describe('POST /v1/me/imports/linkedin/uploads', () => {
     expect((await ask(me)).status).toBe(201);
   });
 
+  it('a preview that finds no object keeps its ticket reserved', async () => {
+    const http = await start({ IMPORT_MAX_PENDING: '1' });
+    const me = await member('me');
+    const ask = () => http.post('/v1/me/imports/linkedin/uploads').set(me.auth).send({ size: 100 });
+    const first = await ask();
+    expect(first.status).toBe(201);
+    await preview(http, me, (first.body as { uploadId: string }).uploadId).expect(404);
+    expect((await ask()).status).toBe(409);
+  });
+
+  it('serialises a user’s tickets: a stale listing cannot slip past a reconciliation', async () => {
+    const http = await start({ IMPORT_MAX_PENDING: '1' });
+    const me = await member('me');
+    const ask = () => http.post('/v1/me/imports/linkedin/uploads').set(me.auth).send({ size: 100 });
+    let lists = 0;
+    const list = storage.list.bind(storage);
+    storage.list = (prefix, max) => {
+      lists += 1;
+      return list(prefix, max);
+    };
+    const a = await ask();
+    expect(a.status).toBe(201);
+
+    // B's listing is read (empty bucket) and then held, as a slow response would be
+    let held!: () => void;
+    let listed!: () => void;
+    const listingRead = new Promise<void>((r) => (listed = r));
+    const hold = new Promise<void>((r) => (held = r));
+    storage.afterList = async () => {
+      listed();
+      await hold;
+    };
+    const b = ask().then((r) => r);
+    await listingRead;
+
+    // A's upload lands, then C asks: its listing sees A and reconciles the reservation
+    expect(storage.putSigned(a.body as never, Buffer.alloc(100))).toBe(200);
+    const c = ask().then((r) => r);
+    // C's listing happens now if nothing serialises it behind B (A's ticket was list 1, B's 2);
+    // with the queue it cannot, so give it a bounded window to prove it does not.
+    for (let i = 0; i < 100 && lists < 3; i++) await new Promise((r) => setTimeout(r, 5));
+    held();
+    expect([(await b).status, (await c).status]).toEqual([409, 409]);
+  });
+
   it('answers 503 STORAGE_UNAVAILABLE without a bucket, and 401 without a token', async () => {
     const http = await start({}, false);
     const me = await member('me');

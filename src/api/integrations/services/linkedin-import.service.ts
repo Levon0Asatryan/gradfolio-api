@@ -81,17 +81,21 @@ export class LinkedinImportService {
       throw new AppError('IMPORT_TOO_LARGE', 'the export is too large', 413);
     }
     const cap = this.cfg.IMPORT_MAX_PENDING;
-    const listed = await storage.list(importPrefix(user.id), cap);
-    // No await between the count and the reservation: concurrent requests see each other.
-    const owed = this.outstanding(user.id, new Set(listed.map((o) => o.key)));
-    if (listed.length + owed >= cap) {
-      throw new ConflictError('LIMIT_REACHED', `at most ${cap} uploads may wait for a preview`);
-    }
     const uploadId = randomUUID();
     const ttlMs = this.cfg.UPLOAD_URL_TTL_S * 1000;
-    const mine = this.tickets.get(user.id) ?? new Map<string, number>();
-    mine.set(uploadId, Date.now() + ttlMs);
-    this.tickets.set(user.id, mine);
+    // The listing, the count and the reservation are one step per user: two requests must
+    // not hold listings of different ages while one of them reconciles the reservations.
+    const mine = await this.serialised(user.id, async () => {
+      const listed = await storage.list(importPrefix(user.id), cap);
+      const owed = this.outstanding(user.id, new Set(listed.map((o) => o.key)));
+      if (listed.length + owed >= cap) {
+        throw new ConflictError('LIMIT_REACHED', `at most ${cap} uploads may wait for a preview`);
+      }
+      const held = this.tickets.get(user.id) ?? new Map<string, number>();
+      held.set(uploadId, Date.now() + ttlMs);
+      this.tickets.set(user.id, held);
+      return held;
+    });
     const signed = await storage
       .signUpload({
         key: importKey(user.id, uploadId),
@@ -121,10 +125,11 @@ export class LinkedinImportService {
   async preview(user: UserRow, body: z.output<typeof linkedinPreviewRequestSchema>) {
     const storage = this.requireStorage();
     const key = importKey(user.id, body.uploadId);
-    this.tickets.get(user.id)?.delete(body.uploadId);
 
     const info = await storage.stat(key);
+    // A missing object keeps its ticket reserved until it expires: the URL is still valid.
     if (info === null) throw new AppError('IMPORT_UPLOAD_MISSING', 'no such upload', 404);
+    this.tickets.get(user.id)?.delete(body.uploadId);
 
     // Busy is checked after the existence check and before any read; the upload is kept so
     // the student can ask again.
@@ -167,6 +172,19 @@ export class LinkedinImportService {
       this.running -= 1;
       await this.discard(storage, key);
     }
+  }
+
+  private readonly queues = new Map<string, Promise<unknown>>();
+
+  /** Runs `fn` after every earlier call for the same user has finished (one API process). */
+  private serialised<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+    const run = (this.queues.get(userId) ?? Promise.resolve()).then(fn, fn);
+    const tail = run.catch(() => undefined);
+    this.queues.set(userId, tail);
+    void tail.then(() => {
+      if (this.queues.get(userId) === tail) this.queues.delete(userId);
+    });
+    return run;
   }
 
   /** Unexpired tickets of this user whose object is not in the listing yet. */
