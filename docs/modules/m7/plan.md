@@ -457,19 +457,37 @@ prints, **to the terminal only**:
 - if a first line is not a header (a notes preamble), the script says so and stops: Levon pastes the
   header line himself (F3).
 
-Until then the parser is written against **names I remember and have not verified**:
+Headers **confirmed on a real English export** (Levon's archive, 2026-11-01; headers, row counts and
+masked date shapes only, no values). ru and am headers are **unconfirmed**: a file whose header row
+matches none of these is reported as an unrecognised export language, never guessed. The parser
+(`src/core/linkedin-export/`) matches columns by exact name, so column order does not matter.
 
-| Dataset        | File                 | Columns (unverified)                                                  |
-| -------------- | -------------------- | --------------------------------------------------------------------- |
-| positions      | `Positions.csv`      | `Company Name, Title, Description, Location, Started On, Finished On` |
-| education      | `Education.csv`      | `School Name, Start Date, End Date, Notes, Degree Name, Activities`   |
-| skills         | `Skills.csv`         | `Name`                                                                |
-| certifications | `Certifications.csv` | `Name, Url, Authority, License Number, Started On, Finished On`       |
+| Dataset        | File                 | Columns, in the real order (confirmed, en)                                                                                                                    |
+| -------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| positions      | `Positions.csv`      | `Company Name, Title, Description, Location, Started On, Finished On`                                                                                         |
+| education      | `Education.csv`      | `School Name, Start Date, End Date, Notes, Degree Name, Activities`                                                                                           |
+| skills         | `Skills.csv`         | `Name`                                                                                                                                                        |
+| certifications | `Certifications.csv` | `Name, Url, Authority, Started On, Finished On, License Number`                                                                                               |
+| profile        | `Profile.csv`        | `First Name, Last Name, Maiden Name, Address, Birth Date, Headline, Summary, Industry, Zip Code, Geo Location, Twitter Handles, Websites, Instant Messengers` |
 
-Open questions only real files answer: whether names or columns are localised for ru/am accounts
-(each exporter notes their LinkedIn interface language); date formats (`Jan 2020`? `2020`?); where
-the field of study is (our `education.field` is required); encoding and BOM; any preamble lines.
-Fixtures (F1) are generated from the verified headers with invented rows.
+Answers from the real export: the headers are English with no preamble line (the parser still scans
+the first six records for the header row); dates are `Mon YYYY` (a year-only or full date is also
+accepted, anything else is reported unparsed); **there is no field-of-study column** (our
+`education.field` is required), so the preview always proposes an empty `field` with a `REQUIRED`
+problem for the student to fill; `Notes` fills `education.description`. Still unverified: encoding
+other than UTF-8, and any ru/am file.
+
+Read from `Profile.csv`: only First Name, Last Name, Headline, Summary, Industry, Geo Location,
+Websites. Birth Date, Address, Zip Code, Maiden Name and Instant Messengers are not in the parser's
+column list, so they are never copied out of a row; they appear in `skippedColumns` by name only.
+Known columns with no profile field (`Location`, `Activities`, `Finished On`/`License Number` of a
+certification) are ignored without being reported.
+
+Fixtures (F1) are `src/testing/fixtures/linkedin/*.csv`: invented rows under the real headers.
+
+Parser outcome per file: `ok` (items with `problems`, skipped column names), `unrecognised_language`,
+`columns_missing` (names), `empty`; it throws `LinkedinParseError` (`MALFORMED_CSV`,
+`RECORD_TOO_LARGE`, `TOO_MANY_ROWS`) for a damaged file. T41 maps these to the `IMPORT_*` codes below.
 
 ### 4.2 Upload and parse (7.7)
 
