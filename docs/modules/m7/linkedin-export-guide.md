@@ -30,23 +30,45 @@ Only `Positions.csv`, `Education.csv`, `Skills.csv`, `Certifications.csv` and (f
 and headline) `Profile.csv`. Everything else in the ZIP (messages, connections, invitations)
 is never read or stored.
 
-## Provisional headers (public sample, NOT from a real archive)
+## Headers confirmed on a real export (Levon's archive, 2026-11-01, English interface)
 
-Until the real exports are checked (queue M7-T1), the parser is built on these headers from a
-public export sample (not personal data). Every column stays "provisional" in the code and
-PR until a real export confirms it.
+Checked with a throwaway script that printed only headers, row counts and masked date shapes
+(no values). The archive is named `Basic_LinkedInDataExport_<date>.zip`, holds 22 CSV files
+and one subfolder (`Jobs/`), so **ZIP entries can have a path**. Other languages (ru/am) are
+still unchecked; Narek and Pargev may send header lines for those.
 
-| File | Headers, in order |
-|---|---|
-| `Positions.csv` | Company Name, Title, Description, Location, Started On, Finished On |
-| `Education.csv` | School Name, Start Date, End Date, Notes, Degree Name, Activities |
-| `Skills.csv` | Name |
-| `Certifications.csv` | Name, Url, Authority, Started On, Finished On, License Number |
-| `Projects.csv` | Title, Description, Url, Started On, Finished On |
-| `Profile.csv` | not known yet |
+| File | Headers, in order | Rows (this archive) |
+|---|---|---|
+| `Positions.csv` | Company Name, Title, Description, Location, Started On, Finished On | 6 |
+| `Education.csv` | School Name, Start Date, End Date, Notes, Degree Name, Activities | 3 |
+| `Skills.csv` | Name | 23 |
+| `Certifications.csv` | Name, Url, Authority, Started On, Finished On, License Number | 5 |
+| `Profile.csv` | First Name, Last Name, Maiden Name, Address, Birth Date, Headline, Summary, Industry, Zip Code, Geo Location, Twitter Handles, Websites, Instant Messengers | 1 |
+| `Registration.csv` | Registered At, Registration Ip, Subscription Types | 1 (never read) |
 
-Format rules to build in (from the sample's notes): detect the header row (some files start
-with explanatory lines); quoted commas, quotes and multi-line cells; missing files and extra
-columns are normal; empty values; several date formats (no timezone assumed); duplicate or
-empty header names; validate ZIP paths and decompressed sizes before reading. Files vary by
-interface language: unknown, check on real exports.
+Other files present, never read: Endorsement_Received_Info, Endorsement_Given_Info, messages,
+SavedJobAlerts, Invitations, Company Follows, Whatsapp Phone Numbers, Job Applicant Saved
+Screening Question Responses, Notes, Events, Rich_Media, PhoneNumbers, Email Addresses,
+Jobs/Job Seeker Preferences, Jobs/Job Applications, Jobs/Saved Jobs, Jobs/Job Applicant Saved Answers.
+
+Observed formats:
+- Dates in Positions, Education and Certifications are **month-abbreviation + year** (shape
+  `Mon YYYY`, e.g. a three-letter English month, a space, four digits). An empty
+  `Finished On` / `End Date` means "present" or not given. A year-only or full date may
+  occur in other accounts: the parser must accept `YYYY`, `Mon YYYY` and a full date, and
+  report anything else as unparsed, never guess.
+- No multi-line cells in this archive, but descriptions can be long: keep quoted multi-line
+  support and a length cap.
+- Files have no preamble lines here (header is line 1); still detect the header row.
+- `Skills.csv` is a single column `Name`.
+- `Profile.csv` holds sensitive fields (Birth Date, Address, Zip Code, Maiden Name,
+  Instant Messengers). **Never read, store, log or return them.** Gradfolio reads only
+  First Name, Last Name, Headline, Summary, Industry, Geo Location and Websites.
+
+Format rules to build in: detect the header row; quoted commas, quotes and multi-line cells;
+missing files and extra columns are normal; empty values; duplicate or empty header names;
+no timezone assumed; validate ZIP entry paths (including subfolders), entry count and
+decompressed sizes before reading.
+
+The real archive stays on Levon's machine (`~/Downloads`), never committed, pasted or
+uploaded to a PR. It is used only for the manual real run (T51) on production.
