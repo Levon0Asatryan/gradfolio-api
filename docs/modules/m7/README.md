@@ -45,7 +45,7 @@ finding. The findings were re-landed in #104, #123 and task M7-T30.
 **Status legend:** `todo` (not started), `in progress` (a task chat is working on it),
 `review` (PR open), `done` (merged and deployed), `blocked` (waiting on something that is
 not a task; the Depends column says what). The module chat updates this table in a small
-docs PR whenever a task changes state. **Last updated: 2026-10-19** (done: T20–T24, T25 (api #114), T27, T28, T30, T29 (api #111), T31, T34 (fe #132), T33 (fe #133), T35 (fe #134), T36 (api #112); in progress: T32; free: T50, T52; blocked: T40–T43, T51).
+docs PR whenever a task changes state. **Last updated: 2026-11-01** (done: T20–T24, T25 (api #114), T27, T28, T30, T29 (api #111), T31, T34 (fe #132), T33 (fe #133), T35 (fe #134), T32 (fe #136, merged without a review of record), T50 (Levon confirmed the real GitHub run), T36 (api #112); free: T52; blocked: T40–T43, T51).
 
 The **Status** column is the status of record. **Depends on** lists tasks that must be
 **merged** first. Task IDs start at T20 because **M7-T1 to M7-T13 are Levon's queue rows**
@@ -68,13 +68,13 @@ brief, "queue M7-T1" always means a queue row.
 | M7-T36 | Reconnect after a dead token: connect re-runs the GitHub sign-in            | api, fe | —                 | 7.2     | done        | [T36](tasks/M7-T36-reconnect-after-dead-token.md)  |
 | M7-T30 | Focus and announcement after Publish on cards and the project page          | fe      | —                 | 7.14    | done        | [T30](tasks/M7-T30-publish-focus.md)               |
 | M7-T31 | Import entry points: after connect, Projects → Add                          | fe      | —                 | 7.14    | done        | [T31](tasks/M7-T31-import-entry-points.md)         |
-| M7-T32 | Suggestions inbox: skills, links, project changes, notification             | fe      | T20 (T21, T22)    | 7.13    | in progress | [T32](tasks/M7-T32-suggestions-inbox.md)           |
+| M7-T32 | Suggestions inbox: skills, links, project changes, notification             | fe      | T20 (T21, T22)    | 7.13    | done        | [T32](tasks/M7-T32-suggestions-inbox.md)           |
 | M7-T33 | One source for the Auth0 settings read by the app                           | fe      | —                 | 7.11    | done        | [T33](tasks/M7-T33-auth0-settings-source.md)       |
 | M7-T40 | LinkedIn export: real headers, synthetic fixtures, parser                   | api     | queue M7-T1       | 7.6     | blocked     | [T40](tasks/M7-T40-linkedin-parser.md)             |
 | M7-T41 | LinkedIn ZIP upload, guards and preview                                     | api     | T40               | 7.7     | blocked     | [T41](tasks/M7-T41-linkedin-upload-preview.md)     |
 | M7-T42 | LinkedIn confirm: selected items become profile rows                        | api     | T41               | 7.8     | blocked     | [T42](tasks/M7-T42-linkedin-confirm.md)            |
 | M7-T43 | LinkedIn import wizard (onboarding and integrations page)                   | fe      | T41, T42 deployed | 7.9     | blocked     | [T43](tasks/M7-T43-linkedin-wizard.md)             |
-| M7-T50 | Real GitHub run on production                                               | api, fe | T20, T30, T31     | 7.1–7.5 | todo        | [T50](tasks/M7-T50-github-real-run.md)             |
+| M7-T50 | Real GitHub run on production                                               | api, fe | T20, T30, T31     | 7.1–7.5 | done        | [T50](tasks/M7-T50-github-real-run.md)             |
 | M7-T51 | Real LinkedIn run on production                                             | api, fe | T43, queue M7-T1  | 7.6–7.9 | blocked     | [T51](tasks/M7-T51-linkedin-real-run.md)           |
 | M7-T52 | Verification records and the module report                                  | api, fe | all above         | —       | todo        | [T52](tasks/M7-T52-verification.md)                |
 
