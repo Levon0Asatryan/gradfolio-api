@@ -76,7 +76,7 @@ brief, "queue M7-T1" always means a queue row.
 | M7-T42 | LinkedIn confirm: selected items become profile rows                        | api     | T41               | 7.8     | done        | [T42](tasks/M7-T42-linkedin-confirm.md)            |
 | M7-T43 | LinkedIn import wizard (onboarding and integrations page)                   | fe      | T41, T42 deployed | 7.9     | done        | [T43](tasks/M7-T43-linkedin-wizard.md)             |
 | M7-T50 | Real GitHub run on production                                               | api, fe | T20, T30, T31     | 7.1–7.5 | done        | [T50](tasks/M7-T50-github-real-run.md)             |
-| M7-T51 | Real LinkedIn run on production                                             | api, fe | T43, Levon's run  | 7.6–7.9 | todo        | [T51](tasks/M7-T51-linkedin-real-run.md)           |
+| M7-T51 | Real LinkedIn run on production                                             | api, fe | T43, Levon's run  | 7.6–7.9 | done        | [T51](tasks/M7-T51-linkedin-real-run.md)           |
 | M7-T52 | Verification records and the module report                                  | api, fe | all above         | —       | todo        | [T52](tasks/M7-T52-verification.md)                |
 
 **Follow-up from T23 (open, not yet a task):** Codex P2 on `src/core/config/schema.ts`:
