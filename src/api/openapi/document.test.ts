@@ -65,18 +65,7 @@ describe('openapi document', () => {
   it('serves no planned operation: the PR that adds the route removes the flag', () => {
     const served = new Set(nestRoutes(app));
     const planned = OPERATIONS.filter((op) => op.planned !== undefined);
-    expect(planned.length).toBeGreaterThan(0);
     expect(planned.filter((op) => served.has(`${op.method} ${op.path}`))).toEqual([]);
-  });
-
-  it('marks a planned operation as not served yet, in the document itself', () => {
-    const doc = buildOpenApiDocument() as {
-      paths: Record<string, Record<string, Record<string, unknown>>>;
-    };
-    const op = doc.paths['/v1/me/imports/linkedin/confirm']?.post;
-    expect(op?.['x-gradfolio-planned']).toBe('M7 PR (c)');
-    expect(op?.description).toMatch(/^\*\*Not served yet: arrives with M7 PR \(c\)\.\*\*/);
-    expect(doc.paths['/v1/me/integrations']?.get).not.toHaveProperty('x-gradfolio-planned');
   });
 
   it('has unique operation ids', () => {

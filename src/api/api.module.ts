@@ -13,6 +13,7 @@ import { EmailModule } from './email/email.module.js';
 import { FilesModule } from './files/files.module.js';
 import { HealthModule } from './health/health.module.js';
 import { IntegrationsModule } from './integrations/integrations.module.js';
+import { LinkedinImportModule } from './integrations/linkedin-import.module.js';
 import { MeModule } from './me/me.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { ProfilesModule } from './profiles/profiles.module.js';
@@ -55,6 +56,7 @@ import type { DestinationStream } from 'pino';
     ActivitiesModule,
     DashboardModule,
     IntegrationsModule,
+    LinkedinImportModule,
     SuggestionsModule,
     ResumeModule,
     EmailModule,

@@ -4032,8 +4032,7 @@ paths:
       tags:
         - integrations
       summary: Save the selected entries, in one transaction
-      description: "**Not served yet: arrives with M7 PR (c).** The items are validated again like manual entries. Entries equal to an existing one are skipped; skills merge case-insensitively. Over a section cap nothing is saved. A second identical confirm adds nothing."
-      x-gradfolio-planned: M7 PR (c)
+      description: The items are validated again like manual entries (a bad one is a 400 naming its path and nothing is saved). Entries equal to an existing one on the natural key (title + organisation + start; institution + degree + start year; name + issuer + date) or to an earlier item of the request are skipped; skills merge case-insensitively and never reorder or remove existing ones. Over a section cap nothing is saved. A second identical confirm adds nothing. Sets the LinkedIn `lastSyncedAt`.
       security:
         - bearerAuth: []
       requestBody:
@@ -4191,13 +4190,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "429":
-          description: "RATE_LIMITED: over the `import` budget (5 per minute); see Retry-After"
+          description: "RATE_LIMITED: over the `linkedin` budget (3 per minute); see Retry-After"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "503":
-          description: "STORAGE_UNAVAILABLE: uploads are off on this server; AUTH_UNAVAILABLE or DATABASE_UNAVAILABLE"
+          description: AUTH_UNAVAILABLE or DATABASE_UNAVAILABLE
           content:
             application/json:
               schema:

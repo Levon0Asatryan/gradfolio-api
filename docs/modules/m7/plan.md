@@ -597,6 +597,24 @@ counts per section. A second identical confirm: all duplicates, `added: 0`.
 Run (§1.5): the same check-then-insert **without** the lock produced 2 identical rows from two
 concurrent confirms; with `lockUser` the second sees the first's row.
 
+**As built in M7-T42:**
+
+- `confirm` is a method of `LinkedinImportService`; the body is validated by
+  `linkedinConfirmRequestSchema` (the manual-entry create schemas, strict), so a bad item is a
+  `400 VALIDATION_FAILED` naming its path before anything is touched.
+- One `inTransaction` under `lockUser` (taken at the start, then again by each `createIn`):
+  per section the stored rows are read, items matching one on the §4.3 key (or an earlier item
+  of the request) are `skipped`, the rest go in through `SectionService.createIn`, in reverse so
+  the file's first item ends first (sections put a new entry on top). Over `PROFILE_MAX_SECTION_ITEMS`
+  is `409 LIMIT_REACHED` and rolls back everything.
+- Skills: new names (case-insensitive against the stored list and the request) are appended to
+  the stored list, in order, through `SkillsService.replaceIn`; over `PROFILE_MAX_SKILLS` on the canonical list
+  (case and accents folded by the registry) is `409 LIMIT_REACHED` (`replaceIn`'s 400 is converted).
+  `added.skills` is the growth of the stored list.
+- `integrations(linkedin).last_synced_at` is upserted in the same transaction (no token, no
+  status change). A matching key never touches the stored row: an edited entry is never overwritten.
+- `IntegrationsModule` imports `ProfilesModule` for the two services.
+
 ### 4.4 LinkedIn sign-in pre-fill (7.10)
 
 Already built (docs/modules/m2/plan §3.4): name and photo from the token claims on the first request,

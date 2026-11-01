@@ -754,8 +754,8 @@ function suggestionOperations(): Operation[] {
 /**
  * GitHub import and the LinkedIn export import (docs/modules/m7/plan.md §3, §4; §7
  * items 5–10): the contract, published with PR (a) so the frontend can build
- * against it. Those of PR (c) are still `planned`; the PR that serves one
- * drops the flag.
+ * against it. All three are served now (M7-T41, M7-T42); the `planned` flag stays for the next
+ * contract published ahead of its route.
  */
 function plannedImportOperations(): Operation[] {
   const base = { tag: 'integrations', bearer: true } as const;
@@ -768,14 +768,6 @@ function plannedImportOperations(): Operation[] {
     '502': error('GITHUB_UNAVAILABLE: GitHub failed or timed out'),
     '401': authenticatedFailures['401'],
     '503': error('INTEGRATION_UNAVAILABLE, AUTH_UNAVAILABLE or DATABASE_UNAVAILABLE'),
-  };
-  const importFailures = {
-    '401': authenticatedFailures['401'],
-    '429': error('RATE_LIMITED: over the `import` budget (5 per minute); see Retry-After'),
-    '503': error(
-      'STORAGE_UNAVAILABLE: uploads are off on this server; AUTH_UNAVAILABLE or ' +
-        'DATABASE_UNAVAILABLE',
-    ),
   };
   return [
     {
@@ -924,21 +916,25 @@ function plannedImportOperations(): Operation[] {
     },
     {
       ...base,
-      planned: 'M7 PR (c)',
       method: 'post',
       path: '/v1/me/imports/linkedin/confirm',
       operationId: 'confirmLinkedinImport',
       summary: 'Save the selected entries, in one transaction',
       description:
-        'The items are validated again like manual entries. Entries equal to an existing one ' +
-        'are skipped; skills merge case-insensitively. Over a section cap nothing is saved. A ' +
-        'second identical confirm adds nothing.',
+        'The items are validated again like manual entries (a bad one is a 400 naming its path ' +
+        'and nothing is saved). Entries equal to an existing one on the natural key (title + ' +
+        'organisation + start; institution + degree + start year; name + issuer + date) or to an ' +
+        'earlier item of the request are skipped; skills merge case-insensitively and never ' +
+        'reorder or remove existing ones. Over a section cap nothing is saved. A second ' +
+        'identical confirm adds nothing. Sets the LinkedIn `lastSyncedAt`.',
       body: linkedinConfirmRequestSchema,
       responses: {
         '200': { description: 'Counts per section', schema: linkedinConfirmResponseSchema },
         '400': validationFailed,
         '409': error('LIMIT_REACHED: a section would exceed its cap; nothing was saved'),
-        ...importFailures,
+        '401': authenticatedFailures['401'],
+        '429': error('RATE_LIMITED: over the `linkedin` budget (3 per minute); see Retry-After'),
+        '503': error('AUTH_UNAVAILABLE or DATABASE_UNAVAILABLE'),
       },
     },
   ];
