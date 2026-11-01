@@ -57,6 +57,8 @@ export interface FakeAuth0 {
   unlinkStatus?: number;
   /** Answer a user delete with this status instead; nothing is deleted. */
   deleteUserStatus?: number;
+  /** Runs when an unlink arrives, before it is applied (a test reads GitHub's side here). */
+  onUnlink?: (sub: string) => Promise<void>;
   /** Runs when a user delete arrives, before it is applied (a test reads the database here). */
   onDeleteUser?: (sub: string) => Promise<void>;
   failureHeaders: Record<string, string>;
@@ -226,12 +228,30 @@ export function installFakeAuth0(tenant: TestTenant): FakeAuth0 {
           errorCode: 'invalid_body',
         });
       }
+      // A secondary identity that another user still holds is not a user of its own: Auth0
+      // refuses (the wording is the fake's; M7-T37 relies on the refusal, not on the words).
+      for (const [sub, list] of fake.users) {
+        if (
+          sub !== primary &&
+          list.some((i) => i.provider === 'github' && String(i.user_id) === id)
+        ) {
+          if (sub !== `github|${id}`) {
+            return json(res, 400, {
+              statusCode: 400,
+              error: 'Bad Request',
+              message: 'The account is linked to another user (fake)',
+              errorCode: 'invalid_body',
+            });
+          }
+        }
+      }
       fake.withGithub(primary, id);
       return json(res, 201, fake.users.get(primary));
     }
 
     const unlink = /^\/api\/v2\/users\/([^/]+)\/identities\/([^/]+)\/([^/]+)$/.exec(url.pathname);
     if (unlink && req.method === 'DELETE') {
+      await fake.onUnlink?.(decodeURIComponent(unlink[1]!));
       if (fake.unlinkStatus !== undefined) {
         return json(res, fake.unlinkStatus, { statusCode: fake.unlinkStatus }, fake.failureHeaders);
       }

@@ -58,3 +58,19 @@ export class GithubRevokeFailedError extends AppError {
     this.upstreamStatus = upstreamStatus;
   }
 }
+
+/**
+ * 502: the grant is revoked and the connection cleared, but Auth0 did not confirm
+ * unlinking the GitHub identity (M7-T37). A retry finishes the job.
+ */
+export class GithubUnlinkFailedError extends AppError {
+  constructor(cause: string) {
+    super(
+      'GITHUB_UNLINK_FAILED',
+      'GitHub access was removed and GitHub is disconnected, but the GitHub identity is still ' +
+        'linked to your login; try again to finish',
+      502,
+    );
+    this.logDetail = `github unlink failed: ${cause}`;
+  }
+}

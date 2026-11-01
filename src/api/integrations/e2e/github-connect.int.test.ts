@@ -590,6 +590,9 @@ describe('link', () => {
       expect(gh.revoked).toEqual([auth0.githubTokenFor('222')]);
       expect(gh.tokens.has(auth0.githubTokenFor('221'))).toBe(true);
       expect(await githubRow(s.id)).toMatchObject({ status: 'not_connected' });
+      // Only the connected identity is unlinked: the other one’s grant was not revoked (M7-T37).
+      expect((auth0.users.get(s.sub) ?? []).map((i) => String(i.user_id))).toContain('221');
+      expect((auth0.users.get(s.sub) ?? []).map((i) => String(i.user_id))).not.toContain('222');
     });
 
     it('a half-done link to the second identity settles to that identity', async () => {
@@ -791,7 +794,8 @@ describe('disconnect (revoke first, D9)', () => {
     await db.updateTable('integrations').set({ lastSyncedAt: new Date() }).execute();
 
     const res = await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
-    expect(res.body).toEqual({ status: 'not_connected' });
+    // `github|100` signs in with GitHub: Auth0 cannot unlink a primary identity.
+    expect(res.body).toEqual({ status: 'not_connected', githubIdentity: 'kept' });
 
     const grant = gh.requests.find((r) => r.method === 'DELETE')!;
     expect(grant.path).toBe(`/applications/${gh.clientId}/grant`);
@@ -1145,7 +1149,8 @@ describe('disconnect (revoke first, D9)', () => {
       gh.tokens.set(token, { id: Number(githubId), login: `${githubId}-login` });
     }
 
-    it.each(['github|118', 'auth0|linked-118'])(
+    // A secondary identity is unlinked by Disconnect (M7-T37), so only the GitHub login keeps the dead token.
+    it.each(['github|118'])(
       'the production sequence for %s: read 409, Disconnect, Connect offers the sign-in, the fresh token connects (M7-T36)',
       async (sub) => {
         const http = await start();
@@ -1353,6 +1358,219 @@ describe('disconnect (revoke first, D9)', () => {
     expect(gh.requests.filter((r) => r.method === 'DELETE')).toEqual([]);
     const card = await http.get('/v1/me/integrations').set(bob.auth).expect(200);
     expect(card.body.github).toMatchObject({ status: 'not_connected', login: null });
+    // Nothing of Alice's was unlinked either.
+    expect(auth0.callsTo('/api/v2/users/').filter((c) => c.method === 'DELETE')).toEqual([]);
+  });
+
+  describe('unlinks the GitHub identity at Auth0 (M7-T37)', () => {
+    const githubIdentities = (sub: string) =>
+      (auth0.users.get(sub) ?? [])
+        .filter((i) => i.provider === 'github')
+        .map((i) => String(i.user_id));
+    const unlinks = () => auth0.callsTo('/api/v2/users/').filter((c) => c.method === 'DELETE');
+
+    it('a secondary identity: the grant is revoked, then the identity is unlinked', async () => {
+      const http = await start();
+      const s = await connected(http, 'auth0|t37-sec', '301');
+      const revokedWhenUnlinked: string[][] = [];
+      auth0.onUnlink = () => {
+        revokedWhenUnlinked.push([...gh.revoked]);
+        return Promise.resolve();
+      };
+
+      const res = await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+      expect(res.body).toEqual({ status: 'not_connected', githubIdentity: 'unlinked' });
+      // Order: GitHub had deleted the grant when the unlink arrived.
+      expect(revokedWhenUnlinked).toEqual([[auth0.githubTokenFor('301')]]);
+      expect(unlinks().map((c) => c.path)).toEqual([
+        `/api/v2/users/${encodeURIComponent(s.sub)}/identities/github/301`,
+      ]);
+      expect(githubIdentities(s.sub)).toEqual([]);
+      expect(await githubRow(s.id)).toMatchObject({
+        status: 'not_connected',
+        externalUserId: null,
+      });
+      expect(logs.text()).not.toMatch(/SENTINEL/);
+    });
+
+    it('a primary identity is kept: revoked and cleared, no unlink, and the answer says so', async () => {
+      const http = await start();
+      const s = await connected(http, 'github|302', '302');
+      const res = await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+      expect(res.body).toEqual({ status: 'not_connected', githubIdentity: 'kept' });
+      expect(gh.revoked).toEqual([auth0.githubTokenFor('302')]);
+      expect(unlinks()).toEqual([]);
+      expect(githubIdentities(s.sub)).toEqual(['302']);
+      expect(await githubRow(s.id)).toMatchObject({
+        status: 'not_connected',
+        externalUserId: null,
+      });
+    });
+
+    it('a revocation GitHub refuses unlinks nothing', async () => {
+      const http = await start();
+      const s = await connected(http, 'auth0|t37-refused', '303');
+      gh.grantStatus = 403;
+      await http.delete('/v1/me/integrations/github').set(s.auth).expect(502);
+      expect(unlinks()).toEqual([]);
+      expect(githubIdentities(s.sub)).toEqual(['303']);
+      expect(await githubRow(s.id)).toMatchObject({ status: 'connected' });
+    });
+
+    it('an unlink that fails says so, leaves GitHub disconnected, and a retry finishes it', async () => {
+      const http = await start();
+      const s = await connected(http, 'auth0|t37-fail', '304');
+      auth0.unlinkStatus = 500;
+      const failed = await http.delete('/v1/me/integrations/github').set(s.auth).expect(502);
+      expect(failed.body.code).toBe('GITHUB_UNLINK_FAILED');
+      expect(failed.body.message).toContain('GitHub access was removed');
+      expect(failed.body.message).toContain('still linked');
+      // The grant is gone, so the card is truthful: not connected.
+      expect(gh.revoked).toEqual([auth0.githubTokenFor('304')]);
+      expect(await githubRow(s.id)).toMatchObject({
+        status: 'not_connected',
+        externalUserId: null,
+      });
+      expect(githubIdentities(s.sub)).toEqual(['304']);
+
+      delete auth0.unlinkStatus;
+      gh.requests.length = 0;
+      const retry = await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+      expect(retry.body).toEqual({ status: 'not_connected', githubIdentity: 'unlinked' });
+      expect(githubIdentities(s.sub)).toEqual([]);
+      // Nothing to revoke the second time.
+      expect(gh.requests.filter((r) => r.method === 'DELETE')).toEqual([]);
+    });
+
+    it('Auth0 over its limit on the unlink is the same honest answer, not a bare 503', async () => {
+      const http = await start();
+      const s = await connected(http, 'auth0|t37-429', '305');
+      auth0.unlinkStatus = 429;
+      const res = await http.delete('/v1/me/integrations/github').set(s.auth).expect(502);
+      expect(res.body.code).toBe('GITHUB_UNLINK_FAILED');
+      expect(await githubRow(s.id)).toMatchObject({ status: 'not_connected' });
+    });
+
+    it('is idempotent: an identity already gone is success, and a second disconnect finds none', async () => {
+      const http = await start();
+      const s = await connected(http, 'auth0|t37-gone', '306');
+      auth0.unlinkStatus = 404;
+      const first = await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+      expect(first.body.githubIdentity).toBe('unlinked');
+      delete auth0.unlinkStatus;
+      auth0.calls.length = 0;
+      const again = await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+      expect(again.body.githubIdentity).toBe('unlinked');
+      auth0.users.set(
+        s.sub,
+        auth0.users.get(s.sub)!.filter((i) => i.provider !== 'github'),
+      );
+      const none = await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+      expect(none.body).toEqual({ status: 'not_connected', githubIdentity: 'none' });
+    });
+
+    it('the same GitHub account connects to a second Gradfolio account after Disconnect', async () => {
+      const http = await start();
+      const first = await connected(http, 'auth0|t37-first', '307');
+      await http.delete('/v1/me/integrations/github').set(first.auth).expect(200);
+
+      const second = await student('auth0|t37-second');
+      githubKnows('307', '307-login');
+      const res = await http
+        .post('/v1/me/integrations/github/link')
+        .set(second.auth)
+        .send({ idToken: await idToken('307', await nonceFor(http, second)) })
+        .expect(200);
+      expect(res.body).toEqual({ state: 'connected', login: '307-login' });
+      expect(await githubRow(second.id)).toMatchObject({
+        status: 'connected',
+        externalUserId: '307',
+      });
+      expect(await githubRow(first.id)).toMatchObject({ status: 'not_connected' });
+    });
+
+    it('with the identity still linked (the unlink failed) Auth0 refuses the second account', async () => {
+      const http = await start();
+      const first = await connected(http, 'auth0|t37-held', '308');
+      auth0.unlinkStatus = 500;
+      await http.delete('/v1/me/integrations/github').set(first.auth).expect(502);
+      delete auth0.unlinkStatus;
+      const second = await student('auth0|t37-wants');
+      githubKnows('308', '308-login');
+      const res = await http
+        .post('/v1/me/integrations/github/link')
+        .set(second.auth)
+        .send({ idToken: await idToken('308', await nonceFor(http, second)) })
+        .expect(409);
+      expect(res.body.code).toBe('GITHUB_LINK_REFUSED');
+    });
+
+    it('reconnects the same account after Disconnect: a fresh GitHub sign-in links it again', async () => {
+      const http = await start();
+      const s = await connected(http, 'auth0|t37-again', '309');
+      await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+      const offered = await http.post('/v1/me/integrations/github/connect').set(s.auth).expect(200);
+      expect(offered.body.state).toBe('link_required');
+      githubKnows('309', '309-login');
+      const res = await http
+        .post('/v1/me/integrations/github/link')
+        .set(s.auth)
+        .send({ idToken: await idToken('309', offered.body.nonce as string) })
+        .expect(200);
+      expect(res.body.state).toBe('connected');
+      expect(githubIdentities(s.sub)).toEqual(['309']);
+    });
+
+    it('only the caller’s identity is unlinked (second user)', async () => {
+      const http = await start();
+      const alice = await connected(http, 'auth0|t37-alice', '310');
+      const bob = await connected(http, 'auth0|t37-bob', '311');
+      await http.delete('/v1/me/integrations/github').set(bob.auth).expect(200);
+      expect(githubIdentities(alice.sub)).toEqual(['310']);
+      expect(githubIdentities(bob.sub)).toEqual([]);
+      expect(await githubRow(alice.id)).toMatchObject({ status: 'connected' });
+    });
+  });
+
+  describe('Connect to a GitHub account another account has (M7-T37)', () => {
+    it('one that signs in with it: the message says to sign in there with GitHub, or use another', async () => {
+      const http = await start();
+      await createUser(db, { auth0Id: 'github|312', name: 'GitHub-only student' });
+      const s = await student('auth0|t37-wants-312');
+      const res = await http
+        .post('/v1/me/integrations/github/link')
+        .set(s.auth)
+        .send({ idToken: await idToken('312', await nonceFor(http, s)) })
+        .expect(409);
+      expect(res.body.code).toBe('GITHUB_ACCOUNT_IN_USE');
+      expect(res.body.message).toMatch(/sign-in of another Gradfolio account/);
+      expect(res.body.message).toMatch(/sign in to that account with GitHub/);
+      expect(res.body.message).toMatch(/different GitHub account/);
+    });
+
+    it('one that has it connected: the message says to disconnect it there, or use another', async () => {
+      const http = await start();
+      const holder = await student('auth0|t37-holder-313');
+      await db
+        .insertInto('integrations')
+        .values({
+          id: newId(),
+          userId: holder.id,
+          integrationType: 'github',
+          status: 'connected',
+          externalUserId: '313',
+        })
+        .execute();
+      const s = await student('auth0|t37-wants-313');
+      const res = await http
+        .post('/v1/me/integrations/github/link')
+        .set(s.auth)
+        .send({ idToken: await idToken('313', await nonceFor(http, s)) })
+        .expect(409);
+      expect(res.body.code).toBe('GITHUB_ACCOUNT_IN_USE');
+      expect(res.body.message).toMatch(/disconnect GitHub there/);
+      expect(res.body.message).toMatch(/different GitHub account/);
+    });
   });
 });
 

@@ -3508,7 +3508,7 @@ paths:
       tags:
         - integrations
       summary: Disconnect GitHub, revoking access at GitHub first
-      description: "Revokes the GitHub app grant first (every token of it, including the one Auth0 holds); only once GitHub confirms, or there is nothing left to revoke, is GitHub disconnected. A token GitHub itself refuses (`GET /user` answers 401) counts as revoked, whatever the grant delete answered: the API holds no other token, and GitHub deletes a grant only for a valid one. Any other authorization the student made at GitHub stays until they remove it under Settings, Applications. A revocation GitHub refuses changes nothing (502): retry. One whose outcome is unknown (timeout, dropped connection, 5xx) also answers 502, but the grant may still be deleted: the card then shows not_connected and a retry answers 409 GITHUB_LINK_IN_PROGRESS until it settles, after a short delay. Idempotent. Imported projects stay. The GitHub identity stays linked at Auth0 (a GitHub sign-in keeps working); reconnecting needs one fresh GitHub sign-in. `verified` falls back to the email."
+      description: "Revokes the GitHub app grant first (every token of it, including the one Auth0 holds); only once GitHub confirms, or there is nothing left to revoke, is GitHub disconnected. A token GitHub itself refuses (`GET /user` answers 401) counts as revoked, whatever the grant delete answered: the API holds no other token, and GitHub deletes a grant only for a valid one. Any other authorization the student made at GitHub stays until they remove it under Settings, Applications. A revocation GitHub refuses changes nothing (502): retry. One whose outcome is unknown (timeout, dropped connection, 5xx) also answers 502, but the grant may still be deleted: the card then shows not_connected and a retry answers 409 GITHUB_LINK_IN_PROGRESS until it settles, after a short delay. Idempotent. Imported projects stay. Then the GitHub identity is unlinked at Auth0, so the same GitHub account can be connected to another Gradfolio account; `githubIdentity` says what happened: `unlinked`, `kept` (the student signs in with GitHub, and Auth0 cannot unlink a primary identity, so the GitHub sign-in stays on this account) or `none` (nothing was linked). A retry after a failed unlink finishes it. Reconnecting needs one fresh GitHub sign-in. `verified` falls back to the email."
       security:
         - bearerAuth: []
       responses:
@@ -3523,8 +3523,15 @@ paths:
                     type: string
                     enum:
                       - not_connected
+                  githubIdentity:
+                    type: string
+                    enum:
+                      - unlinked
+                      - kept
+                      - none
                 required:
                   - status
+                  - githubIdentity
                 additionalProperties: false
         "401":
           description: "UNAUTHENTICATED: no access token, or one that is invalid or expired"
@@ -3539,7 +3546,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "502":
-          description: "GITHUB_REVOKE_FAILED: GitHub did not confirm the revocation. When GitHub refused, nothing changed. When it timed out, dropped the connection or answered 5xx, the grant may still be deleted: the card shows not_connected and a retry answers 409 GITHUB_LINK_IN_PROGRESS until the outcome settles, after a short delay; retry shortly, and the next request then shows the true state"
+          description: "GITHUB_REVOKE_FAILED: GitHub did not confirm the revocation. When GitHub refused, nothing changed. When it timed out, dropped the connection or answered 5xx, the grant may still be deleted: the card shows not_connected and a retry answers 409 GITHUB_LINK_IN_PROGRESS until the outcome settles, after a short delay; retry shortly, and the next request then shows the true state. GITHUB_UNLINK_FAILED: GitHub was revoked and the card shows not_connected, but Auth0 did not confirm unlinking the GitHub identity; retry to finish"
           content:
             application/json:
               schema:

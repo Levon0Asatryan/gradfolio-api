@@ -80,5 +80,13 @@ export type LinkRequest = z.infer<typeof linkRequestSchema>;
 export const linkResponseSchema = connected.meta({ id: 'GithubConnected' });
 export type LinkResponse = z.infer<typeof linkResponseSchema>;
 
-export const disconnectResponseSchema = z.object({ status: z.literal('not_connected') });
+export const disconnectResponseSchema = z.object({
+  status: z.literal('not_connected'),
+  /**
+   * What became of the GitHub identity at Auth0: `unlinked` (a secondary identity, gone),
+   * `kept` (GitHub is how the student signs in; Auth0 cannot unlink a primary identity),
+   * `none` (no GitHub identity was linked).
+   */
+  githubIdentity: z.enum(['unlinked', 'kept', 'none']),
+});
 export type DisconnectResponse = z.infer<typeof disconnectResponseSchema>;

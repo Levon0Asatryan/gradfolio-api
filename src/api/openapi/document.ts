@@ -602,8 +602,11 @@ function integrationOperations(): Operation[] {
         '(timeout, dropped connection, 5xx) also answers 502, but the grant may still be deleted: ' +
         'the card then shows not_connected and a retry answers 409 GITHUB_LINK_IN_PROGRESS until ' +
         'it settles, after a short delay. Idempotent. Imported projects stay. ' +
-        'The GitHub identity stays linked at Auth0 (a GitHub sign-in keeps working); ' +
-        'reconnecting needs one fresh GitHub sign-in. `verified` falls back to the email.',
+        'Then the GitHub identity is unlinked at Auth0, so the same GitHub account can be connected ' +
+        'to another Gradfolio account; `githubIdentity` says what happened: `unlinked`, `kept` (the ' +
+        'student signs in with GitHub, and Auth0 cannot unlink a primary identity, so the GitHub ' +
+        'sign-in stays on this account) or `none` (nothing was linked). A retry after a failed unlink ' +
+        'finishes it. Reconnecting needs one fresh GitHub sign-in. `verified` falls back to the email.',
       responses: {
         '200': { description: 'Disconnected', schema: disconnectResponseSchema },
         '409': error(inProgress),
@@ -612,7 +615,9 @@ function integrationOperations(): Operation[] {
             'nothing changed. When it timed out, dropped the connection or answered 5xx, the ' +
             'grant may still be deleted: the card shows not_connected and a retry answers 409 ' +
             'GITHUB_LINK_IN_PROGRESS until the outcome settles, after a short delay; retry ' +
-            'shortly, and the next request then shows the true state',
+            'shortly, and the next request then shows the true state. GITHUB_UNLINK_FAILED: GitHub ' +
+            'was revoked and the card shows not_connected, but Auth0 did not confirm unlinking the ' +
+            'GitHub identity; retry to finish',
         ),
         ...failures,
         '503': unavailable,

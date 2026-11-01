@@ -13,7 +13,11 @@ import { isMysqlError, MysqlErrno } from '../../../core/db/mysql-errors.js';
 import { inTransaction } from '../../../core/db/transaction.js';
 import { lockUser } from '../../../core/db/user-lock.js';
 import { AppError, ConflictError } from '../../../core/errors/app-error.js';
-import { GithubNotLinkedError, GithubRevokeFailedError } from '../../../core/github/errors.js';
+import {
+  GithubNotLinkedError,
+  GithubRevokeFailedError,
+  GithubUnlinkFailedError,
+} from '../../../core/github/errors.js';
 import type { GithubUser } from '../../../core/github/github-client.js';
 import type { GithubAccessToken } from '../../../core/github/github-access-token.js';
 import type { GithubIdentity } from '../../../core/github/token-source.js';
@@ -45,10 +49,19 @@ import { consumeNonce, insertNonce } from '../repositories/nonce.repository.js';
  */
 const RECONCILE_MARGIN_S = 2;
 
-const accountInUse = () =>
+/** Another Gradfolio account signs in with this GitHub account: it cannot be freed from there. */
+const accountIsLogin = () =>
   new ConflictError(
     'GITHUB_ACCOUNT_IN_USE',
-    'this GitHub account already belongs to another Gradfolio account',
+    'this GitHub account is the sign-in of another Gradfolio account; sign in to that account ' +
+      'with GitHub, or connect a different GitHub account',
+  );
+/** Another Gradfolio account has this GitHub account connected: it can disconnect it. */
+const accountConnectedElsewhere = () =>
+  new ConflictError(
+    'GITHUB_ACCOUNT_IN_USE',
+    'this GitHub account is connected to another Gradfolio account; sign in to that account and ' +
+      'disconnect GitHub there, or connect a different GitHub account',
   );
 const linkInProgress = () =>
   new ConflictError('GITHUB_LINK_IN_PROGRESS', 'a GitHub link is still in progress; try again');
@@ -57,6 +70,8 @@ export const stateChanged = () =>
     'GITHUB_STATE_CHANGED',
     'GitHub was connected or disconnected at the same moment; reload and try again',
   );
+
+type GithubIdentityOutcome = DisconnectResponse['githubIdentity'];
 
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
 
@@ -219,7 +234,7 @@ export class GithubConnectionService {
       // The caller's own login is not another account: a GitHub-login student
       // signing in again to replace a dead token (M7-T36).
       if (claims.sub !== user.auth0Id && (await accountExists(trx, claims.sub))) {
-        throw accountInUse();
+        throw accountIsLogin();
       }
       try {
         return await writeGithubRow(trx, user.id, row, {
@@ -228,7 +243,7 @@ export class GithubConnectionService {
           externalLogin: null,
         });
       } catch (err) {
-        if (isMysqlError(err, MysqlErrno.DUPLICATE_KEY)) throw accountInUse();
+        if (isMysqlError(err, MysqlErrno.DUPLICATE_KEY)) throw accountConnectedElsewhere();
         throw err;
       }
     });
@@ -306,7 +321,12 @@ export class GithubConnectionService {
   /**
    * `DELETE /v1/me/integrations/github` (plan §2.3, D9): revoke at GitHub
    * first; only once GitHub confirmed (or there is nothing left to revoke) is
-   * the flag cleared. A failed revocation changes nothing. Idempotent.
+   * the flag cleared. A failed revocation changes nothing. Then the GitHub
+   * identity is unlinked at Auth0, so the same GitHub account can be connected to
+   * another Gradfolio account (M7-T37); a primary one (the student signs in with
+   * GitHub) cannot be, and the answer says it was kept. An unlink that fails
+   * leaves the connection cleared (the grant is gone) and answers 502
+   * GITHUB_UNLINK_FAILED; a retry finishes. Idempotent.
    */
   async disconnect(user: UserRow, identity: AccessTokenIdentity): Promise<DisconnectResponse> {
     const gh = this.required();
@@ -334,10 +354,29 @@ export class GithubConnectionService {
       }
     }
 
+    // After the revocation, and while its marker still refuses a connect. Of the
+    // connected account's identity only; with nothing connected, whatever a
+    // failed earlier disconnect left linked.
+    let unlinked: GithubIdentityOutcome | undefined;
+    let unlinkError: Error | undefined;
+    try {
+      unlinked = await this.unlinkGithubAtAuth0(
+        gh,
+        user,
+        row?.status === 'connected' ? row.externalUserId : null,
+      );
+    } catch (err) {
+      unlinkError = err instanceof Error ? err : new Error(String(err));
+    }
     await this.markDisconnected(user.id, identity, expected);
     gh.tokens.forget(user.auth0Id);
-    this.logger.info({ userId: user.id }, 'github disconnected');
-    return { status: 'not_connected' };
+    if (unlinkError !== undefined) {
+      if (!(unlinkError instanceof IntegrationUnavailableError)) throw unlinkError;
+      this.logger.warn({ userId: user.id }, 'github identity not unlinked');
+      throw new GithubUnlinkFailedError(unlinkError.message);
+    }
+    this.logger.info({ userId: user.id, githubIdentity: unlinked }, 'github disconnected');
+    return { status: 'not_connected', githubIdentity: unlinked! };
   }
 
   /**
@@ -364,7 +403,7 @@ export class GithubConnectionService {
       version = versionOf(row);
     }
     // Whatever the row says, Auth0 may still hold a GitHub identity linked to this
-    // login (a disconnect keeps it): deleting the account must not leave it there.
+    // login (a disconnect whose unlink failed leaves it): deleting the account must not leave it there.
     // Deleting the Auth0 user (opt-in) removes every identity with it: nothing to unlink.
     if (this.gh !== null && !this.cfg.AUTH0_DELETE_USERS)
       await this.unlinkGithubAtAuth0(this.gh, user);
@@ -372,24 +411,35 @@ export class GithubConnectionService {
   }
 
   /**
-   * Unlinks every GitHub identity that is *linked to* the caller's login (a
-   * secondary one). Left linked, the next GitHub sign-in of the same person
-   * resolves to this very login, and Auth0 refuses to link a user to what it
-   * already holds. Auth0 re-creates each former secondary as a standalone
-   * `github|<id>` user (what remains, and why it is harmless: docs/modules/m7/plan.md
-   * §2.7). An identity already gone is success; any other failure stops the
-   * deletion before anything is deleted. A login that *is* the GitHub one
-   * (`github|<id>`) has nothing linked to unlink.
+   * Unlinks the GitHub identities that are *linked to* the caller's login (secondary
+   * ones), all of them, or only `only` (a GitHub user id). Left linked, the next
+   * GitHub sign-in of the same person resolves to this very login, and Auth0
+   * refuses to link a user to what it already holds. Auth0 re-creates each former
+   * secondary as a standalone `github|<id>` user (what remains, and why it is
+   * harmless: docs/modules/m7/plan.md §2.7). An identity already gone is success;
+   * any other failure throws. A login that *is* the GitHub one (`github|<id>`)
+   * cannot be unlinked: it is `kept`.
    */
-  private async unlinkGithubAtAuth0(gh: GithubConnect, user: UserRow): Promise<void> {
+  private async unlinkGithubAtAuth0(
+    gh: GithubConnect,
+    user: UserRow,
+    only: string | null = null,
+  ): Promise<GithubIdentityOutcome> {
     const held = await gh.management.identities(user.auth0Id);
+    let outcome: GithubIdentityOutcome = 'none';
     for (const identity of held ?? []) {
       if (identity.provider !== 'github' || !identity.isSocial) continue;
-      if (user.auth0Id === `github|${identity.userId}`) continue;
+      if (only !== null && identity.userId !== only) continue;
+      if (user.auth0Id === `github|${identity.userId}`) {
+        outcome = 'kept';
+        continue;
+      }
       const result = await gh.management.unlinkIdentity(user.auth0Id, 'github', identity.userId);
       this.logger.info({ result }, 'github identity unlinked at auth0');
+      if (outcome === 'none') outcome = 'unlinked';
     }
     gh.tokens.forget(user.auth0Id);
+    return outcome;
   }
 
   /**
@@ -499,7 +549,7 @@ export class GithubConnectionService {
           externalLogin: ghUser.login,
         });
       } catch (err) {
-        if (isMysqlError(err, MysqlErrno.DUPLICATE_KEY)) throw accountInUse();
+        if (isMysqlError(err, MysqlErrno.DUPLICATE_KEY)) throw accountConnectedElsewhere();
         throw err;
       }
       await setUserVerified(trx, userId, true);

@@ -56,6 +56,7 @@ export function githubConnectHarness() {
     delete auth0.unlinkStatus;
     delete auth0.deleteUserStatus;
     delete auth0.onDeleteUser;
+    delete auth0.onUnlink;
     auth0.failureHeaders = {};
     gh.tokens.clear();
     gh.revoked.length = 0;

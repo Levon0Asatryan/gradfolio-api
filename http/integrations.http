@@ -28,7 +28,8 @@ Authorization: Bearer {{accessToken}}
 # @name linkGithub
 # 200 {"state":"connected","login":"…"}. 400 INVALID_ID_TOKEN or INVALID_NONCE for a
 # stale, foreign or reused sign-in; 409 GITHUB_ACCOUNT_IN_USE when that GitHub account
-# is another Gradfolio account. The id token is never stored or logged.
+# is another Gradfolio account (the message says whether to sign in there with GitHub,
+# or disconnect it there). The id token is never stored or logged.
 POST {{baseUrl}}/v1/me/integrations/github/link
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
@@ -37,8 +38,10 @@ Content-Type: application/json
 
 ###
 # @name disconnectGithub
-# 200 {"status":"not_connected"} after GitHub confirmed the revocation (idempotent);
-# 502 GITHUB_REVOKE_FAILED changes nothing.
+# 200 {"status":"not_connected","githubIdentity":"unlinked"|"kept"|"none"} after GitHub
+# confirmed the revocation (idempotent). "kept": GitHub is how this account signs in, so
+# Auth0 keeps the identity. 502 GITHUB_REVOKE_FAILED changes nothing; 502
+# GITHUB_UNLINK_FAILED: revoked and cleared, the identity still linked, retry.
 DELETE {{baseUrl}}/v1/me/integrations/github
 Authorization: Bearer {{accessToken}}
 
