@@ -17,19 +17,19 @@ documents move here when it closes.
 
 ## Modules
 
-| Module                     | Status      | Folder                      |
-| -------------------------- | ----------- | --------------------------- |
-| M1 Data layer              | done        | [m1/](m1/README.md)         |
-| M2 Auth and identity       | done        | [m2/](m2/README.md)         |
-| M3 Profiles                | done        | [m3/](m3/README.md)         |
-| Deploy (GCP)               | done        | [deploy/](deploy/README.md) |
-| M4 Projects and media      | done        | [m4/](m4/README.md)         |
-| M5 Teams and notifications | done        | [m5/](m5/README.md)         |
-| M6 Discovery and dashboard | done        | [m6/](m6/README.md)         |
-| M7 GitHub and LinkedIn     | in progress | [m7/](m7/README.md)         |
-| M8 Utilities and email     | next        | [m8/](m8/README.md)         |
-| M9 Hardening and release   | todo        | [m9/](m9/README.md)         |
-| UI redesign and polish     | in progress | [ui/](ui/README.md)         |
+| Module                     | Status                       | Folder                      |
+| -------------------------- | ---------------------------- | --------------------------- |
+| M1 Data layer              | done                         | [m1/](m1/README.md)         |
+| M2 Auth and identity       | done                         | [m2/](m2/README.md)         |
+| M3 Profiles                | done                         | [m3/](m3/README.md)         |
+| Deploy (GCP)               | done                         | [deploy/](deploy/README.md) |
+| M4 Projects and media      | done                         | [m4/](m4/README.md)         |
+| M5 Teams and notifications | done                         | [m5/](m5/README.md)         |
+| M6 Discovery and dashboard | **reopened** (1 open ticket) | [m6/](m6/README.md)         |
+| M7 GitHub and LinkedIn     | in progress                  | [m7/](m7/README.md)         |
+| M8 Utilities and email     | next                         | [m8/](m8/README.md)         |
+| M9 Hardening and release   | todo                         | [m9/](m9/README.md)         |
+| UI redesign and polish     | in progress                  | [ui/](ui/README.md)         |
 
 ## How work is done: three levels of chats
 
@@ -84,6 +84,11 @@ marks a task `done`, and removes what a finished chat left. Remote branches are 
 by GitHub on merge; check `git branch -r --list 'origin/<module>/*'` at module close.
 
 ### Status and reports
+
+- **A module is `done` only while it has no open ticket.** Opening a ticket in a module that
+  was done sets it to `reopened` (with the number of open tickets) in the tracker, in the
+  module's README and in the table above, in the same PR that opens the ticket. It goes back
+  to `done` when the last ticket closes.
 
 - **Claim before you start.** When a task chat starts on a task, its row goes to
   `in progress` in the module's task table, in a small docs PR, before the chat writes

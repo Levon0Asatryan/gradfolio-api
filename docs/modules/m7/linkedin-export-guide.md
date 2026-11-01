@@ -15,7 +15,7 @@ language; the screenshots per language (en/ru/am) are queue M7-T7.
      Gradfolio reads.
    - Or **"Want something in particular? Select the data files you're most interested in"**:
      tick **Profile**. Other boxes (Articles, Invitations, Recommendations, Registration) are
-     not needed. *Not verified:* that Profile alone contains Positions, Education, Skills
+     not needed. _Not verified:_ that Profile alone contains Positions, Education, Skills
      and Certifications; confirm on the first real export, then fix this line.
 3. Press **Request archive** and confirm with your password (LinkedIn asks; Gradfolio never
    sees it). LinkedIn shows "We will send you an email when your download is ready".
@@ -37,14 +37,14 @@ Checked with a throwaway script that printed only headers, row counts and masked
 and one subfolder (`Jobs/`), so **ZIP entries can have a path**. Other languages (ru/am) are
 still unchecked; Narek and Pargev may send header lines for those.
 
-| File | Headers, in order | Rows (this archive) |
-|---|---|---|
-| `Positions.csv` | Company Name, Title, Description, Location, Started On, Finished On | 6 |
-| `Education.csv` | School Name, Start Date, End Date, Notes, Degree Name, Activities | 3 |
-| `Skills.csv` | Name | 23 |
-| `Certifications.csv` | Name, Url, Authority, Started On, Finished On, License Number | 5 |
-| `Profile.csv` | First Name, Last Name, Maiden Name, Address, Birth Date, Headline, Summary, Industry, Zip Code, Geo Location, Twitter Handles, Websites, Instant Messengers | 1 |
-| `Registration.csv` | Registered At, Registration Ip, Subscription Types | 1 (never read) |
+| File                 | Headers, in order                                                                                                                                           | Rows (this archive) |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| `Positions.csv`      | Company Name, Title, Description, Location, Started On, Finished On                                                                                         | 6                   |
+| `Education.csv`      | School Name, Start Date, End Date, Notes, Degree Name, Activities                                                                                           | 3                   |
+| `Skills.csv`         | Name                                                                                                                                                        | 23                  |
+| `Certifications.csv` | Name, Url, Authority, Started On, Finished On, License Number                                                                                               | 5                   |
+| `Profile.csv`        | First Name, Last Name, Maiden Name, Address, Birth Date, Headline, Summary, Industry, Zip Code, Geo Location, Twitter Handles, Websites, Instant Messengers | 1                   |
+| `Registration.csv`   | Registered At, Registration Ip, Subscription Types                                                                                                          | 1 (never read)      |
 
 Other files present, never read: Endorsement_Received_Info, Endorsement_Given_Info, messages,
 SavedJobAlerts, Invitations, Company Follows, Whatsapp Phone Numbers, Job Applicant Saved
@@ -52,6 +52,7 @@ Screening Question Responses, Notes, Events, Rich_Media, PhoneNumbers, Email Add
 Jobs/Job Seeker Preferences, Jobs/Job Applications, Jobs/Saved Jobs, Jobs/Job Applicant Saved Answers.
 
 Observed formats:
+
 - Dates in Positions, Education and Certifications are **month-abbreviation + year** (shape
   `Mon YYYY`, e.g. a three-letter English month, a space, four digits). An empty
   `Finished On` / `End Date` means "present" or not given. A year-only or full date may
