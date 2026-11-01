@@ -55,19 +55,20 @@ Task IDs start at T20, because T1–T19 would collide with the queue rows `M8-T1
 in Levon's `manual-testing.md` (the things only he can do). In a brief, "queue M8-T11" always
 means a queue row.
 
-| ID     | Task                                                                      | Repo     | Depends on               | Tracker  | Status | Brief                                          |
-| ------ | ------------------------------------------------------------------------- | -------- | ------------------------ | -------- | ------ | ---------------------------------------------- |
-| M8-T20 | Email worker: create the Cloud Run job (delivery off) and the way it runs | api, ops | queue M8-T11             | 8.6      | todo   | [T20](tasks/M8-T20-email-worker.md)            |
-| M8-T21 | First real invite email on production, and the acceptance steps for it    | api, fe  | T20, queue M8-T14        | 8.6, 8.7 | todo   | [T21](tasks/M8-T21-first-real-email.md)        |
-| M8-T22 | Email operations: alerts, the pause switch, and the trial-end decision    | api, ops | T21, queue M8-T12        | 8.6      | todo   | [T22](tasks/M8-T22-email-operations.md)        |
-| M8-T23 | Résumé PDF evidence: generator rationale, p95 and memory, guard proofs    | api      | —                        | 8.1      | todo   | [T23](tasks/M8-T23-pdf-evidence.md)            |
-| M8-T24 | Browser checks for the PDF dialog, Settings and the unsubscribe page      | fe       | T27 (the profile button) | 8.1, 8.8 | todo   | [T24](tasks/M8-T24-browser-checks.md)          |
-| M8-T25 | Decide the Resend adapter: keep it documented or remove it                | api      | —                        | 8.6      | todo   | [T25](tasks/M8-T25-resend-adapter-decision.md) |
-| M8-T26 | Module close-out: the PASS/FAIL table and `report.md`                     | api, fe  | T21, T23, T24            | —        | todo   | [T26](tasks/M8-T26-closeout.md)                |
-| M8-T27 | Move the résumé export button (propose the place, then do it)             | fe       | —                        | 8.1      | todo   | [T27](tasks/M8-T27-export-button-place.md)     |
-| M8-T28 | CV builder: investigation and plan (then a stop for Levon)                | api, fe  | —                        | 8.9      | todo   | [T28](tasks/M8-T28-cv-builder-plan.md)         |
+| ID     | Task                                                                                | Repo     | Depends on               | Tracker  | Status | Brief                                          |
+| ------ | ----------------------------------------------------------------------------------- | -------- | ------------------------ | -------- | ------ | ---------------------------------------------- |
+| M8-T20 | Email worker: create the Cloud Run job (delivery off) and the way it runs           | api, ops | queue M8-T11             | 8.6      | todo   | [T20](tasks/M8-T20-email-worker.md)            |
+| M8-T21 | First real invite email on production, and the acceptance steps for it              | api, fe  | T20, T29, queue M8-T14   | 8.6, 8.7 | todo   | [T21](tasks/M8-T21-first-real-email.md)        |
+| M8-T22 | Email operations: alerts, the pause switch, and the trial-end decision              | api, ops | T21, queue M8-T12        | 8.6      | todo   | [T22](tasks/M8-T22-email-operations.md)        |
+| M8-T23 | Résumé PDF evidence: generator rationale, p95 and memory, guard proofs              | api      | —                        | 8.1      | todo   | [T23](tasks/M8-T23-pdf-evidence.md)            |
+| M8-T24 | Browser checks for the PDF dialog, Settings and the unsubscribe page                | fe       | T27 (the profile button) | 8.1, 8.8 | todo   | [T24](tasks/M8-T24-browser-checks.md)          |
+| M8-T25 | Decide the Resend adapter: keep it documented or remove it                          | api      | —                        | 8.6      | todo   | [T25](tasks/M8-T25-resend-adapter-decision.md) |
+| M8-T26 | Module close-out: the PASS/FAIL table and `report.md`                               | api, fe  | T21, T23, T24            | —        | todo   | [T26](tasks/M8-T26-closeout.md)                |
+| M8-T27 | Move the résumé export button (propose the place, then do it)                       | fe       | —                        | 8.1      | todo   | [T27](tasks/M8-T27-export-button-place.md)     |
+| M8-T28 | CV builder: investigation and plan (then a stop for Levon)                          | api, fe  | —                        | 8.9      | todo   | [T28](tasks/M8-T28-cv-builder-plan.md)         |
+| M8-T29 | The invite email template: a designed layout in en/ru/hy, `List-Unsubscribe`, tests | api      | —                        | 8.7      | todo   | [T29](tasks/M8-T29-invite-email-template.md)   |
 
-Lanes: **T27** (small, first, because **T24** records the profile checks on the moved button), **T28** (plan, stops for Levon; implementation briefs follow), **T20 → T21 → T22** (email, needs Levon's queue rows), **T23** and **T24** (evidence,
+Lanes: **T27** (small, first, because **T24** records the profile checks on the moved button), **T28** (plan, stops for Levon; implementation briefs follow), **T29** (the invite template: it goes before T21, so the first real email already uses it), **T20 → T21 → T22** (email, needs Levon's queue rows), **T23** and **T24** (evidence,
 independent, can start now), **T25** (small decision), then **T26**.
 
 ## Order and parallel lanes (original plan)
