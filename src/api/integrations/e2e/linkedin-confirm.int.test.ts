@@ -356,6 +356,21 @@ describe('POST /v1/me/imports/linkedin/confirm', () => {
     expect((await counts(me)).skills).toBe(3);
   });
 
+  it('the skill cap counts the canonical list: an accent or case variant of a stored skill is not new', async () => {
+    const http = await start({ PROFILE_MAX_SKILLS: '3' });
+    const me = await member('me');
+    await http
+      .put('/v1/me/skills')
+      .set(me.auth)
+      .send({ skills: ['Cafe', 'B1', 'C1'] })
+      .expect(200);
+    const res = await confirm(http, me, body({ skills: ['Café', 'CAFE'] })).expect(200);
+    expect(res.body).toMatchObject({ added: { skills: 0 }, skipped: { skills: 2 } });
+    expect((await counts(me)).skills).toBe(3);
+    // a genuinely new fourth one is still refused
+    await confirm(http, me, body({ skills: ['Café', 'D1'] })).expect(409);
+  });
+
   it('two concurrent identical confirms give one set of rows', async () => {
     const http = await start();
     const me = await member('me');

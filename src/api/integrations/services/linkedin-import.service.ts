@@ -7,7 +7,7 @@ import { newId } from '../../../core/db/ids.js';
 import { lockUser } from '../../../core/db/user-lock.js';
 import { DbService } from '../../../core/db/db.service.js';
 import { inTransaction } from '../../../core/db/transaction.js';
-import { AppError, ConflictError } from '../../../core/errors/app-error.js';
+import { AppError, ConflictError, ValidationError } from '../../../core/errors/app-error.js';
 import {
   LinkedinZipError,
   type LinkedinZipErrorCode,
@@ -279,13 +279,19 @@ export class LinkedinImportService {
         }
       }
       if (fresh.length > 0) {
-        if (current.length + fresh.length > this.cfg.PROFILE_MAX_SKILLS) {
-          throw new ConflictError(
-            'LIMIT_REACHED',
-            `at most ${this.cfg.PROFILE_MAX_SKILLS} skills are allowed`,
-          );
-        }
-        const after = await this.skills.replaceIn(trx, user.id, [...current, ...fresh]);
+        // The cap is checked by replaceIn on the canonical list (the registry folds case and
+        // accents), so a spelling variant of a stored skill is not counted twice.
+        const after = await this.skills
+          .replaceIn(trx, user.id, [...current, ...fresh])
+          .catch((err: unknown) => {
+            if (err instanceof ValidationError) {
+              throw new ConflictError(
+                'LIMIT_REACHED',
+                `at most ${this.cfg.PROFILE_MAX_SKILLS} skills are allowed`,
+              );
+            }
+            throw err;
+          });
         added.skills = after.length - current.length;
       }
       skipped.skills = body.skills.length - added.skills;

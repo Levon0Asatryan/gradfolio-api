@@ -608,8 +608,8 @@ concurrent confirms; with `lockUser` the second sees the first's row.
   the file's first item ends first (sections put a new entry on top). Over `PROFILE_MAX_SECTION_ITEMS`
   is `409 LIMIT_REACHED` and rolls back everything.
 - Skills: new names (case-insensitive against the stored list and the request) are appended to
-  the stored list, in order, through `SkillsService.replaceIn`; over `PROFILE_MAX_SKILLS` after
-  deduplication is `409 LIMIT_REACHED` (checked first, so it is not the 400 `replaceIn` would give).
+  the stored list, in order, through `SkillsService.replaceIn`; over `PROFILE_MAX_SKILLS` on the canonical list
+  (case and accents folded by the registry) is `409 LIMIT_REACHED` (`replaceIn`'s 400 is converted).
   `added.skills` is the growth of the stored list.
 - `integrations(linkedin).last_synced_at` is upserted in the same transaction (no token, no
   status change). A matching key never touches the stored row: an edited entry is never overwritten.
