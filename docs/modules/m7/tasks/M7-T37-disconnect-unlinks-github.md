@@ -42,7 +42,8 @@ Do not merge. Never write a secret or token into a file, PR or chat.
 Signed up with GitHub, pressed Disconnect, then opened a second account (Google) and pressed Connect with the same GitHub account:
 "That GitHub account already belongs to another Gradfolio account." The identity is still linked to the first user at Auth0.
 
-Case to handle: the account was **created by signing in with GitHub**, so GitHub is its *primary* identity. Auth0 cannot unlink a primary identity. Do not pretend it worked:
+Case to handle: the account was **created by signing in with GitHub**, so GitHub is its _primary_ identity. Auth0 cannot unlink a primary identity. Do not pretend it worked:
+
 - Disconnect still revokes the grant and clears the Gradfolio-side link, and says plainly that the GitHub login stays on this account because it is how the user signs in.
 - The Connect error for that case must say what to do (sign in to the first account, or use a different GitHub account), not only "already belongs".
 - Test both cases: secondary identity (unlinked) and primary identity (kept, honest answer). Prove each guard by removal.
