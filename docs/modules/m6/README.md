@@ -1,7 +1,8 @@
 # M6: Discovery and dashboard
 
-**Status:** done, and reopened on 2026-11-01 for one problem (T20 below). Built before the
-module-folder layout, so this page indexes its documents instead of listing task briefs.
+**Status: REOPENED, not done.** The module was built and closed on 2026-10-11 and was reopened on
+2026-11-01: **1 open ticket** (M6-T20, below). It becomes `done` again when that ticket is closed.
+The rest was built before the module-folder layout, so this page indexes its documents.
 
 Search (with short tokens), tag pages, browse, tag cloud, the dashboard.
 
