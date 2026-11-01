@@ -66,7 +66,7 @@ brief, "queue M7-T1" always means a queue row.
 | M7-T34 | Offer the import after every successful connect, and keep offering it       | fe      | —                 | 7.14    | done        | [T34](tasks/M7-T34-offer-import-after-connect.md)  |
 | M7-T35 | Import dialog wording when only profile data is imported                    | fe      | —                 | 7.14    | done        | [T35](tasks/M7-T35-profile-only-import-wording.md) |
 | M7-T36 | Reconnect after a dead token: connect re-runs the GitHub sign-in            | api, fe | —                 | 7.2     | done        | [T36](tasks/M7-T36-reconnect-after-dead-token.md)  |
-| M7-T37 | Disconnect unlinks the GitHub identity at Auth0                             | api     | —                 | 7.4     | todo        | [T37](tasks/M7-T37-disconnect-unlinks-github.md)   |
+| M7-T37 | Disconnect unlinks the GitHub identity at Auth0                             | api     | —                 | 7.4     | in progress | [T37](tasks/M7-T37-disconnect-unlinks-github.md)   |
 | M7-T30 | Focus and announcement after Publish on cards and the project page          | fe      | —                 | 7.14    | done        | [T30](tasks/M7-T30-publish-focus.md)               |
 | M7-T31 | Import entry points: after connect, Projects → Add                          | fe      | —                 | 7.14    | done        | [T31](tasks/M7-T31-import-entry-points.md)         |
 | M7-T32 | Suggestions inbox: skills, links, project changes, notification             | fe      | T20 (T21, T22)    | 7.13    | done        | [T32](tasks/M7-T32-suggestions-inbox.md)           |
