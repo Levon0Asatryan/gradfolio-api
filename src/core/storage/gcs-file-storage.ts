@@ -76,6 +76,11 @@ export class GcsFileStorage implements FileStorage {
     return Buffer.concat(chunks);
   }
 
+  openRange(key: string, start: number, end: number) {
+    // GCS's `end` is inclusive.
+    return this.bucket.file(key).createReadStream({ start, end: end - 1 });
+  }
+
   async claim(
     key: string,
     version: { generation: string; metageneration: string },

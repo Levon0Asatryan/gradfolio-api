@@ -195,6 +195,8 @@ const rateLimit = {
   // largest per-route number, kept small by the cost of one suggestion (three
   // statements of at most 5 rows).
   RATE_LIMIT_SUGGEST: z.coerce.number().int().min(1).max(100_000).default(240),
+  // The LinkedIn export import (upload ticket, preview, confirm): tighter than `import`.
+  RATE_LIMIT_LINKEDIN: z.coerce.number().int().min(1).max(100_000).default(3),
   // Integrations status, connect, link, disconnect (docs/modules/m7/plan.md §7).
   RATE_LIMIT_INTEGRATION: z.coerce.number().int().min(1).max(100_000).default(30),
   // The same budgets for an anonymous caller whose address is the frontend's
@@ -301,6 +303,23 @@ const storage = {
   // Objects one user may hold under their prefix (registered or not).
   UPLOAD_MAX_FILES_PER_USER: z.coerce.number().int().min(1).max(5000).default(200),
   PROJECT_MAX_ATTACHMENTS: z.coerce.number().int().min(1).max(200).default(20),
+  // LinkedIn export ZIP (docs/modules/m7/plan.md §4.2). The ZIP's size as uploaded; waiting
+  // uploads per user; entries in the archive; the sum of declared uncompressed sizes; one
+  // parsed entry's size; the declared ratio above which an entry of 1 MB or more is a bomb;
+  // CSV rows per dataset; previews running at once in this process.
+  IMPORT_MAX_ZIP_BYTES: z.coerce.number().int().min(1024).max(100_000_000).default(100_000_000),
+  IMPORT_MAX_PENDING: z.coerce.number().int().min(1).max(20).default(3),
+  IMPORT_MAX_ENTRIES: z.coerce.number().int().min(1).max(50_000).default(5000),
+  IMPORT_MAX_UNCOMPRESSED_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1024)
+    .max(5_000_000_000)
+    .default(500_000_000),
+  IMPORT_MAX_ENTRY_BYTES: z.coerce.number().int().min(1024).max(100_000_000).default(10_000_000),
+  IMPORT_MAX_RATIO: z.coerce.number().int().min(1).max(10_000).default(100),
+  IMPORT_MAX_ROWS: z.coerce.number().int().min(1).max(50_000).default(2000),
+  IMPORT_MAX_CONCURRENT: z.coerce.number().int().min(1).max(20).default(2),
 };
 
 /** Teams and notifications (docs/modules/m5/plan.md §1, §5.3). */

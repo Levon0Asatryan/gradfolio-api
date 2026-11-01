@@ -4,6 +4,8 @@
  *   npm run storage:sweep                      (dry run: lists what would go)
  *   npm run storage:sweep -- --apply           (deletes)
  *   npm run storage:sweep -- --hours 6         (age floor, default 24)
+ *   npm run storage:sweep -- --prefix imports/ (LinkedIn export ZIPs a preview never took;
+ *                                               needs no database)
  *
  * Needs STORAGE_BUCKET and credentials that may list and delete in it (on Cloud
  * Run, the service account). Safe to repeat.
@@ -14,6 +16,8 @@ import { createPool } from '../db/pool.js';
 import { describeError } from '../errors/describe.js';
 import { GcsFileStorage } from './gcs-file-storage.js';
 import { sweepOrphans } from './sweep.js';
+import { IMPORTS_ROOT } from './file-rules.js';
+import { sweepImports } from './sweep-imports.js';
 
 async function main(): Promise<void> {
   const apply = process.argv.includes('--apply');
@@ -23,6 +27,19 @@ async function main(): Promise<void> {
 
   const cfg = loadConfig();
   if (cfg.STORAGE_BUCKET === undefined) throw new Error('STORAGE_BUCKET is not set');
+  if (process.argv.includes('--prefix')) {
+    if (process.argv[process.argv.indexOf('--prefix') + 1] !== IMPORTS_ROOT) {
+      throw new Error(`--prefix only accepts ${IMPORTS_ROOT}`);
+    }
+    const result = await sweepImports(new GcsFileStorage(cfg.STORAGE_BUCKET), {
+      apply,
+      minAgeMs: hours * 3_600_000,
+    });
+    process.stdout.write(
+      `sweep ${IMPORTS_ROOT}: ${result.scanned} scanned, ${result.stale.length} stale, ${result.deleted} deleted${apply ? '' : ' (dry run; pass --apply)'}\n`,
+    );
+    return;
+  }
   const pool = createPool({ ...cfg, DATABASE_POOL_MAX: 2 });
   try {
     const result = await sweepOrphans(

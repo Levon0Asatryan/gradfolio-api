@@ -20,6 +20,7 @@ import { UploadsService } from './services/uploads.service.js';
     FileUrlService,
     UploadsService,
   ],
-  exports: [FileUrlService],
+  // FILE_STORAGE: the LinkedIn import reads the export ZIP from the same bucket.
+  exports: [FileUrlService, FILE_STORAGE],
 })
 export class FilesModule {}

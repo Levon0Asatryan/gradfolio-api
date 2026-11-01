@@ -3893,8 +3893,7 @@ paths:
       tags:
         - integrations
       summary: Get a signed URL to upload a LinkedIn data export ZIP
-      description: "**Not served yet: arrives with M7 PR (c).** The browser PUTs the ZIP straight to the returned URL (never through the frontend’s server: its body limit is 4.5 MB). At most IMPORT_MAX_PENDING uploads wait at once."
-      x-gradfolio-planned: M7 PR (c)
+      description: "The browser PUTs the ZIP straight to the returned URL (never through the frontend’s server: its body limit is 4.5 MB). At most IMPORT_MAX_PENDING uploads wait at once."
       security:
         - bearerAuth: []
       requestBody:
@@ -3944,7 +3943,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "429":
-          description: "RATE_LIMITED: over the `import` budget (5 per minute); see Retry-After"
+          description: "RATE_LIMITED: over the `linkedin` budget (3 per minute); see Retry-After"
           content:
             application/json:
               schema:
@@ -3961,8 +3960,7 @@ paths:
       tags:
         - integrations
       summary: Read an uploaded export and propose entries; saves nothing
-      description: "**Not served yet: arrives with M7 PR (c).** Parses positions, education, skills and certifications; each item is `new`, `duplicate` (already on the profile) or `invalid` (with `problems`). The upload is deleted afterwards, whatever the outcome. Only the four datasets are ever opened."
-      x-gradfolio-planned: M7 PR (c)
+      description: "Parses positions, education, skills and certifications; each item is `new`, `duplicate` (already on the profile, or earlier in the file) or `invalid` (with `problems`; the student fixes it in the preview). Education items always carry a `field` problem: the export has no field of study. The upload is deleted afterwards, whatever the outcome (except IMPORT_BUSY and IMPORT_UPLOAD_MISSING). Only the four datasets are ever opened; the profile file never is."
       security:
         - bearerAuth: []
       requestBody:
@@ -4011,13 +4009,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "422":
-          description: IMPORT_NOT_ZIP, IMPORT_TOO_MANY_ENTRIES, IMPORT_UNCOMPRESSED_TOO_LARGE, IMPORT_RATIO_EXCEEDED, IMPORT_UNSAFE_PATH, IMPORT_ENCRYPTED, IMPORT_ENTRY_NOT_CSV, IMPORT_EMPTY, IMPORT_COLUMNS_MISSING (see `details`), IMPORT_MALFORMED_CSV
+          description: "IMPORT_NOT_ZIP, IMPORT_TOO_MANY_ENTRIES, IMPORT_UNCOMPRESSED_TOO_LARGE, IMPORT_RATIO_EXCEEDED, IMPORT_UNSAFE_PATH, IMPORT_ENCRYPTED, IMPORT_ENTRY_NOT_CSV, IMPORT_DUPLICATE_ENTRY, IMPORT_EMPTY, IMPORT_COLUMNS_MISSING (`details`: file and columns), IMPORT_LANGUAGE_UNRECOGNISED (`details`: file; only the English export is supported), IMPORT_MALFORMED_CSV"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "429":
-          description: "RATE_LIMITED, or IMPORT_BUSY: too many previews running; see Retry-After"
+          description: "RATE_LIMITED (the `linkedin` budget, 3 per minute), or IMPORT_BUSY: too many previews running; see Retry-After. The upload is kept after IMPORT_BUSY."
           content:
             application/json:
               schema:

@@ -549,6 +549,35 @@ Preview response: per section `items[]` with `status: new | duplicate | invalid`
 fields, `problems`; plus `skippedColumns`, `missingFiles`. Duplicate = same natural key as an
 existing row (§4.3). Nothing is saved.
 
+**As built in M7-T41** (the table above stays the design; these are the differences):
+
+- Budget: the three LinkedIn routes use a new `linkedin` budget (`RATE_LIMIT_LINKEDIN`, default
+  3/min), tighter than `import`; each route keeps its own counter.
+- Code `IMPORT_DUPLICATE_ENTRY` (a dataset file twice in the archive) and
+  `IMPORT_LANGUAGE_UNRECOGNISED` (no known header in a dataset: ru/am or not an export;
+  `details.file`) are added. `IMPORT_COLUMNS_MISSING` carries `details: {file, columns}`.
+- yauzl runs with `strictFileNames` (a backslash is refused, not turned into `/`),
+  `validateEntrySizes` (an entry that inflates past its declared size fails, mapped to
+  `IMPORT_UNCOMPRESSED_TOO_LARGE`) and `autoClose: false`. A name yauzl itself rejects is mapped to
+  `IMPORT_UNSAFE_PATH`; our own check additionally refuses NUL, drive letters and names over 255.
+- The ratio and the total-size checks run on every entry's declared sizes, read or not. A storage
+  read error is passed through as a server error, never as a bad archive.
+- `Profile.csv` is **not opened** by the preview (it holds a birth date and an address, and the
+  preview has no field for it); it counts as an other entry.
+- Duplicate: the same natural key as an existing row or an earlier item of the file; a duplicate
+  wins over a problem. Every education item carries a `field` problem (`REQUIRED`) because the
+  export has no field of study, so it is `invalid` until the student fills it in the preview.
+- `IMPORT_BUSY` keeps the waiting upload (the student asks again); every other outcome after the
+  object was found deletes it, and a failed delete is logged, never fatal.
+- Backstops: `docker/gcs-lifecycle.json` (age one day on `imports/`, applied by Levon, queue M7-T8:
+  `gcloud storage buckets update gs://<bucket> --lifecycle-file=docker/gcs-lifecycle.json`) and
+  `npm run storage:sweep -- --prefix imports/ [--apply] [--hours N]`.
+- `IMPORT_MAX_PENDING` counts the bucket listing plus the caller's unexpired tickets not yet
+  uploaded (in this process, Q9), so tickets cannot be collected past the cap. Each user's list-count-reserve step is serialised;
+  a preview releases its slot only when it found the object (a missing one keeps the ticket until it expires).
+- A signed URL that outlives the delete (TTL 300 s) can write the same key once more; that object
+  has no reader and is removed by the lifecycle rule or the sweep.
+
 ### 4.3 Confirm (7.8)
 
 `POST /v1/me/imports/linkedin/confirm { experience[], education[], certifications[], skills[] }`.
@@ -871,9 +900,9 @@ in the lazy mode.
 | 5   | `GET /v1/me/github/repos`                                                | b   | `integration` | paginated, rate limit surfaced                     |
 | 6   | `POST /v1/me/github/import`                                              | b   | `import`      | batch ≤ 10                                         |
 | 7   | `POST /v1/me/projects/{id}/github/sync`                                  | b   | `import`      | `?dryRun=true`                                     |
-| 8   | `POST /v1/me/imports/linkedin/uploads`                                   | c   | `import`      | signed `PUT`                                       |
-| 9   | `POST /v1/me/imports/linkedin/preview`                                   | c   | `import`      | deletes the object                                 |
-| 10  | `POST /v1/me/imports/linkedin/confirm`                                   | c   | `import`      | one transaction                                    |
+| 8   | `POST /v1/me/imports/linkedin/uploads`                                   | c   | `linkedin`    | signed `PUT`                                       |
+| 9   | `POST /v1/me/imports/linkedin/preview`                                   | c   | `linkedin`    | deletes the object                                 |
+| 10  | `POST /v1/me/imports/linkedin/confirm`                                   | c   | `linkedin`    | one transaction                                    |
 | 11  | `GET /v1/me/suggestions`, `…/refresh`, `…/{id}/accept`, `…/{id}/dismiss` | d   | as §6.5       |                                                    |
 
 New budgets: `integration` (`RATE_LIMIT_INTEGRATION`, default 30/min); `import` stays at 5/min,

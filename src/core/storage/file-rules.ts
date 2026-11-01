@@ -71,3 +71,15 @@ export function objectKeyOf(url: string, bucket: string): string | null {
   }
   return key === '' || key.includes('..') || key.includes('//') ? null : key;
 }
+
+/**
+ * A LinkedIn export ZIP waiting for its preview: `imports/<userId>/<uploadId>.zip`. The key
+ * is derived from the caller and the upload id, so a client never names a key, and another
+ * user's id finds no object. Deleted after the preview; a bucket lifecycle rule (age one
+ * day) is the backstop (docker/gcs-lifecycle.json).
+ */
+export const IMPORTS_ROOT = 'imports/';
+export const importPrefix = (userId: string) => `${IMPORTS_ROOT}${userId}/`;
+export const importKey = (userId: string, uploadId: string) =>
+  `${importPrefix(userId)}${uploadId}.zip`;
+export const IMPORT_ZIP_TYPE = 'application/zip';
