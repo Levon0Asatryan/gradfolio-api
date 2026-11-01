@@ -227,8 +227,23 @@ itself the GitHub one, `link` finds the identity already held (nothing to link),
 own `github|<id>` as another account, reads the new token, and a token still refused after the sign-in is
 `409 GITHUB_NOT_LINKED` with the reservation released. Not verified: that Auth0 replaces the stored token on
 that sign-in (the 2026-10-19 11:59 log says yes; M7-T50 confirms). Projects already imported stay (`source = 'github'`); re-sync then answers
-`409 GITHUB_NOT_CONNECTED`. The Auth0 identity is **not** unlinked (a GitHub-only user would lose
-their login; `update:users` is already a wide scope): the card says so.
+`409 GITHUB_NOT_CONNECTED`.
+
+**Unlink (M7-T37, Levon decided 2026-11-01).** After the revocation, and while its marker still refuses
+a connect, the GitHub identity of the connected account is unlinked at Auth0
+(`DELETE /users/{sub}/identities/github/{id}`, `update:users`, the call account deletion already
+makes, §2.7), so the same GitHub account can be connected to another Gradfolio account. With no
+connection to disconnect, every GitHub identity still linked is unlinked (what a failed earlier
+unlink left). An identity already gone is success. Auth0 cannot unlink a **primary** identity: when the
+account was created by signing in with GitHub (`sub` is `github|<id>`), the identity is **kept**, and the
+response says so (`githubIdentity: "kept"`; the other values are `unlinked` and `none`). The grant is
+still revoked and the Gradfolio-side link cleared; the student still signs in with GitHub. Connecting
+that GitHub account to another account is then `409 GITHUB_ACCOUNT_IN_USE`, whose message says to sign in
+to the first account with GitHub or use a different GitHub account (a GitHub account connected as a
+secondary elsewhere gets a message saying to disconnect it there). If the unlink fails, the connection
+is cleared anyway (the grant is gone) and the answer is `502 GITHUB_UNLINK_FAILED`: GitHub access was
+removed, the identity is still linked, a retry finishes. Deleting the Auth0 user stays
+`AUTH0_DELETE_USERS` (§2.7).
 
 ### 2.4 If Levon overrules D2 (encrypted cached copy)
 
