@@ -87,6 +87,12 @@ function onlyWhereOptedIn(name: RateBudgetName): ThrottlerOptions['skipIf'] {
               skipIf: onlyWhereOptedIn('upload'),
             },
             {
+              name: 'linkedin',
+              ttl,
+              limit: cfg.RATE_LIMIT_LINKEDIN,
+              skipIf: onlyWhereOptedIn('linkedin'),
+            },
+            {
               name: 'integration',
               ttl,
               limit: cfg.RATE_LIMIT_INTEGRATION,

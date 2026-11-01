@@ -10,6 +10,7 @@ export const RATE_BUDGETS = [
   'browse',
   'suggest',
   'integration',
+  'linkedin',
 ] as const;
 export type RateBudgetName = (typeof RATE_BUDGETS)[number];
 
