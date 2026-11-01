@@ -1,7 +1,9 @@
+import { createHash } from 'node:crypto';
 import { createConnection } from 'mysql2/promise';
 import type request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { newId } from '../../../core/db/ids.js';
+import { insertNonce } from '../repositories/nonce.repository.js';
 import { waitForLockWaiters } from '../../../testing/barrier.js';
 import { adminDatabaseUrl, testDatabaseUrl } from '../../../testing/database.js';
 import type { FakeAuth0 } from '../../../testing/fake-auth0.js';
@@ -1519,6 +1521,41 @@ describe('disconnect (revoke first, D9)', () => {
         .expect(200);
       expect(res.body.state).toBe('connected');
       expect(githubIdentities(s.sub)).toEqual(['309']);
+    });
+
+    it('a link arriving during the unlink of a leftover identity is refused, and the row settles (barrier)', async () => {
+      const http = await start();
+      const s = await connected(http, 'auth0|t37-race', '314');
+      auth0.unlinkStatus = 500;
+      await http.delete('/v1/me/integrations/github').set(s.auth).expect(502);
+      delete auth0.unlinkStatus;
+      // Retry: the row is not connected, the identity is still linked. A link
+      // that arrives while Auth0 is unlinking must not reserve and connect.
+      githubKnows('314', '314-login');
+      const nonce = 'race-nonce-314';
+      await insertNonce(
+        db,
+        createHash('sha256').update(nonce).digest('hex'),
+        s.id,
+        new Date(Date.now() + 600_000),
+      );
+      let during = 0;
+      auth0.onUnlink = async () => {
+        const res = await http
+          .post('/v1/me/integrations/github/link')
+          .set(s.auth)
+          .send({ idToken: await idToken('314', nonce) });
+        during = res.status;
+        expect(res.body.code).toBe('GITHUB_LINK_IN_PROGRESS');
+      };
+      const retry = await http.delete('/v1/me/integrations/github').set(s.auth).expect(200);
+      expect(retry.body.githubIdentity).toBe('unlinked');
+      expect(during).toBe(409);
+      expect(githubIdentities(s.sub)).toEqual([]);
+      expect(await githubRow(s.id)).toMatchObject({
+        status: 'not_connected',
+        externalUserId: null,
+      });
     });
 
     it('only the caller’s identity is unlinked (second user)', async () => {

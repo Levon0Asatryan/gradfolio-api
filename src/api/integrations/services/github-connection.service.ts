@@ -354,6 +354,10 @@ export class GithubConnectionService {
       }
     }
 
+    // Nothing connected: the unlink still holds a marker, or a link finishing
+    // meanwhile would have its fresh identity unlinked under it.
+    if (row?.status !== 'connected') expected = await this.beginUnlink(user.id, row);
+
     // After the revocation, and while its marker still refuses a connect. Of the
     // connected account's identity only; with nothing connected, whatever a
     // failed earlier disconnect left linked.
@@ -613,6 +617,26 @@ export class GithubConnectionService {
         status: 'linking',
         externalUserId: row.externalUserId,
         externalLogin: row.externalLogin,
+      });
+    });
+  }
+
+  /**
+   * Marks a row that is not connected (or missing) `linking`, with no GitHub id,
+   * for the time the leftover GitHub identity is unlinked at Auth0, so a link
+   * cannot reserve and finish meanwhile (409 GITHUB_LINK_IN_PROGRESS). Returns the
+   * version written. Only onto the row as it was read (409 GITHUB_STATE_CHANGED).
+   * A marker left behind is released by `reconcile` once it is stale.
+   */
+  private async beginUnlink(userId: string, read: IntegrationRow | undefined): Promise<number> {
+    return inTransaction(this.dbs.db, async (trx) => {
+      await lockUser(trx, userId);
+      const row = await lockGithubRow(trx, userId);
+      if (versionOf(row) !== versionOf(read)) throw stateChanged();
+      return writeGithubRow(trx, userId, row, {
+        status: 'linking',
+        externalUserId: null,
+        externalLogin: null,
       });
     });
   }
