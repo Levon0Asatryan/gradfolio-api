@@ -17,6 +17,8 @@ purchase. Delivery remains disabled pending account/sender verification and
 credentials. The adapter, signed webhook and job runbook are in PR #123.
 See [SendGrid setup and trial limitations](sendgrid.md).
 See [plan](plan.md), [verification](verification.md), and [email operations](email.md).
+The main chat checked every task against its brief on 2026-11-01: see the
+[audit](audit-2026-11-01.md) for what is evidenced and what is still open.
 No production email delivery is claimed.
 
 ## Tasks

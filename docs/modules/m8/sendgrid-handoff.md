@@ -5,6 +5,15 @@ verification. The sending API key and signed Event Webhook public key are saved
 privately with Narek. His Google account cannot see the current Gradfolio GCP
 project. Do not create a second cloud project or send credentials in chat.
 
+## Status on 2026-11-01 (checked by the main chat, read-only)
+
+Levon approved the access and the provider choice. Step 1 is done (the SendGrid revision
+`gradfolio-api-00073` is deployed). Step 2 is done: the three secrets exist since
+2026-10-26, and the API has the webhook key and the unsubscribe secret. An unsigned webhook
+request answers 400. **Steps 3 to 9 are open:** there is no `gradfolio-email-worker` job, the
+Cloud Scheduler API is not enabled, and no email has been sent. The text below is the
+original plan, kept as written.
+
 ## Already prepared
 
 - Provider adapter and signed endpoint `/v1/email/webhooks/sendgrid` in PR #123.
