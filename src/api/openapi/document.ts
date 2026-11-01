@@ -864,7 +864,6 @@ function plannedImportOperations(): Operation[] {
     },
     {
       ...base,
-      planned: 'M7 PR (c)',
       method: 'post',
       path: '/v1/me/imports/linkedin/uploads',
       operationId: 'createLinkedinUpload',
@@ -878,20 +877,27 @@ function plannedImportOperations(): Operation[] {
         '400': validationFailed,
         '409': error('LIMIT_REACHED: too many uploads waiting for a preview'),
         '413': error('IMPORT_TOO_LARGE: over IMPORT_MAX_ZIP_BYTES'),
-        ...importFailures,
+        '401': authenticatedFailures['401'],
+        '429': error('RATE_LIMITED: over the `linkedin` budget (3 per minute); see Retry-After'),
+        '503': error(
+          'STORAGE_UNAVAILABLE: uploads are off on this server; AUTH_UNAVAILABLE or ' +
+            'DATABASE_UNAVAILABLE',
+        ),
       },
     },
     {
       ...base,
-      planned: 'M7 PR (c)',
       method: 'post',
       path: '/v1/me/imports/linkedin/preview',
       operationId: 'previewLinkedinImport',
       summary: 'Read an uploaded export and propose entries; saves nothing',
       description:
         'Parses positions, education, skills and certifications; each item is `new`, ' +
-        '`duplicate` (already on the profile) or `invalid` (with `problems`). The upload is ' +
-        'deleted afterwards, whatever the outcome. Only the four datasets are ever opened.',
+        '`duplicate` (already on the profile, or earlier in the file) or `invalid` (with ' +
+        '`problems`; the student fixes it in the preview). Education items always carry a ' +
+        '`field` problem: the export has no field of study. The upload is deleted afterwards, ' +
+        'whatever the outcome (except IMPORT_BUSY and IMPORT_UPLOAD_MISSING). Only the four ' +
+        'datasets are ever opened; the profile file never is.',
       body: linkedinPreviewRequestSchema,
       responses: {
         '200': { description: 'The proposal', schema: linkedinPreviewResponseSchema },
@@ -901,10 +907,19 @@ function plannedImportOperations(): Operation[] {
         '422': error(
           'IMPORT_NOT_ZIP, IMPORT_TOO_MANY_ENTRIES, IMPORT_UNCOMPRESSED_TOO_LARGE, ' +
             'IMPORT_RATIO_EXCEEDED, IMPORT_UNSAFE_PATH, IMPORT_ENCRYPTED, IMPORT_ENTRY_NOT_CSV, ' +
-            'IMPORT_EMPTY, IMPORT_COLUMNS_MISSING (see `details`), IMPORT_MALFORMED_CSV',
+            'IMPORT_DUPLICATE_ENTRY, IMPORT_EMPTY, IMPORT_COLUMNS_MISSING (`details`: file and ' +
+            'columns), IMPORT_LANGUAGE_UNRECOGNISED (`details`: file; only the English export ' +
+            'is supported), IMPORT_MALFORMED_CSV',
         ),
-        ...importFailures,
-        '429': error('RATE_LIMITED, or IMPORT_BUSY: too many previews running; see Retry-After'),
+        '401': authenticatedFailures['401'],
+        '429': error(
+          'RATE_LIMITED (the `linkedin` budget, 3 per minute), or IMPORT_BUSY: too many ' +
+            'previews running; see Retry-After. The upload is kept after IMPORT_BUSY.',
+        ),
+        '503': error(
+          'STORAGE_UNAVAILABLE: uploads are off on this server; AUTH_UNAVAILABLE or ' +
+            'DATABASE_UNAVAILABLE',
+        ),
       },
     },
     {

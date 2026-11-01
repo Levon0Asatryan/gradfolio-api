@@ -8,9 +8,11 @@ import { Auth0IdpTokenSource } from '../../core/github/token-source.js';
 import { GITHUB_CONNECT, type GithubConnect } from './integrations.constants.js';
 import { GithubImportController, GithubSyncController } from './github-import.controller.js';
 import { IntegrationsController } from './integrations.controller.js';
+import { LinkedinImportController } from './linkedin-import.controller.js';
 import { GithubConnectionService } from './services/github-connection.service.js';
 import { GithubImportService } from './services/github-import.service.js';
 import { GithubSyncService } from './services/github-sync.service.js';
+import { LinkedinImportService } from './services/linkedin-import.service.js';
 
 /** GitHub connect's clients, or null when any of its five credentials is unset (D9). */
 export function createGithubConnect(cfg: AppConfig): GithubConnect | null {
@@ -47,11 +49,17 @@ export function createGithubConnect(cfg: AppConfig): GithubConnect | null {
 }
 
 @Module({
-  controllers: [IntegrationsController, GithubImportController, GithubSyncController],
+  controllers: [
+    IntegrationsController,
+    GithubImportController,
+    GithubSyncController,
+    LinkedinImportController,
+  ],
   providers: [
     GithubConnectionService,
     GithubImportService,
     GithubSyncService,
+    LinkedinImportService,
     { provide: GITHUB_CONNECT, inject: [APP_CONFIG], useFactory: createGithubConnect },
   ],
   exports: [GithubConnectionService, GithubImportService],

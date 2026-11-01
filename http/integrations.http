@@ -102,3 +102,27 @@ Content-Type: application/json
   "repoIds": [812345678],
   "overrides": { "812345678": { "title": "My thesis tracker", "technologies": ["Go", "SQL"] } }
 }
+
+###
+# @name createLinkedinUpload
+# 201 {uploadId, uploadUrl, method:"PUT", headers, expiresAt}. PUT the ZIP (not unzipped) to
+# uploadUrl from the browser with exactly those headers (Content-Type: application/zip,
+# x-goog-content-length-range = the size, x-goog-if-generation-match: 0). 409 LIMIT_REACHED
+# when IMPORT_MAX_PENDING uploads wait; 413 IMPORT_TOO_LARGE; 503 STORAGE_UNAVAILABLE.
+POST {{baseUrl}}/v1/me/imports/linkedin/uploads
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "size": 48213 }
+
+###
+# @name previewLinkedinImport
+# 200 {experience[], education[], certifications[], skills[], skippedColumns, missingFiles,
+#      skippedFileCount, extensions}; each item status new | duplicate | invalid with problems.
+# Saves nothing; deletes the upload afterwards. 404 IMPORT_UPLOAD_MISSING (also for another
+# user's id); 422 IMPORT_* for a refused archive; 429 IMPORT_BUSY (Retry-After 5).
+POST {{baseUrl}}/v1/me/imports/linkedin/preview
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "uploadId": "{{uploadId}}" }
