@@ -126,3 +126,28 @@ Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 { "uploadId": "{{uploadId}}" }
+
+###
+# @name confirmLinkedinImport
+# 200 {"added":{experience,education,certifications,skills},"skipped":{…}}. The items are the
+# preview's, possibly edited; each is validated like a manual entry (400 names the path,
+# nothing saved). Already-present entries are skipped; a second identical call adds nothing.
+# 409 LIMIT_REACHED when a section would pass its cap (nothing saved).
+POST {{baseUrl}}/v1/me/imports/linkedin/confirm
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "experience": [
+    { "title": "Developer", "organization": "Example Co", "start": "2022-09", "end": "2024-06",
+      "summary": "", "achievements": [], "skills": [] }
+  ],
+  "education": [
+    { "institution": "Example University", "degree": "BSc", "field": "Computer Science",
+      "startYear": 2019, "endYear": 2023, "description": null, "highlights": [] }
+  ],
+  "certifications": [
+    { "name": "Cloud Basics", "issuer": "Example Cloud", "date": "2023-03", "credentialUrl": null }
+  ],
+  "skills": ["TypeScript", "SQL"]
+}

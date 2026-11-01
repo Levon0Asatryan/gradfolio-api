@@ -3,7 +3,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { APP_CONFIG } from '../../../core/config/config.module.js';
 import type { AppConfig } from '../../../core/config/schema.js';
+import { newId } from '../../../core/db/ids.js';
+import { lockUser } from '../../../core/db/user-lock.js';
 import { DbService } from '../../../core/db/db.service.js';
+import { inTransaction } from '../../../core/db/transaction.js';
 import { AppError, ConflictError } from '../../../core/errors/app-error.js';
 import {
   LinkedinZipError,
@@ -13,14 +16,19 @@ import { readLinkedinZip } from '../../../core/linkedin-export/zip-reader.js';
 import { IMPORT_ZIP_TYPE, importKey, importPrefix } from '../../../core/storage/file-rules.js';
 import { FILE_STORAGE, type FileStorage } from '../../../core/storage/file-storage.js';
 import { certificationSection } from '../../profiles/repositories/certification.repository.js';
+import type { SectionDefinition } from '../../profiles/repositories/section-definition.js';
 import { educationSection } from '../../profiles/repositories/education.repository.js';
 import { experienceSection } from '../../profiles/repositories/experience.repository.js';
 import { listSkills } from '../../profiles/repositories/skill.repository.js';
+import { SectionService } from '../../profiles/services/section.service.js';
+import { SkillsService } from '../../profiles/services/skills.service.js';
 import type { UserRow } from '../../users/repositories/user.repository.js';
 import type {
+  linkedinConfirmRequestSchema,
   linkedinPreviewRequestSchema,
   linkedinUploadRequestSchema,
 } from '../dto/linkedin-import.dto.js';
+import { certificationKey, educationKey, experienceKey, skillKey } from '../utils/linkedin-keys.js';
 import { buildPreview, type ExistingProfile } from '../utils/linkedin-preview.js';
 import type { z } from 'zod';
 
@@ -60,6 +68,8 @@ export class LinkedinImportService {
     @Inject(FILE_STORAGE) private readonly storage: FileStorage | null,
     @Inject(APP_CONFIG) private readonly cfg: AppConfig,
     private readonly dbs: DbService,
+    private readonly sections: SectionService,
+    private readonly skills: SkillsService,
     @InjectPinoLogger(LinkedinImportService.name) private readonly logger: PinoLogger,
   ) {}
 
@@ -199,6 +209,100 @@ export class LinkedinImportService {
     }
     if (mine.size === 0) this.tickets.delete(userId);
     return n;
+  }
+
+  /**
+   * Saves the selected items. Stateless: the items are the preview's, possibly edited, and
+   * were validated again by the request schema like a manual entry. One transaction under
+   * the user lock: per section, items equal to an existing row on the natural key (or to an
+   * earlier item of the request) are skipped and the rest inserted, so a second identical
+   * confirm adds nothing and two concurrent ones give one set of rows. A section over its cap
+   * rolls everything back (409 LIMIT_REACHED). `linkedin.last_synced_at` is set in the same
+   * transaction.
+   */
+  confirm(user: UserRow, body: z.output<typeof linkedinConfirmRequestSchema>) {
+    return inTransaction(this.dbs.db, async (trx) => {
+      await lockUser(trx, user.id);
+      const added = { experience: 0, education: 0, certifications: 0, skills: 0 };
+      const skipped = { ...added };
+
+      const apply = async <TItem extends { id: string }, TInput>(
+        name: 'experience' | 'education' | 'certifications',
+        def: SectionDefinition<TItem, TInput>,
+        items: TInput[],
+        keyOf: (v: TInput) => string | null,
+        stored: (row: TItem) => string | null,
+      ) => {
+        const seen = new Set((await def.list(trx, user.id)).map(stored));
+        const fresh: TInput[] = [];
+        for (const item of items) {
+          const key = keyOf(item);
+          if (key !== null && seen.has(key)) {
+            skipped[name] += 1;
+            continue;
+          }
+          if (key !== null) seen.add(key);
+          fresh.push(item);
+        }
+        // Sections put a new entry first: insert in reverse so the file's order is kept.
+        for (const item of fresh.reverse()) {
+          await this.sections.createIn(trx, def, user.id, item);
+          added[name] += 1;
+        }
+      };
+
+      await apply('experience', experienceSection, body.experience, experienceKey, experienceKey);
+      await apply('education', educationSection, body.education, educationKey, educationKey);
+      await apply(
+        'certifications',
+        certificationSection,
+        body.certifications,
+        certificationKey,
+        certificationKey,
+      );
+
+      const current = (
+        await trx
+          .selectFrom('userSkills')
+          .select('skillName')
+          .where('userId', '=', user.id)
+          .orderBy('sortOrder')
+          .execute()
+      ).map((r) => r.skillName);
+      const have = new Set(current.map(skillKey));
+      const fresh: string[] = [];
+      for (const name of body.skills) {
+        const key = skillKey(name);
+        if (!have.has(key)) {
+          have.add(key);
+          fresh.push(name);
+        }
+      }
+      if (fresh.length > 0) {
+        if (current.length + fresh.length > this.cfg.PROFILE_MAX_SKILLS) {
+          throw new ConflictError(
+            'LIMIT_REACHED',
+            `at most ${this.cfg.PROFILE_MAX_SKILLS} skills are allowed`,
+          );
+        }
+        const after = await this.skills.replaceIn(trx, user.id, [...current, ...fresh]);
+        added.skills = after.length - current.length;
+      }
+      skipped.skills = body.skills.length - added.skills;
+
+      await trx
+        .insertInto('integrations')
+        .values({
+          id: newId(),
+          userId: user.id,
+          integrationType: 'linkedin',
+          lastSyncedAt: new Date(),
+        })
+        .onDuplicateKeyUpdate({ lastSyncedAt: new Date() })
+        .execute();
+
+      return { added, skipped };
+    });
   }
 
   private async discard(storage: FileStorage, key: string): Promise<void> {

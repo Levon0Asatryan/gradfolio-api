@@ -4,6 +4,7 @@ import { RateBudget } from '../rate-limit/decorators/rate-budget.decorator.js';
 import { CurrentUser } from '../users/decorators/current-user.decorator.js';
 import type { UserRow } from '../users/repositories/user.repository.js';
 import {
+  linkedinConfirmRequestSchema,
   linkedinPreviewRequestSchema,
   linkedinUploadRequestSchema,
 } from './dto/linkedin-import.dto.js';
@@ -37,5 +38,15 @@ export class LinkedinImportController {
     body: ReturnType<typeof linkedinPreviewRequestSchema.parse>,
   ) {
     return this.linkedin.preview(user, body);
+  }
+
+  @Post('confirm')
+  @HttpCode(200)
+  confirm(
+    @CurrentUser() user: UserRow,
+    @Body(zodBody(linkedinConfirmRequestSchema))
+    body: ReturnType<typeof linkedinConfirmRequestSchema.parse>,
+  ) {
+    return this.linkedin.confirm(user, body);
   }
 }
