@@ -3,6 +3,8 @@
  * `GcsFileStorage` is the production implementation; tests use an in-memory one
  * with the same preconditions (src/testing/fake-storage.ts).
  */
+import type { Readable } from 'node:stream';
+
 export interface ObjectInfo {
   size: number;
   contentType: string;
@@ -42,6 +44,11 @@ export interface FileStorage {
   stat(key: string): Promise<ObjectInfo | null>;
   /** The first `bytes` bytes of the object. */
   readHead(key: string, bytes: number): Promise<Buffer>;
+  /**
+   * Bytes `start` (inclusive) to `end` (exclusive) of the object, streamed. For random access
+   * into a ZIP; a read error surfaces as the stream's error.
+   */
+  openRange(key: string, start: number, end: number): Readable;
   /**
    * Marks the object registered, only if it is still exactly the version that
    * was validated (same bytes, same metadata). `false`: someone changed it first

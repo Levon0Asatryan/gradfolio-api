@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import { uploadHeaders } from '../core/storage/upload-headers.js';
 import type { FileStorage, ObjectInfo, SignedUpload } from '../core/storage/file-storage.js';
 
@@ -99,6 +100,38 @@ export class FakeFileStorage implements FileStorage {
 
   readHead(key: string, bytes: number) {
     return Promise.resolve(this.objects.get(key)?.body.subarray(0, bytes) ?? Buffer.alloc(0));
+  }
+
+  /** Test seam: a ranged read fails after this many calls (storage down mid-read). */
+  failRangeAfter: number | undefined;
+  rangeReads = 0;
+  /** Test seam: ranged reads wait for this promise, to hold a preview in flight. */
+  rangeGate: Promise<void> | undefined;
+  /** Bytes served by ranged reads, to show a bomb is refused before it is inflated. */
+  rangeBytes = 0;
+
+  openRange(key: string, start: number, end: number) {
+    this.rangeReads++;
+    if (this.failRangeAfter !== undefined && this.rangeReads > this.failRangeAfter) {
+      return new Readable({
+        read() {
+          this.destroy(new Error('storage read failed (injected)'));
+        },
+      });
+    }
+    const body = this.objects.get(key)?.body ?? Buffer.alloc(0);
+    const slice = body.subarray(start, end);
+    this.rangeBytes += slice.length;
+    const gate = this.rangeGate;
+    if (gate === undefined) return Readable.from([slice]);
+    return new Readable({
+      read() {
+        void gate.then(() => {
+          this.push(slice);
+          this.push(null);
+        });
+      },
+    });
   }
 
   async claim(key: string, version: { generation: string; metageneration: string }, label: string) {
