@@ -156,6 +156,26 @@ describe('POST /v1/me/imports/linkedin/uploads', () => {
     await http.post('/v1/me/imports/linkedin/uploads').set(me.auth).send({ size: 100 }).expect(201);
   });
 
+  it('counts tickets not yet uploaded: they cannot be collected past the cap', async () => {
+    const http = await start({ IMPORT_MAX_PENDING: '2' });
+    const me = await member('me');
+    const other = await member('other');
+    const ask = (who: Who) =>
+      http.post('/v1/me/imports/linkedin/uploads').set(who.auth).send({ size: 100 });
+    // concurrent requests see each other
+    const results = await Promise.all([ask(me), ask(me), ask(me)]);
+    expect(results.map((r) => r.status).sort()).toEqual([201, 201, 409]);
+    expect((await ask(me)).status).toBe(409);
+    expect((await ask(other)).status).toBe(201);
+    // a ticket whose upload then arrives is counted once, not twice
+    const ticket = results.find((r) => r.status === 201)!;
+    expect(storage.putSigned(ticket.body as never, Buffer.alloc(100))).toBe(200);
+    expect((await ask(me)).status).toBe(409);
+    // a preview frees its slot
+    await preview(http, me, (ticket.body as { uploadId: string }).uploadId);
+    expect((await ask(me)).status).toBe(201);
+  });
+
   it('answers 503 STORAGE_UNAVAILABLE without a bucket, and 401 without a token', async () => {
     const http = await start({}, false);
     const me = await member('me');

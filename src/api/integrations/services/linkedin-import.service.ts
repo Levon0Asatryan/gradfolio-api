@@ -49,6 +49,12 @@ const BUSY_RETRY_AFTER_S = '5';
 export class LinkedinImportService {
   /** Previews running in this process (one API process, Q9). */
   private running = 0;
+  /**
+   * Tickets signed and not yet seen as an object, per user: upload id -> expiry (ms). A
+   * ticket creates nothing in the bucket until the browser PUTs, so the listing alone would
+   * let a client collect tickets past IMPORT_MAX_PENDING. One API process (Q9).
+   */
+  private readonly tickets = new Map<string, Map<string, number>>();
 
   constructor(
     @Inject(FILE_STORAGE) private readonly storage: FileStorage | null,
@@ -75,16 +81,28 @@ export class LinkedinImportService {
       throw new AppError('IMPORT_TOO_LARGE', 'the export is too large', 413);
     }
     const cap = this.cfg.IMPORT_MAX_PENDING;
-    if ((await storage.list(importPrefix(user.id), cap)).length >= cap) {
+    const listed = await storage.list(importPrefix(user.id), cap);
+    // No await between the count and the reservation: concurrent requests see each other.
+    const owed = this.outstanding(user.id, new Set(listed.map((o) => o.key)));
+    if (listed.length + owed >= cap) {
       throw new ConflictError('LIMIT_REACHED', `at most ${cap} uploads may wait for a preview`);
     }
     const uploadId = randomUUID();
-    const signed = await storage.signUpload({
-      key: importKey(user.id, uploadId),
-      contentType: IMPORT_ZIP_TYPE,
-      size: body.size,
-      ttlS: this.cfg.UPLOAD_URL_TTL_S,
-    });
+    const ttlMs = this.cfg.UPLOAD_URL_TTL_S * 1000;
+    const mine = this.tickets.get(user.id) ?? new Map<string, number>();
+    mine.set(uploadId, Date.now() + ttlMs);
+    this.tickets.set(user.id, mine);
+    const signed = await storage
+      .signUpload({
+        key: importKey(user.id, uploadId),
+        contentType: IMPORT_ZIP_TYPE,
+        size: body.size,
+        ttlS: this.cfg.UPLOAD_URL_TTL_S,
+      })
+      .catch((err: unknown) => {
+        mine.delete(uploadId);
+        throw err;
+      });
     return {
       uploadId,
       uploadUrl: signed.url,
@@ -103,6 +121,7 @@ export class LinkedinImportService {
   async preview(user: UserRow, body: z.output<typeof linkedinPreviewRequestSchema>) {
     const storage = this.requireStorage();
     const key = importKey(user.id, body.uploadId);
+    this.tickets.get(user.id)?.delete(body.uploadId);
 
     const info = await storage.stat(key);
     if (info === null) throw new AppError('IMPORT_UPLOAD_MISSING', 'no such upload', 404);
@@ -148,6 +167,20 @@ export class LinkedinImportService {
       this.running -= 1;
       await this.discard(storage, key);
     }
+  }
+
+  /** Unexpired tickets of this user whose object is not in the listing yet. */
+  private outstanding(userId: string, present: Set<string>): number {
+    const mine = this.tickets.get(userId);
+    if (mine === undefined) return 0;
+    const now = Date.now();
+    let n = 0;
+    for (const [id, expires] of mine) {
+      if (expires <= now || present.has(importKey(userId, id))) mine.delete(id);
+      else n += 1;
+    }
+    if (mine.size === 0) this.tickets.delete(userId);
+    return n;
   }
 
   private async discard(storage: FileStorage, key: string): Promise<void> {
