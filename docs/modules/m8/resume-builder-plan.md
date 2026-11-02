@@ -55,11 +55,33 @@ Reader opens `resume-builder.ts` to see *what goes in* (sections/entries in orde
 
 Keep out of this PR. (A) is its prerequisite: saved CVs/per-CV order/templates all produce a `ResumeData` through the builder and pick a `ResumeTemplate`. T28 already recommends live-view-plus-overrides; (A) does not constrain that. Levon still decides v1.0 scope; this plan changes nothing in tracker 8.9 except noting (A) as a prerequisite slice.
 
-Cheap (A+) option if Levon wants something visible: a second template (`compact`, single column, smaller type) selectable internally, and a **dev-only preview script** (`npm run resume:sample`) that renders a fixture to a file so people can see the output without a profile. Needs his OK; adds an npm script.
+A second template and a sample-render script were considered and **declined** (user, 2026-11-02).
 
 ## 5. Claude Design role
 
-Claude Design (design artifact / design system) is **not** a build dependency for the API. Use it for the *visual spec* of templates and, later, the (B) editor UI: it produces the look (type scale, colours, spacing, A4 mock) that a developer transcribes into a `ResumeTemplate` token table. Proposed order: (1) mock "classic" and one new template in Claude Design at A4, three scripts; (2) copy the numbers into template files. Unverified: whether the team has a Claude Design design system for Gradfolio; ask the user. PDFKit cannot import designs directly — transcription is manual.
+Found in the docs: the Claude Design prototype Levon approved on 2026-10-05
+(https://claude.ai/artifact/XR1nnxZ2niPcyDBADdDgFU, the UI acceptance spec, tracker "UI track"),
+and its code form in the frontend: `gradfolio/src/components/theme/tokens.ts`, written up in
+`gradfolio/docs/ui-plan.md` (palette C calm; Nunito + Noto Sans Armenian; contrast asserted by
+`tokens.test.ts`). The artifact has no résumé/PDF screen (read 2026-11-02; its page shows only
+preview controls), so the frontend tokens file is the source to copy from.
+
+Role in this refactor:
+
+- `ResumeTemplate` names its colour tokens after the design system's roles (`text`,
+  `textSecondary`, `primary`, `secondary`) instead of the current anonymous hex values, and
+  `classic.template.ts` notes the matching `tokens.ts` entry for each one. Then a template can
+  follow the design system by changing values, not code.
+- Today's PDF colours are **not** palette C: `#14334a` / `#253348` / `#536475` / teal `#126677`
+  vs light `text #1E293B`, `secondary text #516072`, `primary #2D4E8A`. Fonts also differ:
+  DejaVu Sans in the PDF, Nunito + Noto Sans Armenian in the UI.
+- **Decision needed (D1):** (a) keep today's colours exactly, so the refactor stays provably
+  output-identical, or (b) switch `classic` to palette C light colours in the same PR (text and
+  links identical; only the colours change, all already ≥ 4.5:1 on white per `ui-plan.md`).
+  Recommended: **(b)**, as a separate commit after the output-identical refactor, so each step
+  is reviewable alone.
+- Fonts stay DejaVu Sans: changing to Nunito + Noto Sans Armenian means bundling two more
+  licensed TTFs and redoing the three-script glyph check (M8 D1). That is out of scope.
 
 ## 6. Tests and proof (Phase 2/3 will do)
 
@@ -72,16 +94,25 @@ Claude Design (design artifact / design system) is **not** a build dependency fo
 ## 7. PR breakdown
 
 1. This plan (docs PR, one review round, then merge).
-2. Implementation PR: builder + template + renderer refactor + tests (single coherent chunk).
-(A+) a third PR only if approved.
+2. Implementation PR: builder + template + renderer refactor + tests (single coherent chunk;
+   palette C colours as its last commit if D1 = b).
 
-## 8. Open questions for Levon / user
+## 8. Answers and open questions
 
-1. Is (A) what "builder" meant, or should this task start (B)/T28?
-2. Want the second template + sample-render script now (A+)?
-3. Does a Claude Design design system for Gradfolio exist? Share the link.
-4. Auth0 tenant details for the real-run phase.
+Answered by the user, 2026-11-02:
+
+1. "Builder" means the code-level refactor (A). (B) stays with T28 and Levon.
+2. No second template, no sample script.
+3. Claude Design: the approved prototype and `tokens.ts`, as in §5.
+
+Open:
+
+- D1 in §5: keep today's colours, or palette C.
+- Auth0 tenant details for the real run: waiting on Levon. Until then, Phase 3 relies on the
+  integration suite's local JWKS tokens (`src/testing/jwks.ts`), which run the real endpoint
+  over HTTP.
 
 ## 9. Not verified
 
-Integration test and real HTTP run; PDFKit version behaviour beyond the existing unit tests; any Claude Design capability (not opened).
+Integration test and real HTTP run; PDFKit behaviour beyond the existing unit tests. The
+Claude Design artifact was read only as a summary (no token values visible there).
