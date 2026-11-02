@@ -7,7 +7,7 @@ Related: tracker 8.9 and [M8-T28](tasks/M8-T28-cv-builder-plan.md) (product-leve
 
 Levon: the PDF works, but it is hard to see how and what is inside; "put a builder in place".
 Reading used here: **(A)** a code-level Builder — make generation understandable and extensible.
-**(B)** the product CV builder (8.9) stays a separate, later decision. *To confirm with Levon/user:* is (A) what he meant?
+**(B)** the product CV builder (8.9) stays a separate, later decision. _To confirm with Levon/user:_ is (A) what he meant?
 
 ## 2. Investigation (run on `main` @ f5b6a6e)
 
@@ -21,7 +21,7 @@ Reading used here: **(A)** a code-level Builder — make generation understandab
   4. content rules (url printed once as link if `text === url`).
 - Repository assembles blocks with an `add(key, entries)` closure — the "builder" already half-exists there, implicitly.
 - Only `resume.service.ts` and tests import `renderResume`. Small blast radius.
-- Hidden-behaviour guards that tests pin and a refactor must keep: time budget checked before *and* after each text op; page cap via `pageAdded`; byte cap with `doc.destroy()`; URL de-dup; Armenian/Cyrillic/Latin glyphs.
+- Hidden-behaviour guards that tests pin and a refactor must keep: time budget checked before _and_ after each text op; page cap via `pageAdded`; byte cap with `doc.destroy()`; URL de-dup; Armenian/Cyrillic/Latin glyphs.
 
 ## 3. Proposal (A): split into model → builder → renderer
 
@@ -35,21 +35,22 @@ snapshotResume (DB)  ──►  ResumeBuilder  ──►  ResumeData  ──► 
 
 Files (feature module `src/api/resume/`, role folders per CLAUDE.md):
 
-| File | Role |
-| --- | --- |
-| `utils/resume-builder.ts` | `ResumeBuilder`: fluent steps; skips empty sections (replaces repository `add` closure); enforces `resumeUrl` validation and the "url == text" rule in one place; `build(): ResumeData`. Pure, no I/O. |
-| `utils/resume-data.ts` | keeps `ResumeData`, labels, `resumeUrl` (unchanged). |
-| `templates/resume-template.ts` | `ResumeTemplate` interface = tokens only: page size, margin, fonts, per-role `{size,color}`, spacing, break thresholds. |
-| `templates/classic.template.ts` | today's look, values lifted verbatim → **byte-for-byte same text/layout** as now. |
-| `utils/render-resume.ts` | `renderResume(data, limits, template = classic)`: keeps limits + PDFKit lifecycle; layout reads the template instead of literals. Public signature stays compatible. |
-| `repositories/resume.repository.ts` | uses `ResumeBuilder` instead of the closure. |
+| File                                | Role                                                                                                                                                                                                   |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `utils/resume-builder.ts`           | `ResumeBuilder`: fluent steps; skips empty sections (replaces repository `add` closure); enforces `resumeUrl` validation and the "url == text" rule in one place; `build(): ResumeData`. Pure, no I/O. |
+| `utils/resume-data.ts`              | keeps `ResumeData`, labels, `resumeUrl` (unchanged).                                                                                                                                                   |
+| `templates/resume-template.ts`      | `ResumeTemplate` interface = tokens only: page size, margin, fonts, per-role `{size,color}`, spacing, break thresholds.                                                                                |
+| `templates/classic.template.ts`     | today's look, values lifted verbatim → **byte-for-byte same text/layout** as now.                                                                                                                      |
+| `utils/render-resume.ts`            | `renderResume(data, limits, template = classic)`: keeps limits + PDFKit lifecycle; layout reads the template instead of literals. Public signature stays compatible.                                   |
+| `repositories/resume.repository.ts` | uses `ResumeBuilder` instead of the closure.                                                                                                                                                           |
 
 Not in this refactor: new endpoints, DB changes, new request fields, a second template exposed over HTTP (`template` is internal until (B) decides). Nothing new to document in `openapi.yaml`/`http/`.
 
-Decision: **no `Renderer` interface for DOCX/HTML** (YAGNI at coursework scale). One renderer, swappable *template*. Revisit only if DOCX is chosen in (B).
+Decision: **no `Renderer` interface for DOCX/HTML** (YAGNI at coursework scale). One renderer, swappable _template_. Revisit only if DOCX is chosen in (B).
 
 ### Why this answers "hard to understand"
-Reader opens `resume-builder.ts` to see *what goes in* (sections/entries in order), `classic.template.ts` to see *how it looks*, `render-resume.ts` to see *limits and PDF plumbing*. Each file < ~80 lines.
+
+Reader opens `resume-builder.ts` to see _what goes in_ (sections/entries in order), `classic.template.ts` to see _how it looks_, `render-resume.ts` to see _limits and PDF plumbing_. Each file < ~80 lines.
 
 ## 4. (B) product CV builder — recommendation
 
