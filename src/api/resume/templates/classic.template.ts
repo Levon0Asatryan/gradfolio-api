@@ -1,9 +1,12 @@
 import type { ResumeTemplate } from './resume-template.js';
 
-/** Single column, A4. */
+/**
+ * Single column, A4. Colours are palette C, light (gradfolio `tokens.ts`): `heading` and `text`
+ * are its `text`, `textSecondary` and `primary` are the same-named tokens.
+ */
 export const classicTemplate: ResumeTemplate = {
   page: { size: 'A4', margin: 48 },
-  colors: { heading: '#14334a', text: '#253348', textSecondary: '#536475', primary: '#126677' },
+  colors: { heading: '#1E293B', text: '#1E293B', textSecondary: '#516072', primary: '#2D4E8A' },
   name: { size: 23, color: 'heading' },
   headline: { size: 12, color: 'textSecondary' },
   sectionTitle: { size: 13, color: 'primary' },
