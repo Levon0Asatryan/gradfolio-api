@@ -1,5 +1,5 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -28,7 +28,7 @@ async function sourceFiles(dir: string): Promise<string[]> {
 }
 
 function layerOf(file: string): string {
-  return relative(SRC, file).split('/')[0] ?? '';
+  return relative(SRC, file).split(sep)[0] ?? '';
 }
 
 const isTest = (file: string) => file.endsWith('.test.ts');
