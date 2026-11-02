@@ -6,7 +6,8 @@ import { experienceSection } from '../../profiles/repositories/experience.reposi
 import { findVisibleUser } from '../../profiles/repositories/profile.repository.js';
 import { listSkills } from '../../profiles/repositories/skill.repository.js';
 import type { ResumeRequest } from '../dto/resume.dto.js';
-import { RESUME_LABELS, type ResumeData, resumeUrl } from '../utils/resume-data.js';
+import { ResumeBuilder, type ResumeEntryInput } from '../utils/resume-builder.js';
+import { RESUME_LABELS, type ResumeData } from '../utils/resume-data.js';
 
 export async function snapshotResume(
   db: Database,
@@ -24,19 +25,16 @@ export async function snapshotResume(
       const user = await findVisibleUser(trx, userId, userId);
       if (!user) throw new NotFoundError('profile');
       const labels = RESUME_LABELS[input.language];
-      const data: ResumeData = { name: user.name, headline: user.headline, blocks: [] };
-      const add = (key: keyof typeof labels, entries: ResumeData['blocks'][number]['entries']) => {
-        if (entries.length) data.blocks.push({ title: labels[key], entries });
-      };
+      const resume = new ResumeBuilder(user.name, user.headline);
+      const add = (key: keyof typeof labels, entries: readonly ResumeEntryInput[]) =>
+        resume.section(labels[key], entries);
       const selected = new Set(input.sections);
       if (selected.has('contact')) {
-        const entries: ResumeData['blocks'][number]['entries'] = [];
+        const entries: ResumeEntryInput[] = [];
         if (user.contactEmail) entries.push({ text: user.contactEmail });
         if (user.location) entries.push({ text: user.location });
-        for (const value of [user.website, user.github, user.linkedin, user.twitter]) {
-          const url = resumeUrl(value);
-          if (url) entries.push({ text: url, url });
-        }
+        for (const link of [user.website, user.github, user.linkedin, user.twitter])
+          entries.push({ link });
         add('contact', entries);
       }
       if (selected.has('bio') && user.bio) add('bio', [{ text: user.bio }]);
@@ -105,7 +103,7 @@ export async function snapshotResume(
           projects.map((p) => ({
             title: p.title,
             text: p.summary ?? '',
-            url: resumeUrl(p.liveDemoUrl) ?? resumeUrl(p.repoUrl),
+            urls: [p.liveDemoUrl, p.repoUrl],
           })),
         );
       }
@@ -119,9 +117,9 @@ export async function snapshotResume(
           (await certificationSection.list(trx, userId)).map((c) => ({
             title: c.name,
             text: `${c.issuer} · ${c.date}`,
-            url: resumeUrl(c.credentialUrl),
+            urls: [c.credentialUrl],
           })),
         );
-      return data;
+      return resume.build();
     });
 }

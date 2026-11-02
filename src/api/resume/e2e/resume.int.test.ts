@@ -90,6 +90,41 @@ describe('resume authorization and selection', () => {
     ).rejects.toMatchObject({ status: 404 });
   });
 
+  it('links safe URLs only: contact links once, a project to its demo, else its repository, a certificate to its credential', async () => {
+    const { user } = await createProfile(db, {
+      contactEmail: 'ani@example.com',
+      website: 'https://ani.example',
+      github: 'javascript:alert(1)',
+    });
+    await createProject(db, user, { title: 'Repo only', repoUrl: 'https://repo.example/a' });
+    await createProject(db, user, {
+      title: 'Both',
+      liveDemoUrl: 'https://demo.example/b',
+      repoUrl: 'https://repo.example/b',
+    });
+    await db
+      .updateTable('certifications')
+      .set({ credentialUrl: 'https://cert.example/1' })
+      .where('userId', '=', user.id)
+      .execute();
+    const data = await app
+      .get(ResumeService)
+      .snapshot(
+        user.id,
+        resumeRequestSchema.parse({ sections: ['contact', 'projects', 'certifications'] }),
+      );
+    const [contact, projects, certifications] = data.blocks;
+    expect(contact?.entries).toEqual([
+      { text: 'ani@example.com', url: undefined },
+      { text: 'https://ani.example/', url: 'https://ani.example/' },
+    ]);
+    expect(Object.fromEntries(projects!.entries.map((e) => [e.title, e.url]))).toEqual({
+      'Repo only': 'https://repo.example/a',
+      Both: 'https://demo.example/b',
+    });
+    expect(certifications?.entries[0]?.url).toBe('https://cert.example/1');
+  });
+
   it('permits accepted public team projects but refuses private team projects', async () => {
     const owner = await createUser(db);
     const member = await createUser(db);
