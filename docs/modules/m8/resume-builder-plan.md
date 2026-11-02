@@ -76,11 +76,10 @@ Role in this refactor:
 - Today's PDF colours are **not** palette C: `#14334a` / `#253348` / `#536475` / teal `#126677`
   vs light `text #1E293B`, `secondary text #516072`, `primary #2D4E8A`. Fonts also differ:
   DejaVu Sans in the PDF, Nunito + Noto Sans Armenian in the UI.
-- **Decision needed (D1):** (a) keep today's colours exactly, so the refactor stays provably
-  output-identical, or (b) switch `classic` to palette C light colours in the same PR (text and
-  links identical; only the colours change, all already ≥ 4.5:1 on white per `ui-plan.md`).
-  Recommended: **(b)**, as a separate commit after the output-identical refactor, so each step
-  is reviewable alone.
+- **D1, decided (user, 2026-11-02): palette C.** `classic` switches to palette C light colours
+  (text and links identical; only the colours change, all already ≥ 4.5:1 on white per
+  `ui-plan.md`), as a separate commit after the output-identical refactor, so each step is
+  reviewable alone. Options weighed: (a) keep today's colours; (b) palette C.
 - Fonts stay DejaVu Sans: changing to Nunito + Noto Sans Armenian means bundling two more
   licensed TTFs and redoing the three-script glyph check (M8 D1). That is out of scope.
 
@@ -96,7 +95,7 @@ Role in this refactor:
 
 1. This plan (docs PR, one review round, then merge).
 2. Implementation PR: builder + template + renderer refactor + tests (single coherent chunk;
-   palette C colours as its last commit if D1 = b).
+   palette C colours as its last commit, per D1).
 
 ## 8. Answers and open questions
 
@@ -108,7 +107,6 @@ Answered by the user, 2026-11-02:
 
 Open:
 
-- D1 in §5: keep today's colours, or palette C.
 - Auth0 tenant details for the real run: waiting on Levon. Until then, Phase 3 relies on the
   integration suite's local JWKS tokens (`src/testing/jwks.ts`), which run the real endpoint
   over HTTP.
