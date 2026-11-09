@@ -144,3 +144,77 @@ describe('resume authorization and selection', () => {
     await http.post('/v1/me/resume').set(auth).send({ sections: [] }).expect(429);
   });
 });
+
+describe('resume order', () => {
+  const titles = (data: { blocks: { title: string }[] }) => data.blocks.map((b) => b.title);
+
+  it('prints sections in the order the client sent, and skips an empty one', async () => {
+    const { user } = await createProfile(db, { bio: 'About me' });
+    const service = app.get(ResumeService);
+    const snapshot = (sections: string[]) =>
+      service.snapshot(user.id, resumeRequestSchema.parse({ sections }));
+    expect(titles(await snapshot(['skills', 'bio', 'education']))).toEqual([
+      'Skills',
+      'About',
+      'Education',
+    ]);
+    expect(titles(await snapshot(['education', 'bio', 'skills']))).toEqual([
+      'Education',
+      'About',
+      'Skills',
+    ]);
+    // 'projects' is listed but the user has none: no empty heading, order of the rest kept.
+    expect(titles(await snapshot(['certifications', 'projects', 'contact', 'bio']))).toEqual([
+      'Certifications',
+      'About',
+    ]);
+  });
+
+  it('prints projects in the order of projectIds, not newest first', async () => {
+    const { user } = await createProfile(db);
+    const [a, b, c] = [
+      await createProject(db, user, { title: 'A', createdAt: new Date('2024-01-01T00:00:00Z') }),
+      await createProject(db, user, { title: 'B', createdAt: new Date('2025-01-01T00:00:00Z') }),
+      await createProject(db, user, { title: 'C', createdAt: new Date('2026-01-01T00:00:00Z') }),
+    ];
+    const service = app.get(ResumeService);
+    const snapshot = (projectIds?: string[]) =>
+      service.snapshot(user.id, resumeRequestSchema.parse({ sections: ['projects'], projectIds }));
+    const order = async (ids: string[]) =>
+      (await snapshot(ids)).blocks[0]?.entries.map((e) => e.title);
+    expect(await order([a.project.id, b.project.id, c.project.id])).toEqual(['A', 'B', 'C']);
+    expect(await order([b.project.id, c.project.id, a.project.id])).toEqual(['B', 'C', 'A']);
+    // A subset, in the client's order.
+    expect(await order([c.project.id, a.project.id])).toEqual(['C', 'A']);
+    // No ids: every visible project, newest first (unchanged default).
+    expect((await snapshot()).blocks[0]?.entries.map((e) => e.title)).toEqual(['C', 'B', 'A']);
+  });
+
+  it('keeps the visibility rules when ordering: an id the caller may not print is still 404', async () => {
+    const { user } = await createProfile(db);
+    const other = await createUser(db);
+    const mine = await createProject(db, user, { title: 'Mine' });
+    const theirs = await createProject(db, other, { title: 'Theirs', isPublic: false });
+    await expect(
+      app.get(ResumeService).snapshot(
+        user.id,
+        resumeRequestSchema.parse({
+          sections: ['projects'],
+          projectIds: [theirs.project.id, mine.project.id],
+          includePrivateProjects: true,
+        }),
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('renders the sections in the requested order over HTTP', async () => {
+    await createProfile(db, { auth0Id: 'auth0|resume-order', bio: 'About me' });
+    const auth = { Authorization: `Bearer ${await tenant.sign({ sub: 'auth0|resume-order' })}` };
+    const response = await request(app.getHttpServer())
+      .post('/v1/me/resume')
+      .set(auth)
+      .send({ sections: ['skills', 'bio'] })
+      .expect(200);
+    expect((response.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
+  });
+});

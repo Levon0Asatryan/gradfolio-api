@@ -5,7 +5,7 @@ import { educationSection } from '../../profiles/repositories/education.reposito
 import { experienceSection } from '../../profiles/repositories/experience.repository.js';
 import { findVisibleUser } from '../../profiles/repositories/profile.repository.js';
 import { listSkills } from '../../profiles/repositories/skill.repository.js';
-import type { ResumeRequest } from '../dto/resume.dto.js';
+import type { ResumeRequest, ResumeSection } from '../dto/resume.dto.js';
 import { RESUME_LABELS, type ResumeData, resumeUrl } from '../utils/resume-data.js';
 
 export async function snapshotResume(
@@ -25,8 +25,10 @@ export async function snapshotResume(
       if (!user) throw new NotFoundError('profile');
       const labels = RESUME_LABELS[input.language];
       const data: ResumeData = { name: user.name, headline: user.headline, blocks: [] };
-      const add = (key: keyof typeof labels, entries: ResumeData['blocks'][number]['entries']) => {
-        if (entries.length) data.blocks.push({ title: labels[key], entries });
+      // Sections are built in a fixed order, then emitted in the order the client sent.
+      const built = new Map<ResumeSection, ResumeData['blocks'][number]>();
+      const add = (key: ResumeSection, entries: ResumeData['blocks'][number]['entries']) => {
+        if (entries.length) built.set(key, { title: labels[key], entries });
       };
       const selected = new Set(input.sections);
       if (selected.has('contact')) {
@@ -96,6 +98,11 @@ export async function snapshotResume(
           .orderBy('p.id')
           .limit(maxProjects + 1)
           .execute();
+        // Explicit ids: the client's order wins. Without ids: newest first (the query's order).
+        if (input.projectIds) {
+          const rank = new Map(input.projectIds.map((id, i) => [id, i]));
+          projects.sort((a, b) => rank.get(a.id)! - rank.get(b.id)!);
+        }
         if (input.projectIds && projects.length !== input.projectIds.length)
           throw new NotFoundError('project');
         if (projects.length > maxProjects)
@@ -122,6 +129,10 @@ export async function snapshotResume(
             url: resumeUrl(c.credentialUrl),
           })),
         );
+      for (const section of input.sections) {
+        const block = built.get(section);
+        if (block) data.blocks.push(block);
+      }
       return data;
     });
 }
