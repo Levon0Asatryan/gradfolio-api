@@ -26,23 +26,22 @@ Reading used here: **(A)** a code-level Builder — make generation understandab
 ## 3. Proposal (A): split into model → builder → renderer
 
 ```
-snapshotResume (DB)  ──►  ResumeBuilder  ──►  ResumeData  ──►  PdfRenderer(template)  ──►  Buffer
-                          .header(name,headline)               limits + PDFKit I/O
-                          .section(key, title)                 Template = pure style table
-                          .entry({title,text,url})
+snapshotResume (DB)  ──►  ResumeBuilder  ──►  ResumeData  ──►  renderResume(template)  ──►  Buffer
+                          new (name, headline)                 limits + PDFKit I/O
+                          .section(title, entries)             Template = pure style table
                           .build()
 ```
 
 Files (feature module `src/api/resume/`, role folders per CLAUDE.md):
 
-| File                                | Role                                                                                                                                                                                                   |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `utils/resume-builder.ts`           | `ResumeBuilder`: fluent steps; skips empty sections (replaces repository `add` closure); enforces `resumeUrl` validation and the "url == text" rule in one place; `build(): ResumeData`. Pure, no I/O. |
-| `utils/resume-data.ts`              | keeps `ResumeData`, labels, `resumeUrl` (unchanged).                                                                                                                                                   |
-| `templates/resume-template.ts`      | `ResumeTemplate` interface = tokens only: page size, margin, fonts, per-role `{size,color}`, spacing, break thresholds.                                                                                |
-| `templates/classic.template.ts`     | today's look, values lifted verbatim → **byte-for-byte same text/layout** as now.                                                                                                                      |
-| `utils/render-resume.ts`            | `renderResume(data, limits, template = classic)`: keeps limits + PDFKit lifecycle; layout reads the template instead of literals. Public signature stays compatible.                                   |
-| `repositories/resume.repository.ts` | uses `ResumeBuilder` instead of the closure.                                                                                                                                                           |
+| File                                | Role                                                                                                                                                                                                                                                                                                           |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `utils/resume-builder.ts`           | `ResumeBuilder`: header in the constructor, then `.section(title, entries)`; skips empty sections (replaces repository `add` closure); runs `resumeUrl` on every link in one place (`{ link }` prints a URL once as its own text; `urls` picks the first safe candidate); `build(): ResumeData`. Pure, no I/O. |
+| `utils/resume-data.ts`              | keeps `ResumeData`, labels, `resumeUrl` (unchanged).                                                                                                                                                                                                                                                           |
+| `templates/resume-template.ts`      | `ResumeTemplate` interface = tokens only: page size, margin, fonts, per-role `{size,color}`, spacing, break thresholds.                                                                                                                                                                                        |
+| `templates/classic.template.ts`     | today's look, values lifted verbatim → **byte-for-byte same text/layout** as now.                                                                                                                                                                                                                              |
+| `utils/render-resume.ts`            | `renderResume(data, limits, template = classic)`: keeps limits + PDFKit lifecycle; layout reads the template instead of literals. Public signature stays compatible.                                                                                                                                           |
+| `repositories/resume.repository.ts` | uses `ResumeBuilder` instead of the closure.                                                                                                                                                                                                                                                                   |
 
 Not in this refactor: new endpoints, DB changes, new request fields, a second template exposed over HTTP (`template` is internal until (B) decides). Nothing new to document in `openapi.yaml`/`http/`.
 
@@ -50,7 +49,9 @@ Decision: **no `Renderer` interface for DOCX/HTML** (YAGNI at coursework scale).
 
 ### Why this answers "hard to understand"
 
-Reader opens `resume-builder.ts` to see _what goes in_ (sections/entries in order), `classic.template.ts` to see _how it looks_, `render-resume.ts` to see _limits and PDF plumbing_. Each file < ~80 lines.
+Reader opens `resume-builder.ts` to see _what goes in_ (sections/entries in order), `classic.template.ts` to see _how it looks_, `render-resume.ts` to see _limits and PDF plumbing_. Each file under ~100 lines (`render-resume.ts` is the largest, 94).
+
+As built (2026-11-02): the builder takes whole sections rather than one `.entry()` call per line, because each section's entries come from one query; the renderer still prints a URL that is the whole entry once, as a link, and the builder makes that case by setting `text` to the normalized URL.
 
 ## 4. (B) product CV builder — recommendation
 

@@ -2,6 +2,8 @@ import { fileURLToPath } from 'node:url';
 import PDFDocument from 'pdfkit';
 import type { AppConfig } from '../../../core/config/schema.js';
 import { AppError } from '../../../core/errors/app-error.js';
+import { classicTemplate } from '../templates/classic.template.js';
+import type { ResumeTemplate, TextStyle } from '../templates/resume-template.js';
 import type { ResumeData } from './resume-data.js';
 
 type Limits = Pick<
@@ -10,13 +12,20 @@ type Limits = Pick<
 >;
 const font = fileURLToPath(new URL('./fonts/DejaVuSans.ttf', import.meta.url));
 
-/** One font covers all three UI scripts; no remote assets or HTML are processed. */
-export async function renderResume(data: ResumeData, limits: Limits): Promise<Buffer> {
+/**
+ * Draws `data` with `template` and enforces the size, page, byte and time limits.
+ * One font covers all three UI scripts; no remote assets or HTML are processed.
+ */
+export async function renderResume(
+  data: ResumeData,
+  limits: Limits,
+  template: ResumeTemplate = classicTemplate,
+): Promise<Buffer> {
   if ([...JSON.stringify(data)].length > limits.RESUME_MAX_CHARS) throw tooLarge();
   const started = performance.now();
   const doc = new PDFDocument({
-    size: 'A4',
-    margin: 48,
+    size: template.page.size,
+    margin: template.page.margin,
     font,
     bufferPages: true,
     info: { Title: `${data.name} - Resume`, Author: data.name, Creator: 'Gradfolio' },
@@ -42,27 +51,35 @@ export async function renderResume(data: ResumeData, limits: Limits): Promise<Bu
     const checkTime = () => {
       if (performance.now() - started > limits.RESUME_RENDER_TIMEOUT_MS) throw tooLarge();
     };
-    const text = (value: string, size = 10, color = '#253348', url?: string) => {
+    const { spacing, keepWithNext } = template;
+    const text = (value: string, style: TextStyle, url?: string) => {
       checkTime();
-      doc.fontSize(size).fillColor(color).text(value, { lineGap: 3, paragraphGap: 4, link: url });
+      doc
+        .fontSize(style.size)
+        .fillColor(template.colors[style.color])
+        .text(value, { lineGap: spacing.lineGap, paragraphGap: spacing.paragraphGap, link: url });
       checkTime();
     };
-    text(data.name, 23, '#14334a');
-    if (data.headline) text(data.headline, 12, '#536475');
-    doc.moveDown(0.6);
+    const keep = (points: number) => {
+      if (doc.y > doc.page.height - doc.page.margins.bottom - points) doc.addPage();
+    };
+    text(data.name, template.name);
+    if (data.headline) text(data.headline, template.headline);
+    doc.moveDown(spacing.afterHeader);
     for (const block of data.blocks) {
-      if (doc.y > doc.page.height - doc.page.margins.bottom - 70) doc.addPage();
-      text(block.title, 13, '#126677');
-      doc.moveDown(0.25);
+      keep(keepWithNext.section);
+      text(block.title, template.sectionTitle);
+      doc.moveDown(spacing.afterSectionTitle);
       for (const entry of block.entries) {
-        if (doc.y > doc.page.height - doc.page.margins.bottom - 55) doc.addPage();
-        if (entry.title) text(entry.title, 11, '#14334a');
+        keep(keepWithNext.entry);
+        if (entry.title) text(entry.title, template.entryTitle);
+        // A URL that is the whole entry prints once, as a link; otherwise on its own line.
         if (entry.text)
-          text(entry.text, 10, '#253348', entry.text === entry.url ? entry.url : undefined);
-        if (entry.url && entry.url !== entry.text) text(entry.url, 9, '#126677', entry.url);
-        doc.moveDown(0.35);
+          text(entry.text, template.body, entry.text === entry.url ? entry.url : undefined);
+        if (entry.url && entry.url !== entry.text) text(entry.url, template.link, entry.url);
+        doc.moveDown(spacing.afterEntry);
       }
-      doc.moveDown(0.5);
+      doc.moveDown(spacing.afterSection);
     }
     checkTime();
     doc.end();
