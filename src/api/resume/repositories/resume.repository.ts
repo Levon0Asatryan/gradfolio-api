@@ -5,7 +5,7 @@ import { educationSection } from '../../profiles/repositories/education.reposito
 import { experienceSection } from '../../profiles/repositories/experience.repository.js';
 import { findVisibleUser } from '../../profiles/repositories/profile.repository.js';
 import { listSkills } from '../../profiles/repositories/skill.repository.js';
-import type { ResumeRequest } from '../dto/resume.dto.js';
+import type { ResumeRequest, ResumeSection } from '../dto/resume.dto.js';
 import { ResumeBuilder, type ResumeEntryInput } from '../utils/resume-builder.js';
 import { RESUME_LABELS, type ResumeData } from '../utils/resume-data.js';
 
@@ -26,8 +26,10 @@ export async function snapshotResume(
       if (!user) throw new NotFoundError('profile');
       const labels = RESUME_LABELS[input.language];
       const resume = new ResumeBuilder(user.name, user.headline);
-      const add = (key: keyof typeof labels, entries: readonly ResumeEntryInput[]) =>
-        resume.section(labels[key], entries);
+      const built = new Map<ResumeSection, readonly ResumeEntryInput[]>();
+      const add = (key: ResumeSection, entries: readonly ResumeEntryInput[]) => {
+        if (entries.length) built.set(key, entries);
+      };
       const selected = new Set(input.sections);
       if (selected.has('contact')) {
         const entries: ResumeEntryInput[] = [];
@@ -94,6 +96,11 @@ export async function snapshotResume(
           .orderBy('p.id')
           .limit(maxProjects + 1)
           .execute();
+        // Explicit ids: the client's order wins. Without ids: newest first (the query's order).
+        if (input.projectIds) {
+          const rank = new Map(input.projectIds.map((id, i) => [id, i]));
+          projects.sort((a, b) => rank.get(a.id)! - rank.get(b.id)!);
+        }
         if (input.projectIds && projects.length !== input.projectIds.length)
           throw new NotFoundError('project');
         if (projects.length > maxProjects)
@@ -120,6 +127,10 @@ export async function snapshotResume(
             urls: [c.credentialUrl],
           })),
         );
+      for (const section of input.sections) {
+        const entries = built.get(section);
+        if (entries) resume.section(labels[section], entries);
+      }
       return resume.build();
     });
 }

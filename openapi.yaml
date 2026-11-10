@@ -317,7 +317,7 @@ paths:
       tags:
         - resume
       summary: Download a resume PDF from selected sections of your profile
-      description: Private/draft own projects require explicit IDs and includePrivateProjects. Accepted-team projects must be public and published. Login email and internal fields are never included. Projects are sorted newest first (createdAt descending, then ID), regardless of projectIds order. Dedicated PDF budget; no stored copy.
+      description: "Private/draft own projects require explicit IDs and includePrivateProjects. Accepted-team projects must be public and published. Login email and internal fields are never included. Order is significant: sections print in the order of `sections`, and projects in the order of `projectIds`. When projectIds is omitted, every visible project of yours prints, newest first (createdAt descending, then ID). Dedicated PDF budget; no stored copy."
       security:
         - bearerAuth: []
       requestBody:
@@ -7401,6 +7401,7 @@ components:
               - projects
               - skills
               - certifications
+          description: "Sections to print, in print order: the order of this array is the order in the PDF. Only listed sections appear; a listed section with no data is omitted."
         projectIds:
           maxItems: 50
           type: array
@@ -7408,6 +7409,7 @@ components:
             type: string
             format: uuid
             pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          description: "Projects to print, in print order: the order of this array is the order in the Projects section. Omit it to print every visible project of yours, newest first."
         includePrivateProjects:
           default: false
           type: boolean

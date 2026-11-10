@@ -1031,7 +1031,7 @@ export const OPERATIONS: readonly Operation[] = [
     summary: 'Download a resume PDF from selected sections of your profile',
     bearer: true,
     description:
-      'Private/draft own projects require explicit IDs and includePrivateProjects. Accepted-team projects must be public and published. Login email and internal fields are never included. Projects are sorted newest first (createdAt descending, then ID), regardless of projectIds order. Dedicated PDF budget; no stored copy.',
+      'Private/draft own projects require explicit IDs and includePrivateProjects. Accepted-team projects must be public and published. Login email and internal fields are never included. Order is significant: sections print in the order of `sections`, and projects in the order of `projectIds`. When projectIds is omitted, every visible project of yours prints, newest first (createdAt descending, then ID). Dedicated PDF budget; no stored copy.',
     body: resumeRequestSchema,
     responses: {
       '200': {
